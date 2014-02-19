@@ -1,0 +1,5 @@
+package mypipe
+
+class Mypipe {
+
+}
