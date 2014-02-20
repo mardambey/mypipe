@@ -2,7 +2,8 @@ package mypipe
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient
 import com.github.shyiko.mysql.binlog.BinaryLogClient.{ LifecycleListener, EventListener }
-import com.github.shyiko.mysql.binlog.event.Event
+import com.github.shyiko.mysql.binlog.event._
+import com.github.shyiko.mysql.binlog.event.EventType._
 import com.typesafe.config.ConfigFactory
 
 import scala.collection.JavaConverters._
@@ -13,6 +14,7 @@ import scala.concurrent.duration._
 import java.util.logging.{ FileHandler, Level, Logger, ConsoleHandler }
 import scala.collection.mutable
 import scala.concurrent.Await
+import scala.Some
 
 object Log {
   val log = Logger.getLogger(getClass.getName)
@@ -76,20 +78,22 @@ object Log {
 
 trait Producer {
   def queue(event: Event)
+  def queueList(events: List[Event])
   def flush()
 }
 
-trait Mutation {
+abstract class Mutation(event: Event) {
   def execute()
 }
 
-class MockMutation extends Mutation {
+class MockMutation(event: Event) extends Mutation(event) {
   def execute() {
-    Log.info("executing mutation")
+    Log.info(s"executing mutation")
   }
 }
 
 case class Queue(mutation: Mutation)
+case class QueueList(mutations: List[Mutation])
 case object Flush
 
 class CassandraBatchWriter extends Actor {
@@ -103,8 +107,9 @@ class CassandraBatchWriter extends Actor {
       Flush)
 
   def receive = {
-    case Queue(mutation) ⇒ mutations += mutation
-    case Flush           ⇒ sender ! flush()
+    case Queue(mutation)     ⇒ mutations += mutation
+    case QueueList(mutation) ⇒ mutations ++= mutation
+    case Flush               ⇒ sender ! flush()
   }
 
   def flush(): Boolean = {
@@ -130,13 +135,17 @@ case class CassandraProducer extends Producer {
     worker ! Queue(createMutation(event))
   }
 
+  def queueList(events: List[Event]) {
+    worker ! QueueList(events.map(e ⇒ createMutation(e)))
+  }
+
   def flush() {
     val future = worker.ask(Flush)(Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds)
     val result = Await.result(future, Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds).asInstanceOf[Boolean]
   }
 
   def createMutation(event: Event): Mutation = {
-    new MockMutation
+    new MockMutation(event)
   }
 }
 
@@ -148,6 +157,7 @@ object Conf {
   val LOGDIR = conf.getString("mypipe.logdir")
   val SHUTDOWN_FLUSH_WAIT_SECS = conf.getInt("mypipe.shutdown-wait-time-seconds")
   val CASSANDRA_FLUSH_INTERVAL_SECS = conf.getInt("mypipe.cassandra-flush-interval-seconds")
+  val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
 
   try {
     new File(DATADIR).mkdirs()
@@ -192,12 +202,55 @@ object BinlogFilePos {
 
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
+  var transactionInProgress = false
+  val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   val producers = new mutable.HashSet[Producer]()
+  val txQueue = new mutable.ListBuffer[Event]
   val client = new BinaryLogClient(hostname, port, username, password);
+
   client.registerEventListener(new EventListener() {
 
     override def onEvent(event: Event) {
-      producers foreach (p ⇒ p.queue(event))
+
+      val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
+
+      eventType match {
+        case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS |
+          PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS |
+          PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
+          if (groupEventsByTx) {
+            txQueue += event
+          } else {
+            producers foreach (p ⇒ p.queue(event))
+          }
+        }
+
+        case QUERY ⇒ {
+          if (groupEventsByTx) {
+            val queryEventData: QueryEventData = event.getData()
+            val query = queryEventData.getSql()
+            if ("BEGIN".equals(query)) {
+              transactionInProgress = true
+            } else if ("COMMIT".equals(query)) {
+              if (groupEventsByTx) {
+                commit()
+              }
+            }
+          }
+        }
+        case XID ⇒ {
+          if (groupEventsByTx) {
+            commit()
+          }
+        }
+        case _ ⇒ println(s"ignored ${eventType}")
+      }
+    }
+
+    def commit() {
+      producers foreach (p ⇒ p.queueList(txQueue.toList))
+      txQueue.clear
+      transactionInProgress = false
     }
   })
 
