@@ -8,6 +8,7 @@ object ApplicationBuild extends Build {
       version := "0.0.1",
       organization := "mypipe",
       scalaVersion := "2.10.3",
+      fork in run := true,
       resolvers ++= Seq(Resolver.mavenLocal,
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
         "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
