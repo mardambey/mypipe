@@ -229,11 +229,13 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           if (groupEventsByTx) {
             val queryEventData: QueryEventData = event.getData()
             val query = queryEventData.getSql()
-            if ("BEGIN".equals(query)) {
-              transactionInProgress = true
-            } else if ("COMMIT".equals(query)) {
-              if (groupEventsByTx) {
+            if (groupEventsByTx) {
+              if ("BEGIN".equals(query)) {
+                transactionInProgress = true
+              } else if ("COMMIT".equals(query)) {
                 commit()
+              } else if ("ROLLBACK".equals(query)) {
+                rollback()
               }
             }
           }
@@ -245,6 +247,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
         }
         case _ ⇒ println(s"ignored ${eventType}")
       }
+    }
+
+    def rollback() {
+      txQueue.clear
+      transactionInProgress = false
     }
 
     def commit() {
