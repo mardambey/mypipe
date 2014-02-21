@@ -77,18 +77,30 @@ object Log {
 }
 
 trait Producer {
-  def queue(event: Event)
-  def queueList(events: List[Event])
+  def queue(mutation: Mutation)
+  def queueList(mutation: List[Mutation])
   def flush()
 }
 
-abstract class Mutation(event: Event) {
+abstract class Mutation(val event: Event) {
   def execute()
 }
 
-class MockMutation(event: Event) extends Mutation(event) {
+case class InsertMutation(override val event: Event) extends Mutation(event) {
   def execute() {
-    Log.info(s"executing mutation")
+    Log.info(s"executing insert mutation")
+  }
+}
+
+case class UpdateMutation(override val event: Event) extends Mutation(event) {
+  def execute() {
+    Log.info(s"executing update mutation")
+  }
+}
+
+case class DeleteMutation(override val event: Event) extends Mutation(event) {
+  def execute() {
+    Log.info(s"executing delete mutation")
   }
 }
 
@@ -131,21 +143,17 @@ case class CassandraProducer extends Producer {
   val system = ActorSystem("mypipe")
   val worker = system.actorOf(Client.props(), "CassandraProducerActor")
 
-  def queue(event: Event) {
-    worker ! Queue(createMutation(event))
+  def queue(mutation: Mutation) {
+    worker ! Queue(mutation)
   }
 
-  def queueList(events: List[Event]) {
-    worker ! QueueList(events.map(e ⇒ createMutation(e)))
+  def queueList(mutations: List[Mutation]) {
+    worker ! QueueList(mutations)
   }
 
   def flush() {
     val future = worker.ask(Flush)(Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds)
     val result = Await.result(future, Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds).asInstanceOf[Boolean]
-  }
-
-  def createMutation(event: Event): Mutation = {
-    new MockMutation(event)
   }
 }
 
@@ -215,13 +223,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
 
       eventType match {
-        case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS |
-          PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS |
-          PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
+        case e: EventType if isMutation(eventType) == true ⇒ {
           if (groupEventsByTx) {
             txQueue += event
           } else {
-            producers foreach (p ⇒ p.queue(event))
+            producers foreach (p ⇒ p.queue(createMutation(event)))
           }
         }
 
@@ -255,7 +261,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
 
     def commit() {
-      producers foreach (p ⇒ p.queueList(txQueue.toList))
+      val mutations = txQueue.map(createMutation(_))
+      producers foreach (p ⇒ p.queueList(mutations.toList))
       txQueue.clear
       transactionInProgress = false
     }
@@ -290,6 +297,21 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   def registerProducer(producer: Producer) {
     producers += producer
+  }
+
+  def isMutation(eventType: EventType): Boolean = eventType match {
+    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS |
+      PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS |
+      PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
+      true
+    }
+    case _ ⇒ false
+  }
+
+  def createMutation(event: Event): Mutation = event.getHeader().asInstanceOf[EventHeader].getEventType() match {
+    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS    ⇒ InsertMutation(event)
+    case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒ UpdateMutation(event)
+    case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ DeleteMutation(event)
   }
 }
 

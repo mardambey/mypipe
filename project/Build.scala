@@ -13,7 +13,8 @@ object ApplicationBuild extends Build {
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
         "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
         "Typesafe Snapshots" at "http://repo.typesafe.com/typesafe/snapshots/",
-        "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/")
+        "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
+        "Twitter Repository" at "http://maven.twttr.com/")
     )
 
   val appDependencies = Seq(
