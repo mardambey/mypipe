@@ -20,7 +20,11 @@ object ApplicationBuild extends Build {
   val appDependencies = Seq(
     "org.specs2" %% "specs2" % "1.13",
     "com.typesafe.akka" %% "akka-actor" % "2.2.3",
-		"com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0-SNAPSHOT"
+		"com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0-SNAPSHOT",
+    "commons-lang" % "commons-lang" % "2.6",
+    "com.netflix.astyanax" % "astyanax-core" % "1.56.48",
+    "com.netflix.astyanax" % "astyanax-thrift" % "1.56.48",
+    "com.netflix.astyanax" % "astyanax-cassandra" % "1.56.48"
   )
 
   lazy val root = Project(id = "mypipe",

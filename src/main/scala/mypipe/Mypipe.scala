@@ -12,9 +12,11 @@ import akka.actor.{ Props, ActorSystem, Actor }
 import akka.pattern.ask
 import scala.concurrent.duration._
 import java.util.logging.{ FileHandler, Level, Logger, ConsoleHandler }
+import java.io.Serializable
 import scala.collection.mutable
 import scala.concurrent.Await
 import scala.Some
+import com.netflix.astyanax.MutationBatch
 
 object Log {
   val log = Logger.getLogger(getClass.getName)
@@ -77,41 +79,56 @@ object Log {
 }
 
 trait Producer {
-  def queue(mutation: Mutation)
-  def queueList(mutation: List[Mutation])
+  def queue(mutation: Mutation[_])
+  def queueList(mutation: List[Mutation[_]])
   def flush()
 }
 
-abstract class Mutation(val event: Event) {
+abstract class Mutation[T](val db: String, val table: String, val rows: T) {
   def execute()
 }
 
-case class InsertMutation(override val event: Event) extends Mutation(event) {
+case class InsertMutation(
+  override val db: String,
+  override val table: String,
+  override val rows: List[Array[Serializable]])
+    extends Mutation[List[Array[Serializable]]](db, table, rows) {
+
   def execute() {
     Log.info(s"executing insert mutation")
   }
 }
 
-case class UpdateMutation(override val event: Event) extends Mutation(event) {
+case class UpdateMutation(
+  override val db: String,
+  override val table: String,
+  override val rows: List[(Array[Serializable], Array[Serializable])])
+    extends Mutation[List[(Array[Serializable], Array[Serializable])]](db, table, rows) {
+
   def execute() {
     Log.info(s"executing update mutation")
   }
 }
 
-case class DeleteMutation(override val event: Event) extends Mutation(event) {
+case class DeleteMutation(
+  override val db: String,
+  override val table: String,
+  override val rows: List[Array[Serializable]])
+    extends Mutation[List[Array[Serializable]]](db, table, rows) {
+
   def execute() {
     Log.info(s"executing delete mutation")
   }
 }
 
-case class Queue(mutation: Mutation)
-case class QueueList(mutations: List[Mutation])
+case class Queue(mutation: Mutation[_])
+case class QueueList(mutations: List[Mutation[_]])
 case object Flush
 
 class CassandraBatchWriter extends Actor {
 
   implicit val ec = context.dispatcher
-  val mutations = scala.collection.mutable.ListBuffer[Mutation]()
+  val mutations = scala.collection.mutable.ListBuffer[MutationBatch]()
   val cancellable =
     context.system.scheduler.schedule(Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
       Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
@@ -119,9 +136,9 @@ class CassandraBatchWriter extends Actor {
       Flush)
 
   def receive = {
-    case Queue(mutation)     ⇒ mutations += mutation
-    case QueueList(mutation) ⇒ mutations ++= mutation
-    case Flush               ⇒ sender ! flush()
+    case Queue(mutation)      ⇒ mutations += map(mutation)
+    case QueueList(mutationz) ⇒ mutations += map(mutationz)
+    case Flush                ⇒ sender ! flush()
   }
 
   def flush(): Boolean = {
@@ -132,22 +149,58 @@ class CassandraBatchWriter extends Actor {
     true
   }
 
+  def map(mutation: Mutation[_]): MutationBatch = {
+    map(mutation, null)
+    null
+  }
+
+  def map(mutations: List[Mutation[_]]): MutationBatch = {
+    mutations.foreach(m ⇒ map(m, null))
+    null
+  }
+
+  def map(mutation: Mutation[_], mutationBatch: MutationBatch) {
+
+    mutation match {
+
+      case i: InsertMutation ⇒ {
+        i.rows.foreach(row ⇒ {
+          println(s"""InsertMutation: row=${row.getClass.getSimpleName} values=${row.mkString(",")}""")
+        })
+      }
+
+      case u: UpdateMutation ⇒ {
+        u.rows.foreach(row ⇒ {
+          val old = row._1
+          val cur = row._2
+
+          println(s"""UpdateMutation: old=${old.mkString(",")}, cur=${cur.mkString(",")}""")
+        })
+      }
+
+      case d: DeleteMutation ⇒ {
+        d.rows.foreach(row ⇒ {
+          println(s"""DeleteMutation: row=${row.getClass.getSimpleName} values=${row.mkString(",")}""")
+        })
+      }
+    }
+  }
 }
 
-object Client {
+object CassandraBatchWriter {
   def props(): Props = Props(classOf[CassandraBatchWriter])
 }
 
 case class CassandraProducer extends Producer {
 
   val system = ActorSystem("mypipe")
-  val worker = system.actorOf(Client.props(), "CassandraProducerActor")
+  val worker = system.actorOf(CassandraBatchWriter.props(), "CassandraBatchWriterActor")
 
-  def queue(mutation: Mutation) {
+  def queue(mutation: Mutation[_]) {
     worker ! Queue(mutation)
   }
 
-  def queueList(mutations: List[Mutation]) {
+  def queueList(mutations: List[Mutation[_]]) {
     worker ! QueueList(mutations)
   }
 
@@ -210,6 +263,7 @@ object BinlogFilePos {
 
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
+  val tablesById = scala.collection.mutable.HashMap[Long, TableMapEventData]()
   var transactionInProgress = false
   val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   val producers = new mutable.HashSet[Producer]()
@@ -223,6 +277,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
 
       eventType match {
+        case TABLE_MAP ⇒ {
+          val tableMapEventData: TableMapEventData = event.getData();
+          tablesById.put(tableMapEventData.getTableId(), tableMapEventData)
+        }
+
         case e: EventType if isMutation(eventType) == true ⇒ {
           if (groupEventsByTx) {
             txQueue += event
@@ -302,16 +361,31 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   def isMutation(eventType: EventType): Boolean = eventType match {
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS |
       PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS |
-      PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
-      true
-    }
+      PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ true
     case _ ⇒ false
   }
 
-  def createMutation(event: Event): Mutation = event.getHeader().asInstanceOf[EventHeader].getEventType() match {
-    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS    ⇒ InsertMutation(event)
-    case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒ UpdateMutation(event)
-    case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ DeleteMutation(event)
+  def createMutation(event: Event): Mutation[_] = event.getHeader().asInstanceOf[EventHeader].getEventType() match {
+    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒ {
+      val evData = event.getData[WriteRowsEventData]()
+      val tableData = tablesById.get(evData.getTableId).get
+      InsertMutation(tableData.getDatabase(), tableData.getTable(), evData.getRows().asScala.toList)
+    }
+
+    case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒ {
+      val evData = event.getData[UpdateRowsEventData]()
+      val tableData = tablesById.get(evData.getTableId).get
+      val rows = evData.getRows().asScala.toList.map(row ⇒ {
+        (row.getKey, row.getValue)
+      })
+
+      UpdateMutation(tableData.getDatabase(), tableData.getTable(), rows)
+    }
+    case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
+      val evData = event.getData[DeleteRowsEventData]()
+      val tableData = tablesById.get(evData.getTableId).get
+      DeleteMutation(tableData.getDatabase(), tableData.getTable(), evData.getRows().asScala.toList)
+    }
   }
 }
 
