@@ -1,7 +1,7 @@
 package mypipe.producer.cassandra
 
 import com.netflix.astyanax.MutationBatch
-import mypipe.producer.{ DeleteMutation, UpdateMutation, InsertMutation }
+import mypipe.api.{ DeleteMutation, UpdateMutation, InsertMutation }
 
 case class KS(keySpace: String, clusterName: String, seeds: String = "127.0.0.1:9160", port: Int = 9160, maxConnsPerHost: Int = 1) {
 

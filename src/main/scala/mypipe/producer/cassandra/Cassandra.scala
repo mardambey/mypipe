@@ -3,13 +3,13 @@ package mypipe.producer.cassandra
 import akka.actor.{ Actor, ActorSystem, Props }
 import akka.pattern.ask
 import scala.concurrent.duration._
-import mypipe.producer._
 import com.netflix.astyanax.MutationBatch
-import mypipe.producer.DeleteMutation
-import mypipe.producer.UpdateMutation
-import mypipe.producer.InsertMutation
 import mypipe.{ Conf, Log }
 import scala.concurrent.Await
+import mypipe.api._
+import mypipe.api.DeleteMutation
+import mypipe.api.UpdateMutation
+import mypipe.api.InsertMutation
 
 case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])
@@ -55,7 +55,7 @@ class CassandraBatchWriter extends Actor {
 
       case i: InsertMutation ⇒ {
         i.rows.foreach(row ⇒ {
-          println(s"""InsertMutation: row=${row.getClass.getSimpleName} values=${row.mkString(",")}""")
+          println(s"InsertMutation: cols=${i.table.columns} values=${row.mkString(",")}")
         })
       }
 
@@ -64,13 +64,13 @@ class CassandraBatchWriter extends Actor {
           val old = row._1
           val cur = row._2
 
-          println(s"""UpdateMutation: old=${old.mkString(",")}, cur=${cur.mkString(",")}""")
+          println(s"UpdateMutation: cols=${u.table.columns} old=${old.mkString(",")}, cur=${cur.mkString(",")}")
         })
       }
 
       case d: DeleteMutation ⇒ {
         d.rows.foreach(row ⇒ {
-          println(s"""DeleteMutation: row=${row.getClass.getSimpleName} values=${row.mkString(",")}""")
+          println(s"DeleteMutation: cols=${d.table.columns} values=${row.mkString(",")}")
         })
       }
     }
