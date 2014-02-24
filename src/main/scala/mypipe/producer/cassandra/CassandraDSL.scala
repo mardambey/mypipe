@@ -1,15 +1,7 @@
-package mypipe.mapper
+package mypipe.producer.cassandra
 
-import scala.collection.JavaConverters._
-import mypipe.{ InsertMutation, UpdateMutation, DeleteMutation, Mutation }
-import com.netflix.astyanax.{ MutationBatch, Keyspace, AstyanaxContext }
-import com.netflix.astyanax.impl.AstyanaxConfigurationImpl
-import com.netflix.astyanax.connectionpool.NodeDiscoveryType
-import com.netflix.astyanax.connectionpool.impl.{ CountingConnectionPoolMonitor, ConnectionPoolConfigurationImpl }
-import com.netflix.astyanax.thrift.ThriftFamilyFactory
-import com.netflix.astyanax.model.ColumnFamily
-import com.netflix.astyanax.serializers.StringSerializer
-import com.github.shyiko.mysql.binlog.event.WriteRowsEventData
+import com.netflix.astyanax.MutationBatch
+import mypipe.producer.{ DeleteMutation, UpdateMutation, InsertMutation }
 
 case class KS(keySpace: String, clusterName: String, seeds: String = "127.0.0.1:9160", port: Int = 9160, maxConnsPerHost: Int = 1) {
 
