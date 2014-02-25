@@ -119,35 +119,43 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
 
     def parseCreateTable(str: String, columnTypes: Array[Byte]): List[ColumnMetadata] = {
-      val parser = new SQLParser
-      // TODO: clean this up, it's an ugly hack that works for now
-      val s = parser.parseStatement(str.replaceAll("""\(\d+\)""", "").replaceAll("AUTO_INCREMENT", "").replaceAll("""\) ENGINE.+""", ")"))
-      val cols = scala.collection.mutable.ListBuffer[ColumnMetadata]()
-      // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
-      var curNode = 0
+      try {
+        val parser = new SQLParser
+        // TODO: clean this up, it's an ugly hack that works for now
+        val sql = str.replaceAll("""int(eger)?\(\d+\)""", "int").replaceAll("AUTO_INCREMENT", "").replaceAll("""\) ENGINE.+""", ")")
+        val s = parser.parseStatement(sql)
+        val cols = scala.collection.mutable.ListBuffer[ColumnMetadata]()
+        // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
+        var curNode = 0
 
-      val v = new Visitor() {
-        override def skipChildren(node: Visitable): Boolean = false
-        override def stopTraversal(): Boolean = false
-        override def visitChildrenFirst(node: Visitable): Boolean = false
-        override def visit(node: Visitable): Visitable = {
+        val v = new Visitor() {
+          override def skipChildren(node: Visitable): Boolean = false
+          override def stopTraversal(): Boolean = false
+          override def visitChildrenFirst(node: Visitable): Boolean = false
+          override def visit(node: Visitable): Visitable = {
 
-          node match {
-            case n: ColumnDefinitionNode ⇒ {
-              val colType = ColumnMetadata.typeByCode(columnTypes(curNode))
-              cols += ColumnMetadata(n.getColumnName, colType)
-              curNode += 1
+            node match {
+              case n: ColumnDefinitionNode ⇒ {
+                val colType = ColumnMetadata.typeByCode(columnTypes(curNode))
+                cols += ColumnMetadata(n.getColumnName, colType)
+                curNode += 1
+              }
+
+              case _ ⇒
             }
 
-            case _ ⇒
+            node
           }
+        }
 
-          node
+        s.accept(v)
+        cols.toList
+      } catch {
+        case e: Exception ⇒ {
+          Log.severe(s"Failed to parse create table for: $str\n${e.getMessage} -> ${e.getStackTraceString}")
+          List.empty[ColumnMetadata]
         }
       }
-
-      s.accept(v)
-      cols.toList
     }
 
     def rollback() {
