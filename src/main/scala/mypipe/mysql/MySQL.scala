@@ -118,11 +118,17 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       cols
     }
 
+    def sanitizeShowCreateTable(str: String): String =
+      // TODO: clean this up, it's an ugly hack that works for now
+      str
+        .replaceAll("""int(eger)?\(\d+\)""", "int")
+        .replaceAll("AUTO_INCREMENT", "")
+        .replaceAll("""\) ENGINE.+""", ")")
+
     def parseCreateTable(str: String, columnTypes: Array[Byte]): List[ColumnMetadata] = {
       try {
         val parser = new SQLParser
-        // TODO: clean this up, it's an ugly hack that works for now
-        val sql = str.replaceAll("""int(eger)?\(\d+\)""", "int").replaceAll("AUTO_INCREMENT", "").replaceAll("""\) ENGINE.+""", ")")
+        val sql = sanitizeShowCreateTable(str)
         val s = parser.parseStatement(sql)
         val cols = scala.collection.mutable.ListBuffer[ColumnMetadata]()
         // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
