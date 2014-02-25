@@ -48,7 +48,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           val tableMapEventData: TableMapEventData = event.getData();
 
           if (!tablesById.contains(tableMapEventData.getTableId)) {
-            val columns = getColumns(tableMapEventData.getDatabase(), tableMapEventData.getTable())
+            val columns = getColumns(tableMapEventData.getDatabase(), tableMapEventData.getTable(), tableMapEventData.getColumnTypes())
             val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns)
             tablesById.put(tableMapEventData.getTableId(), table)
           }
@@ -87,10 +87,10 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
 
     val dbConns = scala.collection.mutable.HashMap[String, Connection]()
-    val dbTableCols = scala.collection.mutable.HashMap[String, List[Column]]()
+    val dbTableCols = scala.collection.mutable.HashMap[String, List[ColumnMetadata]]()
     implicit val ec = ActorSystem("mypipe").dispatcher
 
-    def getColumns(db: String, table: String): List[Column] = {
+    def getColumns(db: String, table: String, columnTypes: Array[Byte]): List[ColumnMetadata] = {
 
       val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
         val dbConn = dbConns.getOrElseUpdate(db, {
@@ -112,17 +112,19 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
         })
 
         val result = Await.result(mapResult, 5 seconds)
-        parseCreateTable(result)
+        parseCreateTable(result, columnTypes)
       })
 
       cols
     }
 
-    def parseCreateTable(str: String): List[Column] = {
+    def parseCreateTable(str: String, columnTypes: Array[Byte]): List[ColumnMetadata] = {
       val parser = new SQLParser
       // TODO: clean this up, it's an ugly hack that works for now
       val s = parser.parseStatement(str.replaceAll("""\(\d+\)""", "").replaceAll("AUTO_INCREMENT", "").replaceAll("""\) ENGINE.+""", ")"))
-      val cols = scala.collection.mutable.ListBuffer[Column]()
+      val cols = scala.collection.mutable.ListBuffer[ColumnMetadata]()
+      // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
+      var curNode = 0
 
       val v = new Visitor() {
         override def skipChildren(node: Visitable): Boolean = false
@@ -132,7 +134,9 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
           node match {
             case n: ColumnDefinitionNode ⇒ {
-              cols += Column(n.getColumnName)
+              val colType = ColumnMetadata.typeByCode(columnTypes(curNode))
+              cols += ColumnMetadata(n.getColumnName, colType)
+              curNode += 1
             }
 
             case _ ⇒
@@ -222,7 +226,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
       // zip the names and values from the table's columns and the row's data and
       // create a map that contains column names to Column objects with values
-      val columns = table.columns.map(c ⇒ c.name).zip(evRow).map(c ⇒ c._1 -> Column(c._1, c._2)).toMap[String, Column]
+      val columns = table.columns.zip(evRow).map(c ⇒ c._1.name -> Column(c._1, c._2)).toMap[String, Column]
 
       Row(table, columns)
 
@@ -234,8 +238,9 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
       // zip the names and values from the table's columns and the row's data and
       // create a map that contains column names to Column objects with values
-      val old = table.columns.map(c ⇒ c.name).zip(evRow.getKey).map(c ⇒ c._1 -> Column(c._1, c._2)).toMap[String, Column]
-      val cur = table.columns.map(c ⇒ c.name).zip(evRow.getValue).map(c ⇒ c._1 -> Column(c._1, c._2)).toMap[String, Column]
+
+      val old = table.columns.zip(evRow.getKey).map(c ⇒ c._1.name -> Column(c._1, c._2)).toMap[String, Column]
+      val cur = table.columns.zip(evRow.getValue).map(c ⇒ c._1.name -> Column(c._1, c._2)).toMap[String, Column]
 
       (Row(table, old), Row(table, cur))
 

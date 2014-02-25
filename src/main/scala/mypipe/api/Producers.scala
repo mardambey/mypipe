@@ -3,6 +3,7 @@ package mypipe.api
 import mypipe.Log
 import java.io.Serializable
 import com.github.shyiko.mysql.binlog.event.TableMapEventData
+import com.github.shyiko.mysql.binlog.event.deserialization.{ ColumnType ⇒ MColumnType }
 
 trait Producer {
   def queue(mutation: Mutation[_])
@@ -10,9 +11,16 @@ trait Producer {
   def flush()
 }
 
-case class Column(name: String, value: Serializable = null)
+object ColumnMetadata {
+  type ColumnType = MColumnType
+
+  def typeByCode(code: Int): ColumnType = MColumnType.byCode(code)
+}
+
+case class ColumnMetadata(name: String, colType: ColumnMetadata.ColumnType)
+case class Column(metadata: ColumnMetadata, value: Serializable = null)
 case class Row(table: Table, columns: Map[String, Column])
-case class Table(id: java.lang.Long, name: String, db: String, evData: TableMapEventData, columns: List[Column])
+case class Table(id: java.lang.Long, name: String, db: String, evData: TableMapEventData, columns: List[ColumnMetadata])
 
 abstract class Mutation[T](val table: Table, val rows: T) {
   def execute()
