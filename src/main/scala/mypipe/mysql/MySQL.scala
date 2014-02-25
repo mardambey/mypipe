@@ -120,6 +120,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
     def parseCreateTable(str: String): List[Column] = {
       val parser = new SQLParser
+      // TODO: clean this up, it's an ugly hack that works for now
       val s = parser.parseStatement(str.replaceAll("""\(\d+\)""", "").replaceAll("AUTO_INCREMENT", "").replaceAll("""\) ENGINE.+""", ")"))
       val cols = scala.collection.mutable.ListBuffer[Column]()
 
@@ -200,23 +201,45 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒ {
       val evData = event.getData[WriteRowsEventData]()
       val table = tablesById.get(evData.getTableId).get
-      InsertMutation(table, evData.getRows().asScala.toList)
+      InsertMutation(table, createRows(table, evData.getRows()))
     }
 
     case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒ {
       val evData = event.getData[UpdateRowsEventData]()
       val table = tablesById.get(evData.getTableId).get
-      val rows = evData.getRows().asScala.toList.map(row ⇒ {
-        (row.getKey, row.getValue)
-      })
-
-      UpdateMutation(table, rows)
+      UpdateMutation(table, createRowsUpdate(table, evData.getRows()))
     }
+
     case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
       val evData = event.getData[DeleteRowsEventData]()
       val table = tablesById.get(evData.getTableId).get
-      DeleteMutation(table, evData.getRows().asScala.toList)
+      DeleteMutation(table, createRows(table, evData.getRows()))
     }
+  }
+
+  protected def createRows(table: Table, evRows: java.util.List[Array[java.io.Serializable]]): List[Row] = {
+    evRows.asScala.map(evRow ⇒ {
+
+      // zip the names and values from the table's columns and the row's data and
+      // create a map that contains column names to Column objects with values
+      val columns = table.columns.map(c ⇒ c.name).zip(evRow).map(c ⇒ c._1 -> Column(c._1, c._2)).toMap[String, Column]
+
+      Row(table, columns)
+
+    }).toList
+  }
+
+  protected def createRowsUpdate(table: Table, evRows: java.util.List[java.util.Map.Entry[Array[java.io.Serializable], Array[java.io.Serializable]]]): List[(Row, Row)] = {
+    evRows.asScala.map(evRow ⇒ {
+
+      // zip the names and values from the table's columns and the row's data and
+      // create a map that contains column names to Column objects with values
+      val old = table.columns.map(c ⇒ c.name).zip(evRow.getKey).map(c ⇒ c._1 -> Column(c._1, c._2)).toMap[String, Column]
+      val cur = table.columns.map(c ⇒ c.name).zip(evRow.getValue).map(c ⇒ c._1 -> Column(c._1, c._2)).toMap[String, Column]
+
+      (Row(table, old), Row(table, cur))
+
+    }).toList
   }
 }
 

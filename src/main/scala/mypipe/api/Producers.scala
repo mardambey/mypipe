@@ -10,7 +10,8 @@ trait Producer {
   def flush()
 }
 
-case class Column(name: String)
+case class Column(name: String, value: Serializable = null)
+case class Row(table: Table, columns: Map[String, Column])
 case class Table(id: java.lang.Long, name: String, db: String, evData: TableMapEventData, columns: List[Column])
 
 abstract class Mutation[T](val table: Table, val rows: T) {
@@ -19,8 +20,8 @@ abstract class Mutation[T](val table: Table, val rows: T) {
 
 case class InsertMutation(
   override val table: Table,
-  override val rows: List[Array[Serializable]])
-    extends Mutation[List[Array[Serializable]]](table, rows) {
+  override val rows: List[Row])
+    extends Mutation[List[Row]](table, rows) {
 
   def execute() {
     Log.info(s"executing insert mutation")
@@ -29,8 +30,8 @@ case class InsertMutation(
 
 case class UpdateMutation(
   override val table: Table,
-  override val rows: List[(Array[Serializable], Array[Serializable])])
-    extends Mutation[List[(Array[Serializable], Array[Serializable])]](table, rows) {
+  override val rows: List[(Row, Row)])
+    extends Mutation[List[(Row, Row)]](table, rows) {
 
   def execute() {
     Log.info(s"executing update mutation")
@@ -39,8 +40,8 @@ case class UpdateMutation(
 
 case class DeleteMutation(
   override val table: Table,
-  override val rows: List[Array[Serializable]])
-    extends Mutation[List[Array[Serializable]]](table, rows) {
+  override val rows: List[Row])
+    extends Mutation[List[Row]](table, rows) {
 
   def execute() {
     Log.info(s"executing delete mutation")

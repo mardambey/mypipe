@@ -55,7 +55,7 @@ class CassandraBatchWriter extends Actor {
 
       case i: InsertMutation ⇒ {
         i.rows.foreach(row ⇒ {
-          println(s"InsertMutation: cols=${i.table.columns} values=${row.mkString(",")}")
+          println(s"InsertMutation: table=${i.table.name} values=$row")
         })
       }
 
@@ -63,14 +63,13 @@ class CassandraBatchWriter extends Actor {
         u.rows.foreach(row ⇒ {
           val old = row._1
           val cur = row._2
-
-          println(s"UpdateMutation: cols=${u.table.columns} old=${old.mkString(",")}, cur=${cur.mkString(",")}")
+          println(s"UpdateMutation: table=${u.table.name} old=$old, cur=$cur")
         })
       }
 
       case d: DeleteMutation ⇒ {
         d.rows.foreach(row ⇒ {
-          println(s"DeleteMutation: cols=${d.table.columns} values=${row.mkString(",")}")
+          println(s"DeleteMutation: table=${d.table.name} values=$row")
         })
       }
     }
