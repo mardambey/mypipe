@@ -15,10 +15,9 @@ case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])
 case object Flush
 
-class CassandraBatchWriter extends Actor {
+class CassandraBatchWriter(mappings: List[Mapping[MutationBatch]]) extends Actor {
 
   implicit val ec = context.dispatcher
-  val mutations = scala.collection.mutable.ListBuffer[MutationBatch]()
   val cancellable =
     context.system.scheduler.schedule(Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
       Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
@@ -26,64 +25,61 @@ class CassandraBatchWriter extends Actor {
       Flush)
 
   def receive = {
-    case Queue(mutation)      ⇒ mutations += map(mutation)
-    case QueueList(mutationz) ⇒ mutations += map(mutationz)
+    case Queue(mutation)      ⇒ map(mutation)
+    case QueueList(mutationz) ⇒ map(mutationz)
     case Flush                ⇒ sender ! flush()
   }
 
   def flush(): Boolean = {
-    Log.warning(s"TODO: flush ${mutations.size} mutations.")
+    Log.info(s"Flush ${CassandraMappings.mutations.size} mutations.")
 
-    // TODO: flush
-    mutations.clear()
+    val results = CassandraMappings.mutations.map(m ⇒ {
+      try {
+        // TODO: use execute async
+        Some(m._2.execute())
+      } catch {
+        case e: Exception ⇒ {
+          Log.severe(s"Could not execute mutation batch: ${e.getMessage} -> ${e.getStackTraceString}")
+          None
+        }
+      }
+    })
+
+    CassandraMappings.mutations.clear()
     true
   }
 
-  def map(mutation: Mutation[_]): MutationBatch = {
-    map(mutation, null)
-    null
+  def map(mutations: List[Mutation[_]]): List[MutationBatch] = {
+    mutations.map(m ⇒ map(m)).flatten
   }
 
-  def map(mutations: List[Mutation[_]]): MutationBatch = {
-    mutations.foreach(m ⇒ map(m, null))
-    null
-  }
-
-  def map(mutation: Mutation[_], mutationBatch: MutationBatch) {
+  def map(mutation: Mutation[_]): List[MutationBatch] = {
 
     mutation match {
 
       case i: InsertMutation ⇒ {
-        i.rows.foreach(row ⇒ {
-          println(s"InsertMutation: table=${i.table.name} values=$row")
-        })
+        mappings.map(m ⇒ m.map(i)).filter(_.isDefined).map(_.get)
       }
 
       case u: UpdateMutation ⇒ {
-        u.rows.foreach(row ⇒ {
-          val old = row._1
-          val cur = row._2
-          println(s"UpdateMutation: table=${u.table.name} old=$old, cur=$cur")
-        })
+        mappings.map(m ⇒ m.map(u)).filter(_.isDefined).map(_.get)
       }
 
       case d: DeleteMutation ⇒ {
-        d.rows.foreach(row ⇒ {
-          println(s"DeleteMutation: table=${d.table.name} values=$row")
-        })
+        mappings.map(m ⇒ m.map(d)).filter(_.isDefined).map(_.get)
       }
     }
   }
 }
 
 object CassandraBatchWriter {
-  def props(): Props = Props(classOf[CassandraBatchWriter])
+  def props(mappings: List[Mapping[MutationBatch]]): Props = Props(new CassandraBatchWriter(mappings))
 }
 
-case class CassandraProducer extends Producer {
+case class CassandraProducer(mappings: List[Mapping[MutationBatch]]) extends Producer {
 
   val system = ActorSystem("mypipe")
-  val worker = system.actorOf(CassandraBatchWriter.props(), "CassandraBatchWriterActor")
+  val worker = system.actorOf(CassandraBatchWriter.props(mappings), "CassandraBatchWriterActor")
 
   def queue(mutation: Mutation[_]) {
     worker ! Queue(mutation)

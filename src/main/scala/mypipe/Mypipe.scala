@@ -1,12 +1,13 @@
 package mypipe
 
-import mypipe.producer.cassandra.CassandraProducer
+import mypipe.producer.cassandra.{ CassandraProfileMapping, CassandraProducer }
 import mypipe.mysql.{ BinlogConsumer, BinlogFilePos, HostPortUserPass }
 import scala.collection.JavaConverters._
 
 object Mypipe extends App {
 
-  val producer = CassandraProducer()
+  val mappings = List(new CassandraProfileMapping())
+  val producer = CassandraProducer(mappings)
 
   val consumers = Conf.sources.asScala.map(
     source ⇒ {
