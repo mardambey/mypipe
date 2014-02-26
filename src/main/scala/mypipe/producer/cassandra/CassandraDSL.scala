@@ -25,6 +25,16 @@ class CassandraProfileMapping extends Mapping[MutationBatch] {
   import CassandraMappings.{ mutation, columnFamily }
   import CassandraMappings.Serializers._
 
+  val wswl = columnFamily(
+    name = "wswl",
+    keySer = STRING,
+    colSer = TIMEUUID)
+
+  val counters = columnFamily(
+    name = "profile_counters",
+    keySer = STRING,
+    colSer = STRING)
+
   def map(mutation: UpdateMutation): Option[MutationBatch] = None
   def map(mutation: DeleteMutation): Option[MutationBatch] = None
 
@@ -38,16 +48,6 @@ class CassandraProfileMapping extends Mapping[MutationBatch] {
         val rowKey = row("profile_id").value.toString
         val time = row("log_time").value.asInstanceOf[Int].toLong
         val timeUUID = TimeUUIDUtils.getTimeUUID(time)
-
-        val wswl = columnFamily(
-          name = "wswl",
-          keySer = STRING,
-          colSer = TIMEUUID)
-
-        val counters = columnFamily(
-          name = "profile_counters",
-          keySer = STRING,
-          colSer = STRING)
 
         val m = mutation("logs")
 
