@@ -9,6 +9,7 @@ import com.netflix.astyanax.connectionpool.NodeDiscoveryType
 import com.netflix.astyanax.connectionpool.impl.{ CountingConnectionPoolMonitor, ConnectionPoolConfigurationImpl }
 import com.netflix.astyanax.thrift.ThriftFamilyFactory
 import com.netflix.astyanax.util.TimeUUIDUtils
+import mypipe.Conf
 
 trait Mapping[T] {
   def map(mutation: InsertMutation): Option[T]
@@ -73,11 +74,10 @@ class CassandraProfileMapping extends Mapping[MutationBatch] {
 
 object CassandraMappings {
 
-  // TODO: get these from the config
-  val clusterName: String = "Test Cluster"
-  val seeds: String = "127.0.0.1:9160"
-  val port: Int = 9160
-  val maxConnsPerHost: Int = 1
+  val CASSANDRA_CLUSTER_NAME = Conf.conf.getString("mypipe.cassandra.cluster.name")
+  val CASSANDRA_SEEDS = Conf.conf.getString("mypipe.cassandra.cluster.seeds")
+  val CASSANDRA_PORT = Conf.conf.getInt("mypipe.cassandra.cluster.port")
+  val CASSANDRA_MAX_CONNS_PER_HOST = Conf.conf.getInt("mypipe.cassandra.cluster.max-conns-per-host")
 
   val keyspaces = scala.collection.mutable.HashMap[String, Keyspace]()
   val columnFamilies = scala.collection.mutable.HashMap[String, ColumnFamily[_, _]]()
@@ -109,14 +109,14 @@ object CassandraMappings {
   protected def createKeyspace(keyspace: String): Keyspace = {
 
     val context: AstyanaxContext[Keyspace] = new AstyanaxContext.Builder()
-      .forCluster(clusterName)
+      .forCluster(CASSANDRA_CLUSTER_NAME)
       .forKeyspace(keyspace)
       .withAstyanaxConfiguration(new AstyanaxConfigurationImpl()
         .setDiscoveryType(NodeDiscoveryType.RING_DESCRIBE))
-      .withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(s"$clusterName-$keyspace-connpool")
-        .setPort(port)
-        .setMaxConnsPerHost(maxConnsPerHost)
-        .setSeeds(seeds))
+      .withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(s"$CASSANDRA_CLUSTER_NAME-$keyspace-connpool")
+        .setPort(CASSANDRA_PORT)
+        .setMaxConnsPerHost(CASSANDRA_MAX_CONNS_PER_HOST)
+        .setSeeds(CASSANDRA_SEEDS))
       .withConnectionPoolMonitor(new CountingConnectionPoolMonitor())
       .buildKeyspace(ThriftFamilyFactory.getInstance())
 

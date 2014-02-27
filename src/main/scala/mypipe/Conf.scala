@@ -8,11 +8,11 @@ object Conf {
 
   val conf = ConfigFactory.load()
   val sources = conf.getStringList("mypipe.sources")
-  val DATADIR = conf.getString("mypipe.datadir")
-  val LOGDIR = conf.getString("mypipe.logdir")
+  val DATADIR = conf.getString("mypipe.data-dir")
+  val LOGDIR = conf.getString("mypipe.log-dir")
   val SHUTDOWN_FLUSH_WAIT_SECS = conf.getInt("mypipe.shutdown-wait-time-seconds")
-  val CASSANDRA_FLUSH_INTERVAL_SECS = conf.getInt("mypipe.cassandra-flush-interval-seconds")
   val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
+  val FLUSH_INTERVAL_SECS = Conf.conf.getInt("mypipe.flush-interval-seconds")
 
   try {
     new File(DATADIR).mkdirs()

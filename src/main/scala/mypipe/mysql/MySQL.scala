@@ -202,8 +202,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   def connect() {
     flusher = Some(system.scheduler.schedule(
-      Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
-      Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds) {
+      Conf.FLUSH_INTERVAL_SECS seconds,
+      Conf.FLUSH_INTERVAL_SECS seconds) {
         producers foreach (p ⇒ p.flush)
         Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition))
       })
