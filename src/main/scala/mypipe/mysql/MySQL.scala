@@ -16,7 +16,7 @@ import mypipe.api.InsertMutation
 import com.github.mauricio.async.db.{ RowData, QueryResult, Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
-import akka.actor.ActorSystem
+import akka.actor.{ Cancellable, ActorSystem }
 
 import com.foundationdb.sql.parser.{ ColumnDefinitionNode, Visitable, SQLParser, Visitor }
 
@@ -36,6 +36,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   val producers = new scala.collection.mutable.HashSet[Producer]()
   val txQueue = new scala.collection.mutable.ListBuffer[Event]
   val client = new BinaryLogClient(hostname, port, username, password)
+
+  val system = ActorSystem("mypipe")
+  implicit val ec = system.dispatcher
+
+  var flusher: Option[Cancellable] = None
 
   client.registerEventListener(new EventListener() {
 
@@ -196,11 +201,18 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   })
 
   def connect() {
+    flusher = Some(system.scheduler.schedule(
+      Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
+      Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds) {
+        producers foreach (p ⇒ p.flush)
+        Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition))
+      })
     client.connect()
   }
 
   def disconnect() {
     client.disconnect()
+    flusher.foreach(_.cancel())
     producers foreach (p ⇒ p.flush)
   }
 

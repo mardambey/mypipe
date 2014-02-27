@@ -17,13 +17,6 @@ case object Flush
 
 class CassandraBatchWriter(mappings: List[Mapping[MutationBatch]]) extends Actor {
 
-  implicit val ec = context.dispatcher
-  val cancellable =
-    context.system.scheduler.schedule(Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
-      Conf.CASSANDRA_FLUSH_INTERVAL_SECS seconds,
-      self,
-      Flush)
-
   def receive = {
     case Queue(mutation)      ⇒ map(mutation)
     case QueueList(mutationz) ⇒ map(mutationz)
