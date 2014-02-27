@@ -18,8 +18,6 @@ import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
 import akka.actor.{ Cancellable, ActorSystem }
 
-import com.foundationdb.sql.parser.{ ColumnDefinitionNode, Visitable, SQLParser, Visitor }
-
 case class BinlogFilePos(filename: String, pos: Long) {
   override def toString(): String = s"$filename:$pos"
 }
@@ -99,71 +97,48 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
       val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
         val dbConn = dbConns.getOrElseUpdate(db, {
-          val configuration = new Configuration(username, hostname, port, Some(password), Some(db))
+          val configuration = new Configuration(username, hostname, port, Some(password), Some("information_schema"))
           val connection: Connection = new MySQLConnection(configuration)
           Await.result(connection.connect, 5 seconds)
           connection
         })
 
-        val future: Future[QueryResult] = dbConn.sendQuery(s"SHOW CREATE TABLE $db.$table")
+        val future: Future[QueryResult] = dbConn.sendQuery(
+          s"""select COLUMN_NAME from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
 
-        val mapResult: Future[String] = future.map(queryResult ⇒ queryResult.rows match {
+        val mapResult: Future[List[String]] = future.map(queryResult ⇒ queryResult.rows match {
           case Some(resultSet) ⇒ {
-            val row: RowData = resultSet.head
-            row(1).asInstanceOf[String]
+            resultSet.map(row ⇒ {
+              row(0).asInstanceOf[String]
+            }).toList
           }
 
-          case None ⇒ ""
+          case None ⇒ List.empty[String]
         })
 
         val result = Await.result(mapResult, 5 seconds)
-        parseCreateTable(result, columnTypes)
+        createColumns(result, columnTypes)
       })
 
       cols
     }
 
-    def sanitizeShowCreateTable(str: String): String =
-      // TODO: clean this up, it's an ugly hack that works for now
-      str
-        .replaceAll("""int(eger)?\(\d+\)""", "int")
-        .replaceAll("AUTO_INCREMENT", "")
-        .replaceAll("""\) ENGINE.+""", ")")
-
-    def parseCreateTable(str: String, columnTypes: Array[Byte]): List[ColumnMetadata] = {
+    def createColumns(columns: List[String], columnTypes: Array[Byte]): List[ColumnMetadata] = {
       try {
-        val parser = new SQLParser
-        val sql = sanitizeShowCreateTable(str)
-        val s = parser.parseStatement(sql)
-        val cols = scala.collection.mutable.ListBuffer[ColumnMetadata]()
         // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
-        var curNode = 0
+        var cur = 0
 
-        val v = new Visitor() {
-          override def skipChildren(node: Visitable): Boolean = false
-          override def stopTraversal(): Boolean = false
-          override def visitChildrenFirst(node: Visitable): Boolean = false
-          override def visit(node: Visitable): Visitable = {
+        val cols = columns.map(colName ⇒ {
+          val colType = ColumnMetadata.typeByCode(columnTypes(cur))
+          cur += 1
+          ColumnMetadata(colName, colType)
+        })
 
-            node match {
-              case n: ColumnDefinitionNode ⇒ {
-                val colType = ColumnMetadata.typeByCode(columnTypes(curNode))
-                cols += ColumnMetadata(n.getColumnName, colType)
-                curNode += 1
-              }
+        cols
 
-              case _ ⇒
-            }
-
-            node
-          }
-        }
-
-        s.accept(v)
-        cols.toList
       } catch {
         case e: Exception ⇒ {
-          Log.severe(s"Failed to parse create table for: $str\n${e.getMessage} -> ${e.getStackTraceString}")
+          Log.severe(s"Failed to determine column names: $columns\n${e.getMessage} -> ${e.getStackTraceString}")
           List.empty[ColumnMetadata]
         }
       }

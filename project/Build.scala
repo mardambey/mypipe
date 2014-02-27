@@ -25,8 +25,7 @@ object ApplicationBuild extends Build {
     "com.netflix.astyanax" % "astyanax-core" % "1.56.48",
     "com.netflix.astyanax" % "astyanax-thrift" % "1.56.48",
     "com.netflix.astyanax" % "astyanax-cassandra" % "1.56.48",
-		"com.github.mauricio" %% "mysql-async" % "0.2.12",
-		"com.foundationdb" % "fdb-sql-parser" % "1.1.0"
+		"com.github.mauricio" %% "mysql-async" % "0.2.12"
   )
 
   lazy val root = Project(id = "mypipe",
