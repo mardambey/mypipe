@@ -105,16 +105,16 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
         })
 
         val future: Future[QueryResult] = dbConn.sendQuery(
-          s"""select COLUMN_NAME from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
+          s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
 
-        val mapResult: Future[List[String]] = future.map(queryResult ⇒ queryResult.rows match {
+        val mapResult: Future[List[(String, Boolean)]] = future.map(queryResult ⇒ queryResult.rows match {
           case Some(resultSet) ⇒ {
             resultSet.map(row ⇒ {
-              row(0).asInstanceOf[String]
+              (row(0).asInstanceOf[String], row(1).equals("PRI"))
             }).toList
           }
 
-          case None ⇒ List.empty[String]
+          case None ⇒ List.empty[(String, Boolean)]
         })
 
         val result = Await.result(mapResult, 5 seconds)
@@ -124,15 +124,17 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       cols
     }
 
-    def createColumns(columns: List[String], columnTypes: Array[Byte]): List[ColumnMetadata] = {
+    def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {
       try {
         // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
         var cur = 0
 
-        val cols = columns.map(colName ⇒ {
+        val cols = columns.map(c ⇒ {
+          val colName = c._1
+          val isPrimaryKey = c._2
           val colType = ColumnMetadata.typeByCode(columnTypes(cur))
           cur += 1
-          ColumnMetadata(colName, colType)
+          ColumnMetadata(colName, colType, isPrimaryKey)
         })
 
         cols
