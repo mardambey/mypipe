@@ -45,6 +45,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     override def onEvent(event: Event) {
 
       val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
+      println(event)
 
       eventType match {
         case TABLE_MAP ⇒ {

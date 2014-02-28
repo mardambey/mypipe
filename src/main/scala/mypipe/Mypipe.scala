@@ -9,24 +9,31 @@ object Mypipe extends App {
 
   val producers: List[Producer] = Conf.PRODUCERS.map(kv ⇒ {
     val name = kv._1
-    val value = kv._2
     Log.info(s"Loading configuration for producers $name")
 
     val conf = Conf.conf.getConfig(s"mypipe.producers.$name")
     val clazz = conf.getString("class")
-    val mappings = conf.getStringList("mappings")
+    val enabled = if (conf.hasPath("enabled")) conf.getBoolean("enabled") else true
 
-    Log.info(s"  $clazz requires the following mappings: $mappings")
+    if (enabled) {
+      val mappings = if (conf.hasPath("mappings")) conf.getStringList("mappings").asScala else List[String]()
 
-    try {
-      val m = mappings.asScala.map(mappingClass ⇒ Class.forName(mappingClass).newInstance()).toList
-      val producer = Class.forName(clazz).getConstructor(classOf[List[Mapping]]).newInstance(m)
-      producer
-    } catch {
-      case e: Exception ⇒ {
-        Log.severe(s"Failed to configure producer $name: ${e.getMessage}\n${e.getStackTraceString}")
-        null
+      Log.info(s"  $clazz requires the following mappings: $mappings")
+
+      try {
+        val m = mappings.map(mappingClass ⇒ Class.forName(mappingClass).newInstance()).toList
+        val producer = Class.forName(clazz).getConstructor(classOf[List[Mapping]]).newInstance(m)
+        producer
+      } catch {
+        case e: Exception ⇒ {
+          Log.severe(s"Failed to configure producer $name: ${e.getMessage}\n${e.getStackTraceString}")
+          null
+        }
       }
+
+    } else {
+      // disabled
+      null
     }
   }).toList.filter(_ != null).asInstanceOf[List[Producer]]
 
