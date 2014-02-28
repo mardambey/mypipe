@@ -15,7 +15,7 @@ case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])
 case object Flush
 
-class CassandraBatchWriter(mappings: List[Mapping[MutationBatch]]) extends Actor {
+class CassandraBatchWriter(mappings: List[Mapping]) extends Actor {
 
   def receive = {
     case Queue(mutation)      ⇒ map(mutation)
@@ -42,34 +42,25 @@ class CassandraBatchWriter(mappings: List[Mapping[MutationBatch]]) extends Actor
     true
   }
 
-  def map(mutations: List[Mutation[_]]): List[MutationBatch] = {
-    mutations.map(m ⇒ map(m)).flatten
+  def map(mutations: List[Mutation[_]]) {
+    mutations.map(m ⇒ map(m))
   }
 
-  def map(mutation: Mutation[_]): List[MutationBatch] = {
+  def map(mutation: Mutation[_]) {
 
     mutation match {
-
-      case i: InsertMutation ⇒ {
-        mappings.map(m ⇒ m.map(i)).filter(_.isDefined).map(_.get)
-      }
-
-      case u: UpdateMutation ⇒ {
-        mappings.map(m ⇒ m.map(u)).filter(_.isDefined).map(_.get)
-      }
-
-      case d: DeleteMutation ⇒ {
-        mappings.map(m ⇒ m.map(d)).filter(_.isDefined).map(_.get)
-      }
+      case i: InsertMutation ⇒ mappings.map(m ⇒ m.map(i))
+      case u: UpdateMutation ⇒ mappings.map(m ⇒ m.map(u))
+      case d: DeleteMutation ⇒ mappings.map(m ⇒ m.map(d))
     }
   }
 }
 
 object CassandraBatchWriter {
-  def props(mappings: List[Mapping[MutationBatch]]): Props = Props(new CassandraBatchWriter(mappings))
+  def props(mappings: List[Mapping]): Props = Props(new CassandraBatchWriter(mappings))
 }
 
-case class CassandraProducer(mappings: List[Mapping[MutationBatch]]) extends Producer {
+case class CassandraProducer(mappings: List[Mapping]) extends Producer(mappings) {
 
   val system = ActorSystem("mypipe")
   val worker = system.actorOf(CassandraBatchWriter.props(mappings), "CassandraBatchWriterActor")

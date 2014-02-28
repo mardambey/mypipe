@@ -11,13 +11,13 @@ import com.netflix.astyanax.thrift.ThriftFamilyFactory
 import com.netflix.astyanax.util.TimeUUIDUtils
 import mypipe.Conf
 
-trait Mapping[T] {
-  def map(mutation: InsertMutation): Option[T]
-  def map(mutation: UpdateMutation): Option[T]
-  def map(mutation: DeleteMutation): Option[T]
+abstract class Mapping {
+  def map(mutation: InsertMutation) {}
+  def map(mutation: UpdateMutation) {}
+  def map(mutation: DeleteMutation) {}
 }
 
-class CassandraProfileMapping extends Mapping[MutationBatch] {
+class CassandraProfileMapping extends Mapping {
 
   // create keyspace logs;
   // create column family profile_counters with default_validation_class=CounterColumnType;
@@ -36,10 +36,10 @@ class CassandraProfileMapping extends Mapping[MutationBatch] {
     keySer = STRING,
     colSer = STRING)
 
-  def map(mutation: UpdateMutation): Option[MutationBatch] = None
-  def map(mutation: DeleteMutation): Option[MutationBatch] = None
+  override def map(mutation: UpdateMutation) = None
+  override def map(mutation: DeleteMutation) = None
 
-  def map(i: InsertMutation): Option[MutationBatch] = {
+  override def map(i: InsertMutation) {
 
     (i.table.db, i.table.name) match {
 
@@ -57,16 +57,12 @@ class CassandraProfileMapping extends Mapping[MutationBatch] {
 
         m.withRow(counters, rowKey)
           .incrementCounterColumn("views", 1)
-
-        Some(m)
       }
 
       case ("logging", "foo") ⇒ {
-        None
       }
 
       case x ⇒ {
-        None
       }
     }
   }
@@ -74,10 +70,10 @@ class CassandraProfileMapping extends Mapping[MutationBatch] {
 
 object CassandraMappings {
 
-  val CASSANDRA_CLUSTER_NAME = Conf.conf.getString("mypipe.cassandra.cluster.name")
-  val CASSANDRA_SEEDS = Conf.conf.getString("mypipe.cassandra.cluster.seeds")
-  val CASSANDRA_PORT = Conf.conf.getInt("mypipe.cassandra.cluster.port")
-  val CASSANDRA_MAX_CONNS_PER_HOST = Conf.conf.getInt("mypipe.cassandra.cluster.max-conns-per-host")
+  val CASSANDRA_CLUSTER_NAME = Conf.conf.getString("mypipe.producers.cassandra.cluster.name")
+  val CASSANDRA_SEEDS = Conf.conf.getString("mypipe.producers.cassandra.cluster.seeds")
+  val CASSANDRA_PORT = Conf.conf.getInt("mypipe.producers.cassandra.cluster.port")
+  val CASSANDRA_MAX_CONNS_PER_HOST = Conf.conf.getInt("mypipe.producers.cassandra.cluster.max-conns-per-host")
 
   val keyspaces = scala.collection.mutable.HashMap[String, Keyspace]()
   val columnFamilies = scala.collection.mutable.HashMap[String, ColumnFamily[_, _]]()
