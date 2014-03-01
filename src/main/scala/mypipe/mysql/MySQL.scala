@@ -13,11 +13,10 @@ import mypipe.api._
 import mypipe.api.UpdateMutation
 import mypipe.api.DeleteMutation
 import mypipe.api.InsertMutation
-import com.github.mauricio.async.db.{ RowData, QueryResult, Connection, Configuration }
+import com.github.mauricio.async.db.{ QueryResult, Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
 import akka.actor.{ Cancellable, ActorSystem }
-import akka.dispatch.Futures
 import scala.collection.immutable.ListMap
 
 case class BinlogFilePos(filename: String, pos: Long) {
@@ -91,7 +90,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       }
     }
 
-    val dbConns = scala.collection.mutable.HashMap[String, Connection]()
+    val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
     val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
     implicit val ec = ActorSystem("mypipe").dispatcher
 
@@ -100,12 +99,14 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
         val dbConn = dbConns.getOrElseUpdate(db, {
           val configuration = new Configuration(username, hostname, port, Some(password), Some("information_schema"))
-          val connection: Connection = new MySQLConnection(configuration)
-          Await.result(connection.connect, 5 seconds)
-          connection
+          val connection1: Connection = new MySQLConnection(configuration)
+          val connection2: Connection = new MySQLConnection(configuration)
+          val futures = Future.sequence(List(connection1.connect, connection2.connect))
+          Await.result(futures, 5 seconds)
+          List(connection1, connection2)
         })
 
-        val futureCols: Future[QueryResult] = dbConn.sendQuery(
+        val futureCols: Future[QueryResult] = dbConn(0).sendQuery(
           s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
 
         val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
@@ -118,9 +119,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           case None ⇒ List.empty[(String, Boolean)]
         })
 
-        val results1 = Await.result(mapCols, 1 seconds)
-
-        val futurePkey: Future[QueryResult] = dbConn.sendQuery(
+        val futurePkey: Future[QueryResult] = dbConn(1).sendQuery(
           s"""SELECT COLUMN_NAME FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION""")
 
         val pKey: Future[List[String]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
@@ -133,7 +132,9 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           case None ⇒ List.empty[String]
         })
 
-        val results2 = Await.result(pKey, 1 seconds)
+        val results = Await.result(Future.sequence(List(mapCols, pKey)), 1 seconds)
+        val results1 = results(0)
+        val results2 = results(1)
 
         val cols = createColumns(results1.asInstanceOf[List[(String, Boolean)]], columnTypes)
         val primaryKey: Option[PrimaryKey] = try {
