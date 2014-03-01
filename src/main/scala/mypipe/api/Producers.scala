@@ -4,7 +4,12 @@ import mypipe.Log
 import java.io.Serializable
 import com.github.shyiko.mysql.binlog.event.TableMapEventData
 import com.github.shyiko.mysql.binlog.event.deserialization.{ ColumnType ⇒ MColumnType }
-import mypipe.producer.cassandra.Mapping
+
+abstract class Mapping {
+  def map(mutation: InsertMutation) {}
+  def map(mutation: UpdateMutation) {}
+  def map(mutation: DeleteMutation) {}
+}
 
 abstract class Producer(mappings: List[Mapping]) {
   def queue(mutation: Mutation[_])

@@ -1,9 +1,8 @@
 package mypipe
 
-import mypipe.producer.cassandra.Mapping
 import mypipe.mysql.{ BinlogConsumer, BinlogFilePos, HostPortUserPass }
 import scala.collection.JavaConverters._
-import mypipe.api.Producer
+import mypipe.api.{ Mapping, Producer }
 
 object Mypipe extends App {
 

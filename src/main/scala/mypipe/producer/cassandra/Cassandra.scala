@@ -3,13 +3,19 @@ package mypipe.producer.cassandra
 import akka.actor.{ Actor, ActorSystem, Props }
 import akka.pattern.ask
 import scala.concurrent.duration._
-import com.netflix.astyanax.MutationBatch
+import com.netflix.astyanax.{ Serializer, Keyspace, AstyanaxContext, MutationBatch }
 import mypipe.{ Conf, Log }
 import scala.concurrent.Await
 import mypipe.api._
 import mypipe.api.DeleteMutation
 import mypipe.api.UpdateMutation
 import mypipe.api.InsertMutation
+import com.netflix.astyanax.serializers.{ TimeUUIDSerializer, LongSerializer, StringSerializer }
+import com.netflix.astyanax.thrift.ThriftFamilyFactory
+import com.netflix.astyanax.connectionpool.impl.{ ConnectionPoolConfigurationImpl, CountingConnectionPoolMonitor }
+import com.netflix.astyanax.connectionpool.NodeDiscoveryType
+import com.netflix.astyanax.impl.AstyanaxConfigurationImpl
+import com.netflix.astyanax.model.ColumnFamily
 
 case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])
@@ -79,3 +85,55 @@ case class CassandraProducer(mappings: List[Mapping]) extends Producer(mappings)
   }
 }
 
+object CassandraMappings {
+
+  val CASSANDRA_CLUSTER_NAME = Conf.conf.getString("mypipe.producers.cassandra.cluster.name")
+  val CASSANDRA_SEEDS = Conf.conf.getString("mypipe.producers.cassandra.cluster.seeds")
+  val CASSANDRA_PORT = Conf.conf.getInt("mypipe.producers.cassandra.cluster.port")
+  val CASSANDRA_MAX_CONNS_PER_HOST = Conf.conf.getInt("mypipe.producers.cassandra.cluster.max-conns-per-host")
+
+  val keyspaces = scala.collection.mutable.HashMap[String, Keyspace]()
+  val columnFamilies = scala.collection.mutable.HashMap[String, ColumnFamily[_, _]]()
+  val mutations = scala.collection.mutable.HashMap[String, MutationBatch]()
+
+  object Serializers {
+    val TIMEUUID = TimeUUIDSerializer.get()
+    val STRING = StringSerializer.get()
+    val LONG = LongSerializer.get()
+  }
+
+  def columnFamily[R, C](name: String, keySer: Serializer[R], colSer: Serializer[C]): ColumnFamily[R, C] = {
+    columnFamilies.getOrElseUpdate(name, createColumnFamily[R, C](name, keySer, colSer)).asInstanceOf[ColumnFamily[R, C]]
+  }
+
+  def mutation(keyspace: String): MutationBatch = {
+    mutations.getOrElseUpdate(keyspace, createMutation(keyspace))
+  }
+
+  protected def createMutation(keyspace: String): MutationBatch = {
+    val ks = keyspaces.getOrElseUpdate(keyspace, createKeyspace(keyspace))
+    ks.prepareMutationBatch()
+  }
+
+  protected def createColumnFamily[R, C](cf: String, keySer: Serializer[R], colSer: Serializer[C]): ColumnFamily[R, C] = {
+    new ColumnFamily[R, C](cf, keySer, colSer)
+  }
+
+  protected def createKeyspace(keyspace: String): Keyspace = {
+
+    val context: AstyanaxContext[Keyspace] = new AstyanaxContext.Builder()
+      .forCluster(CASSANDRA_CLUSTER_NAME)
+      .forKeyspace(keyspace)
+      .withAstyanaxConfiguration(new AstyanaxConfigurationImpl()
+        .setDiscoveryType(NodeDiscoveryType.RING_DESCRIBE))
+      .withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(s"$CASSANDRA_CLUSTER_NAME-$keyspace-connpool")
+        .setPort(CASSANDRA_PORT)
+        .setMaxConnsPerHost(CASSANDRA_MAX_CONNS_PER_HOST)
+        .setSeeds(CASSANDRA_SEEDS))
+      .withConnectionPoolMonitor(new CountingConnectionPoolMonitor())
+      .buildKeyspace(ThriftFamilyFactory.getInstance())
+
+    context.start()
+    context.getClient()
+  }
+}

@@ -1,7 +1,6 @@
 package mypipe.producer.stdout
 
 import mypipe.api._
-import mypipe.producer.cassandra.Mapping
 import mypipe.Log
 import mypipe.api.UpdateMutation
 import mypipe.api.InsertMutation
