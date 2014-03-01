@@ -39,12 +39,18 @@ object Conf {
     }
   }
 
+  private var lastBinlogFilePos = scala.collection.mutable.HashMap[String, BinlogFilePos]()
+
   def binlogFilePosSave(hostname: String, port: Int, filePos: BinlogFilePos) {
-    Log.info(s"Saving binlog position for $hostname:$port => $filePos")
-    val fileName = binlogStatusFile(hostname, port)
-    val file = new File(fileName)
-    val writer = new PrintWriter(file)
-    writer.write(s"${filePos.filename}:${filePos.pos}")
-    writer.close()
+
+    if (!lastBinlogFilePos.getOrElse(hostname + port, "").equals(filePos)) {
+      Log.info(s"Saving binlog position for $hostname:$port => $filePos")
+      val fileName = binlogStatusFile(hostname, port)
+      val file = new File(fileName)
+      val writer = new PrintWriter(file)
+      writer.write(s"${filePos.filename}:${filePos.pos}")
+      writer.close()
+      lastBinlogFilePos(hostname + port) = filePos
+    }
   }
 }
