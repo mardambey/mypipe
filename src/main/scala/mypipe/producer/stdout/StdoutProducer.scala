@@ -45,13 +45,27 @@ class StdoutProducer(mappings: List[Mapping]) extends Producer(mappings) {
           val curValues = cur.columns.values.map(_.value)
           val colNames = u.table.columns.map(_.name)
           val updates = colNames.zip(curValues).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")
-          mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ($updates)  WHERE ($where)"
+          mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ($updates) WHERE ($where)"
 
         })
-
       }
 
       case d: DeleteMutation ⇒ {
+        d.rows.foreach(row ⇒ {
+
+          val pKeyColNames = if (d.table.primaryKey.isDefined) d.table.primaryKey.get.columns.map(_.name) else List.empty[String]
+
+          val p = pKeyColNames.map(colName ⇒ {
+            val cols = row.columns
+            cols.filter(_._1.equals(colName))
+            cols.head
+          })
+
+          val pKeyVals = p.map(_._2.value.toString)
+          val where = pKeyColNames.zip(pKeyVals).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")
+          mutations += s"DELETE FROM ${d.table.db}.${d.table.name} WHERE ($where)"
+
+        })
       }
 
     }
