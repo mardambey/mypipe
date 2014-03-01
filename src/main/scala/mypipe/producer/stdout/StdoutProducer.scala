@@ -41,7 +41,11 @@ class StdoutProducer(mappings: List[Mapping]) extends Producer(mappings) {
           })
 
           val pKeyVals = p.map(_._2.value.toString)
-          mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ${u.table.columns.map(_.name).zip(cur.columns.values.map(_.value)).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")} WHERE (${pKeyColNames.zip(pKeyVals).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")})"
+          val where = pKeyColNames.zip(pKeyVals).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")
+          val curValues = cur.columns.values.map(_.value)
+          val colNames = u.table.columns.map(_.name)
+          val updates = colNames.zip(curValues).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")
+          mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ($updates)  WHERE ($where)"
 
         })
 
