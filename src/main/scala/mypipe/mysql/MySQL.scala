@@ -17,6 +17,7 @@ import com.github.mauricio.async.db.{ RowData, QueryResult, Connection, Configur
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
 import akka.actor.{ Cancellable, ActorSystem }
+import akka.dispatch.Futures
 
 case class BinlogFilePos(filename: String, pos: Long) {
   override def toString(): String = s"$filename:$pos"
@@ -45,7 +46,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     override def onEvent(event: Event) {
 
       val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
-      println(event)
 
       eventType match {
         case TABLE_MAP ⇒ {
@@ -53,7 +53,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
           if (!tablesById.contains(tableMapEventData.getTableId)) {
             val columns = getColumns(tableMapEventData.getDatabase(), tableMapEventData.getTable(), tableMapEventData.getColumnTypes())
-            val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns)
+            val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
+            println(table)
             tablesById.put(tableMapEventData.getTableId(), table)
           }
         }
@@ -91,10 +92,10 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
 
     val dbConns = scala.collection.mutable.HashMap[String, Connection]()
-    val dbTableCols = scala.collection.mutable.HashMap[String, List[ColumnMetadata]]()
+    val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
     implicit val ec = ActorSystem("mypipe").dispatcher
 
-    def getColumns(db: String, table: String, columnTypes: Array[Byte]): List[ColumnMetadata] = {
+    def getColumns(db: String, table: String, columnTypes: Array[Byte]): (List[ColumnMetadata], Option[PrimaryKey]) = {
 
       val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
         val dbConn = dbConns.getOrElseUpdate(db, {
@@ -104,10 +105,10 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           connection
         })
 
-        val future: Future[QueryResult] = dbConn.sendQuery(
+        val futureCols: Future[QueryResult] = dbConn.sendQuery(
           s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
 
-        val mapResult: Future[List[(String, Boolean)]] = future.map(queryResult ⇒ queryResult.rows match {
+        val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
           case Some(resultSet) ⇒ {
             resultSet.map(row ⇒ {
               (row(0).asInstanceOf[String], row(1).equals("PRI"))
@@ -117,8 +118,32 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           case None ⇒ List.empty[(String, Boolean)]
         })
 
-        val result = Await.result(mapResult, 5 seconds)
-        createColumns(result, columnTypes)
+        val results1 = Await.result(mapCols, 1 seconds)
+
+        val futurePkey: Future[QueryResult] = dbConn.sendQuery(
+          s"""SELECT COLUMN_NAME FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION""")
+
+        val pKey: Future[List[String]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
+          case Some(resultSet) ⇒ {
+            resultSet.map(row ⇒ {
+              row(0).asInstanceOf[String]
+            }).toList
+          }
+
+          case None ⇒ List.empty[String]
+        })
+
+        val results2 = Await.result(pKey, 1 seconds)
+
+        val cols = createColumns(results1.asInstanceOf[List[(String, Boolean)]], columnTypes)
+        val primaryKey: Option[PrimaryKey] = try {
+          val primaryKeys: List[ColumnMetadata] = results2.asInstanceOf[List[String]].map(colName ⇒ cols.find(_.name.equals(colName)).get)
+          Some(PrimaryKey(primaryKeys))
+        } catch {
+          case t: Throwable ⇒ None
+        }
+
+        (cols, primaryKey)
       })
 
       cols
