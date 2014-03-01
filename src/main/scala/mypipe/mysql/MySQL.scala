@@ -18,6 +18,7 @@ import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
 import akka.actor.{ Cancellable, ActorSystem }
 import akka.dispatch.Futures
+import scala.collection.immutable.ListMap
 
 case class BinlogFilePos(filename: String, pos: Long) {
   override def toString(): String = s"$filename:$pos"
@@ -54,7 +55,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           if (!tablesById.contains(tableMapEventData.getTableId)) {
             val columns = getColumns(tableMapEventData.getDatabase(), tableMapEventData.getTable(), tableMapEventData.getColumnTypes())
             val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
-            println(table)
             tablesById.put(tableMapEventData.getTableId(), table)
           }
         }
@@ -255,7 +255,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
       // zip the names and values from the table's columns and the row's data and
       // create a map that contains column names to Column objects with values
-      val columns = table.columns.zip(evRow).map(c ⇒ c._1.name -> Column(c._1, c._2)).toMap[String, Column]
+      val cols = table.columns.zip(evRow).map(c ⇒ c._1.name -> Column(c._1, c._2))
+      val columns = ListMap.empty[String, Column] ++ cols.toArray
 
       Row(table, columns)
 
@@ -268,8 +269,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       // zip the names and values from the table's columns and the row's data and
       // create a map that contains column names to Column objects with values
 
-      val old = table.columns.zip(evRow.getKey).map(c ⇒ c._1.name -> Column(c._1, c._2)).toMap[String, Column]
-      val cur = table.columns.zip(evRow.getValue).map(c ⇒ c._1.name -> Column(c._1, c._2)).toMap[String, Column]
+      val old = ListMap.empty[String, Column] ++ table.columns.zip(evRow.getKey).map(c ⇒ c._1.name -> Column(c._1, c._2))
+      val cur = ListMap.empty[String, Column] ++ table.columns.zip(evRow.getValue).map(c ⇒ c._1.name -> Column(c._1, c._2))
 
       (Row(table, old), Row(table, cur))
 

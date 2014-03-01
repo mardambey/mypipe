@@ -25,11 +25,18 @@ class StdoutProducer(mappings: List[Mapping]) extends Producer(mappings) {
     mutation match {
 
       case i: InsertMutation ⇒ {
-        mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}}) VALUES (${i.rows.head.columns.values.map(_.value).mkString(", ")}})"
+        mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}) VALUES (${i.rows.head.columns.values.map(_.value).mkString(", ")})"
       }
 
       case u: UpdateMutation ⇒ {
-        mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ${u.table.columns.map(_.name).zip(u.rows.head._2.columns.values.map(_.value)).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")} WHERE /*TODO*/"
+        val pKeyColNames = if (u.table.primaryKey.isDefined) u.table.primaryKey.get.columns.map(_.name) else List.empty[String]
+        val p = pKeyColNames.map(colName ⇒ {
+          val cols = u.rows.head._1.columns
+          cols.filter(_._1.equals(colName))
+          cols.head
+        })
+        val pKeyVals = p.map(_._2.value.toString)
+        mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ${u.table.columns.map(_.name).zip(u.rows.head._2.columns.values.map(_.value)).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")} WHERE (${pKeyColNames.zip(pKeyVals).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")})"
       }
 
       case d: DeleteMutation ⇒ {
