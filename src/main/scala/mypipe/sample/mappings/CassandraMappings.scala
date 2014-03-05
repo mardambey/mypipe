@@ -1,20 +1,18 @@
 package mypipe.sample.mappings
 
-import mypipe.api.Mapping
-import com.netflix.astyanax.util.TimeUUIDUtils
-import mypipe.producer.cassandra.CassandraMappings
+import mypipe.producer.cassandra.CassandraMapping
+import mypipe.producer.cassandra.CassandraMapping._
 import mypipe.api.DeleteMutation
 import mypipe.api.UpdateMutation
 import mypipe.api.InsertMutation
 
-class CassandraProfileMapping extends Mapping {
+import com.netflix.astyanax.util.TimeUUIDUtils
+
+class CassandraProfileMapping extends CassandraMapping {
 
   // create keyspace logs;
   // create column family profile_counters with default_validation_class=CounterColumnType;
   // create column family wswl with comparator=TimeUUIDType;
-
-  import CassandraMappings.{ mutation, columnFamily }
-  import CassandraMappings.Serializers._
 
   val wswl = columnFamily(
     name = "wswl",

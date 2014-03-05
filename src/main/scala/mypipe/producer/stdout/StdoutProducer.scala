@@ -1,11 +1,11 @@
 package mypipe.producer.stdout
 
 import mypipe.api._
-import mypipe.Log
 import mypipe.api.UpdateMutation
 import mypipe.api.InsertMutation
+import com.typesafe.config.Config
 
-class StdoutProducer(mappings: List[Mapping]) extends Producer(mappings) {
+class StdoutProducer(mappings: List[Mapping], config: Config) extends Producer(mappings, config) {
 
   val mutations = scala.collection.mutable.ListBuffer[String]()
 
@@ -69,6 +69,10 @@ class StdoutProducer(mappings: List[Mapping]) extends Producer(mappings) {
       }
 
     }
+  }
+
+  override def toString(): String = {
+    "StdoutProducer"
   }
 
 }

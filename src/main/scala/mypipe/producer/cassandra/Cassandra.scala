@@ -4,7 +4,7 @@ import akka.actor.{ Actor, ActorSystem, Props }
 import akka.pattern.ask
 import scala.concurrent.duration._
 import com.netflix.astyanax.{ Serializer, Keyspace, AstyanaxContext, MutationBatch }
-import mypipe.{ Conf, Log }
+import mypipe.Conf
 import scala.concurrent.Await
 import mypipe.api._
 import mypipe.api.DeleteMutation
@@ -16,6 +16,7 @@ import com.netflix.astyanax.connectionpool.impl.{ ConnectionPoolConfigurationImp
 import com.netflix.astyanax.connectionpool.NodeDiscoveryType
 import com.netflix.astyanax.impl.AstyanaxConfigurationImpl
 import com.netflix.astyanax.model.ColumnFamily
+import com.typesafe.config.Config
 
 case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])
@@ -30,9 +31,9 @@ class CassandraBatchWriter(mappings: List[Mapping]) extends Actor {
   }
 
   def flush(): Boolean = {
-    Log.info(s"Flush ${CassandraMappings.mutations.size} mutations.")
+    Log.info(s"Flush ${CassandraMapping.mutations.size} mutations.")
 
-    val results = CassandraMappings.mutations.map(m ⇒ {
+    val results = CassandraMapping.mutations.map(m ⇒ {
       try {
         // TODO: use execute async
         Some(m._2.execute())
@@ -44,7 +45,7 @@ class CassandraBatchWriter(mappings: List[Mapping]) extends Actor {
       }
     })
 
-    CassandraMappings.mutations.clear()
+    CassandraMapping.mutations.clear()
     true
   }
 
@@ -66,7 +67,22 @@ object CassandraBatchWriter {
   def props(mappings: List[Mapping]): Props = Props(new CassandraBatchWriter(mappings))
 }
 
-case class CassandraProducer(mappings: List[Mapping]) extends Producer(mappings) {
+case class CassandraProducer(mappings: List[Mapping], config: Config) extends Producer(mappings, config) {
+
+  val clusterConfig = try {
+    val CASSANDRA_CLUSTER_NAME = config.getString("cluster.name")
+    val CASSANDRA_SEEDS = config.getString("cluster.seeds")
+    val CASSANDRA_PORT = config.getInt("cluster.port")
+    val CASSANDRA_MAX_CONNS_PER_HOST = config.getInt("cluster.max-conns-per-host")
+    CassandraClusterConfig(CASSANDRA_CLUSTER_NAME, CASSANDRA_PORT, CASSANDRA_SEEDS, CASSANDRA_MAX_CONNS_PER_HOST)
+  } catch {
+    case e: Exception ⇒ {
+      Log.severe(s"Error connecting to Cassandra cluster: ${e.getMessage} -> ${e.getStackTraceString}")
+      CassandraClusterConfig("NoName", 0, "NoSeeds", 1)
+    }
+  }
+
+  mappings.foreach(_.asInstanceOf[CassandraMapping].clusterConfig = clusterConfig)
 
   val system = ActorSystem("mypipe")
   val worker = system.actorOf(CassandraBatchWriter.props(mappings), "CassandraBatchWriterActor")
@@ -83,53 +99,58 @@ case class CassandraProducer(mappings: List[Mapping]) extends Producer(mappings)
     val future = worker.ask(Flush)(Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds)
     val result = Await.result(future, Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds).asInstanceOf[Boolean]
   }
+
+  override def toString(): String = {
+    // TODO: this needs to be able to return the cassandra cluster address / name
+    "CassandraProducer"
+  }
 }
 
-object CassandraMappings {
+case class CassandraClusterConfig(clusterName: String, port: Int, seeds: String, maxConnsPerHost: Int = 1)
 
-  val CASSANDRA_CLUSTER_NAME = Conf.conf.getString("mypipe.producers.cassandra.cluster.name")
-  val CASSANDRA_SEEDS = Conf.conf.getString("mypipe.producers.cassandra.cluster.seeds")
-  val CASSANDRA_PORT = Conf.conf.getInt("mypipe.producers.cassandra.cluster.port")
-  val CASSANDRA_MAX_CONNS_PER_HOST = Conf.conf.getInt("mypipe.producers.cassandra.cluster.max-conns-per-host")
+trait CassandraMapping extends Mapping {
 
-  val keyspaces = scala.collection.mutable.HashMap[String, Keyspace]()
+  var clusterConfig: CassandraClusterConfig = null
+
   val columnFamilies = scala.collection.mutable.HashMap[String, ColumnFamily[_, _]]()
-  val mutations = scala.collection.mutable.HashMap[String, MutationBatch]()
-
-  object Serializers {
-    val TIMEUUID = TimeUUIDSerializer.get()
-    val STRING = StringSerializer.get()
-    val LONG = LongSerializer.get()
-  }
 
   def columnFamily[R, C](name: String, keySer: Serializer[R], colSer: Serializer[C]): ColumnFamily[R, C] = {
     columnFamilies.getOrElseUpdate(name, createColumnFamily[R, C](name, keySer, colSer)).asInstanceOf[ColumnFamily[R, C]]
   }
 
   def mutation(keyspace: String): MutationBatch = {
-    mutations.getOrElseUpdate(keyspace, createMutation(keyspace))
-  }
-
-  protected def createMutation(keyspace: String): MutationBatch = {
-    val ks = keyspaces.getOrElseUpdate(keyspace, createKeyspace(keyspace))
-    ks.prepareMutationBatch()
+    CassandraMapping.mutations.getOrElseUpdate(keyspace, CassandraMapping.createMutation(keyspace, clusterConfig))
   }
 
   protected def createColumnFamily[R, C](cf: String, keySer: Serializer[R], colSer: Serializer[C]): ColumnFamily[R, C] = {
     new ColumnFamily[R, C](cf, keySer, colSer)
   }
+}
 
-  protected def createKeyspace(keyspace: String): Keyspace = {
+object CassandraMapping {
+  val TIMEUUID = TimeUUIDSerializer.get()
+  val STRING = StringSerializer.get()
+  val LONG = LongSerializer.get()
+
+  val keyspaces = scala.collection.mutable.HashMap[String, Keyspace]()
+  val mutations = scala.collection.mutable.HashMap[String, MutationBatch]()
+
+  protected def createMutation(keyspace: String, clusterConfig: CassandraClusterConfig): MutationBatch = {
+    val ks = keyspaces.getOrElseUpdate(keyspace, createKeyspace(keyspace, clusterConfig))
+    ks.prepareMutationBatch()
+  }
+
+  protected def createKeyspace(keyspace: String, clusterConfig: CassandraClusterConfig): Keyspace = {
 
     val context: AstyanaxContext[Keyspace] = new AstyanaxContext.Builder()
-      .forCluster(CASSANDRA_CLUSTER_NAME)
+      .forCluster(clusterConfig.clusterName)
       .forKeyspace(keyspace)
       .withAstyanaxConfiguration(new AstyanaxConfigurationImpl()
         .setDiscoveryType(NodeDiscoveryType.RING_DESCRIBE))
-      .withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(s"$CASSANDRA_CLUSTER_NAME-$keyspace-connpool")
-        .setPort(CASSANDRA_PORT)
-        .setMaxConnsPerHost(CASSANDRA_MAX_CONNS_PER_HOST)
-        .setSeeds(CASSANDRA_SEEDS))
+      .withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(s"${clusterConfig.clusterName}-$keyspace-connpool")
+        .setPort(clusterConfig.port)
+        .setMaxConnsPerHost(clusterConfig.maxConnsPerHost)
+        .setSeeds(clusterConfig.seeds))
       .withConnectionPoolMonitor(new CountingConnectionPoolMonitor())
       .buildKeyspace(ThriftFamilyFactory.getInstance())
 

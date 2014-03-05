@@ -8,16 +8,20 @@ import com.github.shyiko.mysql.binlog.event._
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import mypipe.Conf
-import mypipe.Log
 import mypipe.api._
-import mypipe.api.UpdateMutation
-import mypipe.api.DeleteMutation
-import mypipe.api.InsertMutation
 import com.github.mauricio.async.db.{ QueryResult, Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
 import akka.actor.{ Cancellable, ActorSystem }
 import scala.collection.immutable.ListMap
+import mypipe.api.PrimaryKey
+import mypipe.api.UpdateMutation
+import scala.Some
+import mypipe.api.Column
+import mypipe.api.DeleteMutation
+import mypipe.api.Table
+import mypipe.api.Row
+import mypipe.api.InsertMutation
 
 case class BinlogFilePos(filename: String, pos: Long) {
   override def toString(): String = s"$filename:$pos"
@@ -33,159 +37,14 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   val tablesById = scala.collection.mutable.HashMap[Long, Table]()
   var transactionInProgress = false
   val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
-  val producers = new scala.collection.mutable.HashSet[Producer]()
+  val producers = new scala.collection.mutable.HashMap[String, Producer]()
   val txQueue = new scala.collection.mutable.ListBuffer[Event]
-  val client = new BinaryLogClient(hostname, port, username, password)
-
+  val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
+  val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
   val system = ActorSystem("mypipe")
   implicit val ec = system.dispatcher
-
   var flusher: Option[Cancellable] = None
-
-  client.registerEventListener(new EventListener() {
-
-    override def onEvent(event: Event) {
-
-      val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
-
-      eventType match {
-        case TABLE_MAP ⇒ {
-          val tableMapEventData: TableMapEventData = event.getData();
-
-          if (!tablesById.contains(tableMapEventData.getTableId)) {
-            val columns = getColumns(tableMapEventData.getDatabase(), tableMapEventData.getTable(), tableMapEventData.getColumnTypes())
-            val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
-            tablesById.put(tableMapEventData.getTableId(), table)
-          }
-        }
-
-        case e: EventType if isMutation(eventType) == true ⇒ {
-          if (groupEventsByTx) {
-            txQueue += event
-          } else {
-            producers foreach (p ⇒ p.queue(createMutation(event)))
-          }
-        }
-
-        case QUERY ⇒ {
-          if (groupEventsByTx) {
-            val queryEventData: QueryEventData = event.getData()
-            val query = queryEventData.getSql()
-            if (groupEventsByTx) {
-              if ("BEGIN".equals(query)) {
-                transactionInProgress = true
-              } else if ("COMMIT".equals(query)) {
-                commit()
-              } else if ("ROLLBACK".equals(query)) {
-                rollback()
-              }
-            }
-          }
-        }
-        case XID ⇒ {
-          if (groupEventsByTx) {
-            commit()
-          }
-        }
-        case _ ⇒ Log.finer(s"Event ignored ${eventType}")
-      }
-    }
-
-    val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
-    val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
-    implicit val ec = ActorSystem("mypipe").dispatcher
-
-    def getColumns(db: String, table: String, columnTypes: Array[Byte]): (List[ColumnMetadata], Option[PrimaryKey]) = {
-
-      val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
-        val dbConn = dbConns.getOrElseUpdate(db, {
-          val configuration = new Configuration(username, hostname, port, Some(password), Some("information_schema"))
-          val connection1: Connection = new MySQLConnection(configuration)
-          val connection2: Connection = new MySQLConnection(configuration)
-          val futures = Future.sequence(List(connection1.connect, connection2.connect))
-          Await.result(futures, 5 seconds)
-          List(connection1, connection2)
-        })
-
-        val futureCols: Future[QueryResult] = dbConn(0).sendQuery(
-          s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
-
-        val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
-          case Some(resultSet) ⇒ {
-            resultSet.map(row ⇒ {
-              (row(0).asInstanceOf[String], row(1).equals("PRI"))
-            }).toList
-          }
-
-          case None ⇒ List.empty[(String, Boolean)]
-        })
-
-        val futurePkey: Future[QueryResult] = dbConn(1).sendQuery(
-          s"""SELECT COLUMN_NAME FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION""")
-
-        val pKey: Future[List[String]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
-          case Some(resultSet) ⇒ {
-            resultSet.map(row ⇒ {
-              row(0).asInstanceOf[String]
-            }).toList
-          }
-
-          case None ⇒ List.empty[String]
-        })
-
-        val results = Await.result(Future.sequence(List(mapCols, pKey)), 1 seconds)
-        val results1 = results(0)
-        val results2 = results(1)
-
-        val cols = createColumns(results1.asInstanceOf[List[(String, Boolean)]], columnTypes)
-        val primaryKey: Option[PrimaryKey] = try {
-          val primaryKeys: List[ColumnMetadata] = results2.asInstanceOf[List[String]].map(colName ⇒ cols.find(_.name.equals(colName)).get)
-          Some(PrimaryKey(primaryKeys))
-        } catch {
-          case t: Throwable ⇒ None
-        }
-
-        (cols, primaryKey)
-      })
-
-      cols
-    }
-
-    def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {
-      try {
-        // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
-        var cur = 0
-
-        val cols = columns.map(c ⇒ {
-          val colName = c._1
-          val isPrimaryKey = c._2
-          val colType = ColumnMetadata.typeByCode(columnTypes(cur))
-          cur += 1
-          ColumnMetadata(colName, colType, isPrimaryKey)
-        })
-
-        cols
-
-      } catch {
-        case e: Exception ⇒ {
-          Log.severe(s"Failed to determine column names: $columns\n${e.getMessage} -> ${e.getStackTraceString}")
-          List.empty[ColumnMetadata]
-        }
-      }
-    }
-
-    def rollback() {
-      txQueue.clear
-      transactionInProgress = false
-    }
-
-    def commit() {
-      val mutations = txQueue.map(createMutation(_))
-      producers foreach (p ⇒ p.queueList(mutations.toList))
-      txQueue.clear
-      transactionInProgress = false
-    }
-  })
+  val client = new BinaryLogClient(hostname, port, username, password)
 
   if (binlogFileAndPos != BinlogFilePos.current) {
     Log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
@@ -195,34 +54,194 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     Log.info(s"Using current master binlog position for consuming from $hostname:$port")
   }
 
+  client.registerEventListener(new EventListener() {
+    override def onEvent(event: Event) {
+
+      val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
+
+      eventType match {
+        case TABLE_MAP ⇒ handleTableMap(event)
+        case QUERY ⇒ handleQuery(event)
+        case XID ⇒ handleXid(event)
+        case e: EventType if isMutation(eventType) == true ⇒ handleMutation(event)
+        case _ ⇒ Log.finer(s"Event ignored ${eventType}")
+      }
+    }
+  })
+
   client.registerLifecycleListener(new LifecycleListener {
     override def onDisconnect(client: BinaryLogClient): Unit = {
-      Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition))
+      flusher.foreach(_.cancel())
+      producers foreach ({
+        case (n, p) ⇒ {
+          Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition), n)
+          p.flush
+        }
+      })
+    }
+
+    override def onConnect(client: BinaryLogClient) {
+      flusher = Some(system.scheduler.schedule(
+        Conf.FLUSH_INTERVAL_SECS seconds,
+        Conf.FLUSH_INTERVAL_SECS seconds) {
+          producers foreach ({
+            case (n, p) ⇒ {
+              Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition), n)
+              p.flush
+            }
+          })
+        })
     }
 
     override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
-    override def onConnect(client: BinaryLogClient) {}
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
 
-  def connect() {
-    flusher = Some(system.scheduler.schedule(
-      Conf.FLUSH_INTERVAL_SECS seconds,
-      Conf.FLUSH_INTERVAL_SECS seconds) {
-        producers foreach (p ⇒ p.flush)
-        Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition))
+  def handleMutation(event: Event) {
+    if (groupEventsByTx) {
+      txQueue += event
+    } else {
+      producers.values foreach (p ⇒ p.queue(createMutation(event)))
+    }
+  }
+
+  def handleTableMap(event: Event) {
+    val tableMapEventData: TableMapEventData = event.getData();
+
+    if (!tablesById.contains(tableMapEventData.getTableId)) {
+      val columns = getColumns(tableMapEventData.getDatabase(), tableMapEventData.getTable(), tableMapEventData.getColumnTypes())
+      val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
+      tablesById.put(tableMapEventData.getTableId(), table)
+    }
+  }
+
+  def handleXid(event: Event) {
+    if (groupEventsByTx) {
+      commit()
+    }
+  }
+
+  def handleQuery(event: Event) {
+    if (groupEventsByTx) {
+      val queryEventData: QueryEventData = event.getData()
+      val query = queryEventData.getSql()
+      if (groupEventsByTx) {
+        if ("BEGIN".equals(query)) {
+          transactionInProgress = true
+        } else if ("COMMIT".equals(query)) {
+          commit()
+        } else if ("ROLLBACK".equals(query)) {
+          rollback()
+        }
+      }
+    }
+  }
+
+  def getColumns(db: String, table: String, columnTypes: Array[Byte]): (List[ColumnMetadata], Option[PrimaryKey]) = {
+
+    val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
+      val dbConn = dbConns.getOrElseUpdate(db, {
+        val configuration = new Configuration(username, hostname, port, Some(password), Some("information_schema"))
+        val connection1: Connection = new MySQLConnection(configuration)
+        val connection2: Connection = new MySQLConnection(configuration)
+        val futures = Future.sequence(List(connection1.connect, connection2.connect))
+        Await.result(futures, 5 seconds)
+        List(connection1, connection2)
       })
+
+      val futureCols: Future[QueryResult] = dbConn(0).sendQuery(
+        s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
+
+      val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
+        case Some(resultSet) ⇒ {
+          resultSet.map(row ⇒ {
+            (row(0).asInstanceOf[String], row(1).equals("PRI"))
+          }).toList
+        }
+
+        case None ⇒ List.empty[(String, Boolean)]
+      })
+
+      val futurePkey: Future[QueryResult] = dbConn(1).sendQuery(
+        s"""SELECT COLUMN_NAME FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION""")
+
+      val pKey: Future[List[String]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
+        case Some(resultSet) ⇒ {
+          resultSet.map(row ⇒ {
+            row(0).asInstanceOf[String]
+          }).toList
+        }
+
+        case None ⇒ List.empty[String]
+      })
+
+      val results = Await.result(Future.sequence(List(mapCols, pKey)), 1 seconds)
+      val results1 = results(0)
+      val results2 = results(1)
+
+      val cols = createColumns(results1.asInstanceOf[List[(String, Boolean)]], columnTypes)
+      val primaryKey: Option[PrimaryKey] = try {
+        val primaryKeys: List[ColumnMetadata] = results2.asInstanceOf[List[String]].map(colName ⇒ cols.find(_.name.equals(colName)).get)
+        Some(PrimaryKey(primaryKeys))
+      } catch {
+        case t: Throwable ⇒ None
+      }
+
+      (cols, primaryKey)
+    })
+
+    cols
+  }
+
+  def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {
+    try {
+      // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
+      var cur = 0
+
+      val cols = columns.map(c ⇒ {
+        val colName = c._1
+        val isPrimaryKey = c._2
+        val colType = ColumnMetadata.typeByCode(columnTypes(cur))
+        cur += 1
+        ColumnMetadata(colName, colType, isPrimaryKey)
+      })
+
+      cols
+
+    } catch {
+      case e: Exception ⇒ {
+        Log.severe(s"Failed to determine column names: $columns\n${e.getMessage} -> ${e.getStackTraceString}")
+        List.empty[ColumnMetadata]
+      }
+    }
+  }
+
+  def rollback() {
+    txQueue.clear
+    transactionInProgress = false
+  }
+
+  def commit() {
+    val mutations = txQueue.map(createMutation(_))
+    producers.values foreach (p ⇒ p.queueList(mutations.toList))
+    txQueue.clear
+    transactionInProgress = false
+  }
+
+  override def toString(): String = s"$hostname:$port"
+
+  def connect() {
     client.connect()
   }
 
   def disconnect() {
     client.disconnect()
     flusher.foreach(_.cancel())
-    producers foreach (p ⇒ p.flush)
+    producers.values foreach (p ⇒ p.flush)
   }
 
-  def registerProducer(producer: Producer) {
-    producers += producer
+  def registerProducer(id: String, producer: Producer) {
+    producers += (id -> producer)
   }
 
   def isMutation(eventType: EventType): Boolean = eventType match {

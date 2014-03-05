@@ -4,17 +4,24 @@ import com.typesafe.config.ConfigFactory
 import scala.collection.JavaConverters._
 import java.io.{ PrintWriter, File }
 import mypipe.mysql.BinlogFilePos
+import mypipe.api.Log
 
 object Conf {
 
   val conf = ConfigFactory.load()
-  val sources = conf.getStringList("mypipe.sources")
+
   val DATADIR = conf.getString("mypipe.data-dir")
   val LOGDIR = conf.getString("mypipe.log-dir")
+
   val SHUTDOWN_FLUSH_WAIT_SECS = conf.getInt("mypipe.shutdown-wait-time-seconds")
   val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
   val FLUSH_INTERVAL_SECS = Conf.conf.getInt("mypipe.flush-interval-seconds")
+
+  val CONSUMERS = conf.getObject("mypipe.consumers").asScala
   val PRODUCERS = Conf.conf.getObject("mypipe.producers").asScala
+  val PIPES = Conf.conf.getObject("mypipe.pipes").asScala
+
+  private val lastBinlogFilePos = scala.collection.mutable.HashMap[String, BinlogFilePos]()
 
   try {
     new File(DATADIR).mkdirs()
@@ -23,14 +30,14 @@ object Conf {
     case e: Exception ⇒ println(s"Error while creating data and log dir ${DATADIR}, ${LOGDIR}: ${e.getMessage}")
   }
 
-  def binlogStatusFile(hostname: String, port: Int): String = {
-    s"$DATADIR/$hostname-$port.pos"
+  def binlogStatusFile(hostname: String, port: Int, pipe: String): String = {
+    s"$DATADIR/$pipe-$hostname-$port.pos"
   }
 
-  def binlogFilePos(hostname: String, port: Int): Option[BinlogFilePos] = {
+  def binlogFilePos(hostname: String, port: Int, pipe: String): Option[BinlogFilePos] = {
     try {
 
-      val statusFile = binlogStatusFile(hostname, port)
+      val statusFile = binlogStatusFile(hostname, port, pipe)
       val filePos = scala.io.Source.fromFile(statusFile).getLines().mkString.split(":")
       Some(BinlogFilePos(filePos(0), filePos(1).toLong))
 
@@ -39,18 +46,21 @@ object Conf {
     }
   }
 
-  private var lastBinlogFilePos = scala.collection.mutable.HashMap[String, BinlogFilePos]()
+  def binlogFilePosSave(hostname: String, port: Int, filePos: BinlogFilePos, pipe: String) {
 
-  def binlogFilePosSave(hostname: String, port: Int, filePos: BinlogFilePos) {
+    val key = binlogStatusFile(hostname, port, pipe)
 
-    if (!lastBinlogFilePos.getOrElse(hostname + port, "").equals(filePos)) {
-      Log.info(s"Saving binlog position for $hostname:$port => $filePos")
-      val fileName = binlogStatusFile(hostname, port)
+    if (!lastBinlogFilePos.getOrElse(key, "").equals(filePos)) {
+
+      val fileName = binlogStatusFile(hostname, port, pipe)
       val file = new File(fileName)
       val writer = new PrintWriter(file)
+
+      Log.info(s"Saving binlog position for pipe $pipe/$hostname:$port -> $filePos")
       writer.write(s"${filePos.filename}:${filePos.pos}")
       writer.close()
-      lastBinlogFilePos(hostname + port) = filePos
+
+      lastBinlogFilePos(key) = filePos
     }
   }
 }

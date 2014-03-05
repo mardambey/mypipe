@@ -1,6 +1,7 @@
-package mypipe
+package mypipe.api
 
 import java.util.logging.{ FileHandler, ConsoleHandler, Level, Logger }
+import mypipe.Conf
 
 object Log {
   val log = Logger.getLogger(getClass.getName)
