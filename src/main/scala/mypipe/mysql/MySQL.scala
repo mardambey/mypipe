@@ -32,12 +32,18 @@ object BinlogFilePos {
   val current = BinlogFilePos("", 0)
 }
 
+trait Listener {
+  def onConnect(consumer: BinlogConsumer)
+  def onDisconnect(consumer: BinlogConsumer)
+}
+
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
   val tablesById = scala.collection.mutable.HashMap[Long, Table]()
   var transactionInProgress = false
   val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   val producers = new scala.collection.mutable.HashMap[String, Producer]()
+  val listeners = new scala.collection.mutable.HashSet[Listener]()
   val txQueue = new scala.collection.mutable.ListBuffer[Event]
   val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
   val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
@@ -45,6 +51,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   implicit val ec = system.dispatcher
   var flusher: Option[Cancellable] = None
   val client = new BinaryLogClient(hostname, port, username, password)
+  val self = this
 
   if (binlogFileAndPos != BinlogFilePos.current) {
     Log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
@@ -78,6 +85,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
           p.flush
         }
       })
+
+      listeners foreach (l ⇒ l.onDisconnect(self))
     }
 
     override def onConnect(client: BinaryLogClient) {
@@ -91,6 +100,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
             }
           })
         })
+
+      listeners foreach (l ⇒ l.onConnect(self))
     }
 
     override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
@@ -242,6 +253,10 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   def registerProducer(id: String, producer: Producer) {
     producers += (id -> producer)
+  }
+
+  def registerListener(listener: Listener) {
+    listeners += listener
   }
 
   def isMutation(eventType: EventType): Boolean = eventType match {
