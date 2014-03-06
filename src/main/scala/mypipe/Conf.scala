@@ -21,6 +21,8 @@ object Conf {
   val PRODUCERS = Conf.conf.getObject("mypipe.producers").asScala
   val PIPES = Conf.conf.getObject("mypipe.pipes").asScala
 
+  val MYSQL_SERVER_ID_PREFIX = Conf.conf.getInt("mypipe.mysql-server-id-prefix")
+
   private val lastBinlogFilePos = scala.collection.mutable.HashMap[String, BinlogFilePos]()
 
   try {

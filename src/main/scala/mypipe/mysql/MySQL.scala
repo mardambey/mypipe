@@ -13,6 +13,8 @@ import com.github.mauricio.async.db.{ QueryResult, Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
 import akka.actor.{ Cancellable, ActorSystem }
+import akka.actor.ActorDSL._
+import akka.pattern.ask
 import scala.collection.immutable.ListMap
 import mypipe.api.PrimaryKey
 import mypipe.api.UpdateMutation
@@ -22,6 +24,7 @@ import mypipe.api.DeleteMutation
 import mypipe.api.Table
 import mypipe.api.Row
 import mypipe.api.InsertMutation
+import akka.util.Timeout
 
 case class BinlogFilePos(filename: String, pos: Long) {
   override def toString(): String = s"$filename:$pos"
@@ -35,6 +38,31 @@ object BinlogFilePos {
 trait Listener {
   def onConnect(consumer: BinlogConsumer)
   def onDisconnect(consumer: BinlogConsumer)
+}
+
+object MySQLServerId {
+
+  implicit val system = ActorSystem("mypipe")
+  implicit val ec = system.dispatcher
+  implicit val timeout = Timeout(1 second)
+
+  case object Next
+
+  val a = actor(new Act {
+    var id = Conf.MYSQL_SERVER_ID_PREFIX
+    become {
+      case Next ⇒ {
+        id += 1
+        sender ! id
+      }
+    }
+  })
+
+  def next: Int = {
+
+    val n = ask(a, Next)
+    Await.result(n, 1 second).asInstanceOf[Int]
+  }
 }
 
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
@@ -60,6 +88,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   } else {
     Log.info(s"Using current master binlog position for consuming from $hostname:$port")
   }
+
+  client.setServerId(MySQLServerId.next)
 
   client.registerEventListener(new EventListener() {
     override def onEvent(event: Event) {
