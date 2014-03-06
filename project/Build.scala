@@ -9,6 +9,7 @@ object ApplicationBuild extends Build {
       organization := "mypipe",
       scalaVersion := "2.10.3",
       fork in run := true,
+      parallelExecution in Test := false,
       resolvers ++= Seq(Resolver.mavenLocal,
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
         "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
@@ -18,7 +19,7 @@ object ApplicationBuild extends Build {
     )
 
   val appDependencies = Seq(
-    "org.specs2" %% "specs2" % "1.13",
+    "org.scalatest" % "scalatest_2.10" % "2.1.0" % "test",
     "com.typesafe.akka" %% "akka-actor" % "2.2.3",
 		"com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0-SNAPSHOT",
     "commons-lang" % "commons-lang" % "2.6",

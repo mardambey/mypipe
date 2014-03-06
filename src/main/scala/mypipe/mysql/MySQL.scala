@@ -39,19 +39,19 @@ trait Listener {
 
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
-  val tablesById = scala.collection.mutable.HashMap[Long, Table]()
-  var transactionInProgress = false
-  val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
-  val producers = new scala.collection.mutable.HashMap[String, Producer]()
-  val listeners = new scala.collection.mutable.HashSet[Listener]()
-  val txQueue = new scala.collection.mutable.ListBuffer[Event]
-  val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
-  val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
-  val system = ActorSystem("mypipe")
-  implicit val ec = system.dispatcher
-  var flusher: Option[Cancellable] = None
-  val client = new BinaryLogClient(hostname, port, username, password)
-  val self = this
+  protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
+  protected var transactionInProgress = false
+  protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
+  protected val producers = new scala.collection.mutable.HashMap[String, Producer]()
+  protected val listeners = new scala.collection.mutable.HashSet[Listener]()
+  protected val txQueue = new scala.collection.mutable.ListBuffer[Event]
+  protected val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
+  protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
+  protected val system = ActorSystem("mypipe")
+  protected implicit val ec = system.dispatcher
+  protected var flusher: Option[Cancellable] = None
+  protected val client = new BinaryLogClient(hostname, port, username, password)
+  protected val self = this
 
   if (binlogFileAndPos != BinlogFilePos.current) {
     Log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
@@ -108,7 +108,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
 
-  def handleMutation(event: Event) {
+  protected def handleMutation(event: Event) {
     if (groupEventsByTx) {
       txQueue += event
     } else {
@@ -116,7 +116,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
   }
 
-  def handleTableMap(event: Event) {
+  protected def handleTableMap(event: Event) {
     val tableMapEventData: TableMapEventData = event.getData();
 
     if (!tablesById.contains(tableMapEventData.getTableId)) {
@@ -126,13 +126,13 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
   }
 
-  def handleXid(event: Event) {
+  protected def handleXid(event: Event) {
     if (groupEventsByTx) {
       commit()
     }
   }
 
-  def handleQuery(event: Event) {
+  protected def handleQuery(event: Event) {
     if (groupEventsByTx) {
       val queryEventData: QueryEventData = event.getData()
       val query = queryEventData.getSql()
@@ -148,7 +148,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
   }
 
-  def getColumns(db: String, table: String, columnTypes: Array[Byte]): (List[ColumnMetadata], Option[PrimaryKey]) = {
+  protected def getColumns(db: String, table: String, columnTypes: Array[Byte]): (List[ColumnMetadata], Option[PrimaryKey]) = {
 
     val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
       val dbConn = dbConns.getOrElseUpdate(db, {
@@ -204,7 +204,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     cols
   }
 
-  def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {
+  protected def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {
     try {
       // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
       var cur = 0
@@ -227,12 +227,12 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }
   }
 
-  def rollback() {
+  protected def rollback() {
     txQueue.clear
     transactionInProgress = false
   }
 
-  def commit() {
+  protected def commit() {
     val mutations = txQueue.map(createMutation(_))
     producers.values foreach (p ⇒ p.queueList(mutations.toList))
     txQueue.clear
@@ -259,14 +259,14 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     listeners += listener
   }
 
-  def isMutation(eventType: EventType): Boolean = eventType match {
+  protected def isMutation(eventType: EventType): Boolean = eventType match {
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS |
       PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS |
       PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ true
     case _ ⇒ false
   }
 
-  def createMutation(event: Event): Mutation[_] = event.getHeader().asInstanceOf[EventHeader].getEventType() match {
+  protected def createMutation(event: Event): Mutation[_] = event.getHeader().asInstanceOf[EventHeader].getEventType() match {
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒ {
       val evData = event.getData[WriteRowsEventData]()
       val table = tablesById.get(evData.getTableId).get
