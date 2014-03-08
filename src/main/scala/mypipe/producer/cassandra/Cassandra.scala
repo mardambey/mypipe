@@ -2,6 +2,7 @@ package mypipe.producer.cassandra
 
 import akka.actor.{ Actor, ActorSystem, Props }
 import akka.pattern.ask
+import scala.collection.mutable
 import scala.concurrent.duration._
 import com.netflix.astyanax.{ Serializer, Keyspace, AstyanaxContext, MutationBatch }
 import mypipe.Conf
@@ -22,7 +23,7 @@ case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])
 case object Flush
 
-class CassandraBatchWriter(mappings: List[Mapping]) extends Actor {
+class CassandraBatchWriter(mappings: List[Mapping], mutations: mutable.HashMap[String, MutationBatch]) extends Actor {
 
   def receive = {
     case Queue(mutation)      ⇒ map(mutation)
@@ -31,9 +32,9 @@ class CassandraBatchWriter(mappings: List[Mapping]) extends Actor {
   }
 
   def flush(): Boolean = {
-    Log.info(s"Flush ${CassandraMapping.mutations.size} mutations.")
+    Log.info(s"Flush ${mutations.size} mutations.")
 
-    val results = CassandraMapping.mutations.map(m ⇒ {
+    val results = mutations.map(m ⇒ {
       try {
         // TODO: use execute async
         Some(m._2.execute())
@@ -45,7 +46,7 @@ class CassandraBatchWriter(mappings: List[Mapping]) extends Actor {
       }
     })
 
-    CassandraMapping.mutations.clear()
+    mutations.clear()
     true
   }
 
@@ -64,10 +65,12 @@ class CassandraBatchWriter(mappings: List[Mapping]) extends Actor {
 }
 
 object CassandraBatchWriter {
-  def props(mappings: List[Mapping]): Props = Props(new CassandraBatchWriter(mappings))
+  def props(mappings: List[Mapping], mutations: collection.mutable.HashMap[String, MutationBatch]): Props = Props(new CassandraBatchWriter(mappings, mutations))
 }
 
 case class CassandraProducer(mappings: List[Mapping], config: Config) extends Producer(mappings, config) {
+
+  val mutations = scala.collection.mutable.HashMap[String, MutationBatch]()
 
   val clusterConfig = try {
     val CASSANDRA_CLUSTER_NAME = config.getString("cluster.name")
@@ -82,10 +85,13 @@ case class CassandraProducer(mappings: List[Mapping], config: Config) extends Pr
     }
   }
 
-  mappings.foreach(_.asInstanceOf[CassandraMapping].clusterConfig = clusterConfig)
+  mappings.foreach(m ⇒ {
+    m.asInstanceOf[CassandraMapping].clusterConfig = clusterConfig
+    m.asInstanceOf[CassandraMapping].mutations = mutations
+  })
 
   val system = ActorSystem("mypipe")
-  val worker = system.actorOf(CassandraBatchWriter.props(mappings), "CassandraBatchWriterActor")
+  val worker = system.actorOf(CassandraBatchWriter.props(mappings, mutations), "CassandraBatchWriterActor")
 
   def queue(mutation: Mutation[_]) {
     worker ! Queue(mutation)
@@ -101,8 +107,7 @@ case class CassandraProducer(mappings: List[Mapping], config: Config) extends Pr
   }
 
   override def toString(): String = {
-    // TODO: this needs to be able to return the cassandra cluster address / name
-    "CassandraProducer"
+    s"CassandraProducer/${clusterConfig.clusterName}"
   }
 }
 
@@ -110,6 +115,7 @@ case class CassandraClusterConfig(clusterName: String, port: Int, seeds: String,
 
 trait CassandraMapping extends Mapping {
 
+  var mutations: scala.collection.mutable.HashMap[String, MutationBatch] = null
   var clusterConfig: CassandraClusterConfig = null
 
   val columnFamilies = scala.collection.mutable.HashMap[String, ColumnFamily[_, _]]()
@@ -119,7 +125,7 @@ trait CassandraMapping extends Mapping {
   }
 
   def mutation(keyspace: String): MutationBatch = {
-    CassandraMapping.mutations.getOrElseUpdate(keyspace, CassandraMapping.createMutation(keyspace, clusterConfig))
+    mutations.getOrElseUpdate(keyspace, CassandraMapping.createMutation(keyspace, clusterConfig))
   }
 
   protected def createColumnFamily[R, C](cf: String, keySer: Serializer[R], colSer: Serializer[C]): ColumnFamily[R, C] = {
@@ -133,7 +139,6 @@ object CassandraMapping {
   val LONG = LongSerializer.get()
 
   val keyspaces = scala.collection.mutable.HashMap[String, Keyspace]()
-  val mutations = scala.collection.mutable.HashMap[String, MutationBatch]()
 
   protected def createMutation(keyspace: String, clusterConfig: CassandraClusterConfig): MutationBatch = {
     val ks = keyspaces.getOrElseUpdate(keyspace, createKeyspace(keyspace, clusterConfig))
