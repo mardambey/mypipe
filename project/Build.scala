@@ -18,7 +18,7 @@ object ApplicationBuild extends Build {
         "Twitter Repository" at "http://maven.twttr.com/")
     )
 
-  val appDependencies = Seq(
+  val apiDependencies = Seq(
     "org.scalatest" % "scalatest_2.10" % "2.1.0" % "test",
     "com.typesafe.akka" %% "akka-actor" % "2.2.3",
 		"com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0-SNAPSHOT",
@@ -29,12 +29,33 @@ object ApplicationBuild extends Build {
 		"com.github.mauricio" %% "mysql-async" % "0.2.12"
   )
 
+	val samplesDependencies = apiDependencies
+
+  val runnerDependencies = apiDependencies
+
   lazy val root = Project(id = "mypipe",
-    base = file("."),
+    base = file(".")) aggregate (api, samples, runner)
+
+  lazy val runner = Project(id = "runner",
+    base = file("mypipe-runner"),
     settings = Project.defaultSettings ++ Seq(
-      libraryDependencies ++= appDependencies
+      libraryDependencies ++= runnerDependencies
+    ) ++ Format.settings
+  ) dependsOn(api, samples)
+
+  lazy val api = Project(id = "api",
+    base = file("mypipe-api"),
+    settings = Project.defaultSettings ++ Seq(
+      libraryDependencies ++= apiDependencies
     ) ++ Format.settings
   )
+
+  lazy val samples = Project(id = "samples",
+    base = file("mypipe-samples"),
+    settings = Project.defaultSettings ++ Seq(
+      libraryDependencies ++= samplesDependencies
+    ) ++ Format.settings
+  ) dependsOn(api)
 }
 
 object Format {

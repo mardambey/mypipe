@@ -1,4 +1,4 @@
-package mypipe.sample.mappings
+package mappings
 
 import mypipe.producer.cassandra.CassandraMapping
 import mypipe.producer.cassandra.CassandraMapping._
