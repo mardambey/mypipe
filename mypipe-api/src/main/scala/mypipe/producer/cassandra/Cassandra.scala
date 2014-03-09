@@ -8,9 +8,6 @@ import com.netflix.astyanax.{ Serializer, Keyspace, AstyanaxContext, MutationBat
 import mypipe.Conf
 import scala.concurrent.Await
 import mypipe.api._
-import mypipe.api.DeleteMutation
-import mypipe.api.UpdateMutation
-import mypipe.api.InsertMutation
 import com.netflix.astyanax.serializers._
 import com.netflix.astyanax.thrift.ThriftFamilyFactory
 import com.netflix.astyanax.connectionpool.impl.{ ConnectionPoolConfigurationImpl, CountingConnectionPoolMonitor }
@@ -21,10 +18,7 @@ import com.typesafe.config.Config
 import mypipe.api.UpdateMutation
 import scala.Some
 import mypipe.api.DeleteMutation
-import mypipe.producer.cassandra.CassandraClusterConfig
-import mypipe.producer.cassandra.QueueList
 import mypipe.api.InsertMutation
-import mypipe.producer.cassandra.Queue
 
 case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])

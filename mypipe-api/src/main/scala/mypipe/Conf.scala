@@ -1,7 +1,6 @@
 package mypipe
 
 import com.typesafe.config.ConfigFactory
-import scala.collection.JavaConverters._
 import java.io.{ PrintWriter, File }
 import mypipe.mysql.BinlogFilePos
 import mypipe.api.Log
@@ -16,10 +15,6 @@ object Conf {
   val SHUTDOWN_FLUSH_WAIT_SECS = conf.getInt("mypipe.shutdown-wait-time-seconds")
   val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
   val FLUSH_INTERVAL_SECS = Conf.conf.getInt("mypipe.flush-interval-seconds")
-
-  val CONSUMERS = conf.getObject("mypipe.consumers").asScala
-  val PRODUCERS = Conf.conf.getObject("mypipe.producers").asScala
-  val PIPES = Conf.conf.getObject("mypipe.pipes").asScala
 
   val MYSQL_SERVER_ID_PREFIX = Conf.conf.getInt("mypipe.mysql-server-id-prefix")
 
