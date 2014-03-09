@@ -4,6 +4,13 @@ mypipe latches onto a MySQL server with binary log replication enabled and
 allows for the creation of pipes that can consume the replication stream and
 act on the data.
 
+mypipe tries to provide enough information that usually is not part of the
+MySQL binary log stream so that the data is meaningful. mypipe requires a
+row based binary log format and provides `Insert`, `Update`, and `Delete`
+mutations representing changed rows. Each change is related back to it's
+table and the API provides metadata like column types, primary key
+information (composite, key order), and other such useful information.
+
 ## Producers
 
 Producers receive MySQL binary log events and act on them. They can funnel
