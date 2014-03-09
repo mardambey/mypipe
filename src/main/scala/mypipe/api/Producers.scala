@@ -26,9 +26,17 @@ object ColumnMetadata {
 
 case class PrimaryKey(columns: List[ColumnMetadata])
 case class ColumnMetadata(name: String, colType: ColumnMetadata.ColumnType, isPrimaryKey: Boolean)
-case class Column(metadata: ColumnMetadata, value: Serializable = null)
 case class Row(table: Table, columns: Map[String, Column])
 case class Table(id: java.lang.Long, name: String, db: String, evData: TableMapEventData, columns: List[ColumnMetadata], primaryKey: Option[PrimaryKey])
+
+case class Column(metadata: ColumnMetadata, value: Serializable = null) {
+  def value[T]: T = {
+    value match {
+      case null ⇒ null.asInstanceOf[T]
+      case v    ⇒ v.asInstanceOf[T]
+    }
+  }
+}
 
 sealed abstract class Mutation[T](val table: Table, val rows: T) {
   def execute()

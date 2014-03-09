@@ -11,13 +11,20 @@ import mypipe.api._
 import mypipe.api.DeleteMutation
 import mypipe.api.UpdateMutation
 import mypipe.api.InsertMutation
-import com.netflix.astyanax.serializers.{ TimeUUIDSerializer, LongSerializer, StringSerializer }
+import com.netflix.astyanax.serializers._
 import com.netflix.astyanax.thrift.ThriftFamilyFactory
 import com.netflix.astyanax.connectionpool.impl.{ ConnectionPoolConfigurationImpl, CountingConnectionPoolMonitor }
 import com.netflix.astyanax.connectionpool.NodeDiscoveryType
 import com.netflix.astyanax.impl.AstyanaxConfigurationImpl
 import com.netflix.astyanax.model.ColumnFamily
 import com.typesafe.config.Config
+import mypipe.api.UpdateMutation
+import scala.Some
+import mypipe.api.DeleteMutation
+import mypipe.producer.cassandra.CassandraClusterConfig
+import mypipe.producer.cassandra.QueueList
+import mypipe.api.InsertMutation
+import mypipe.producer.cassandra.Queue
 
 case class Queue(mutation: Mutation[_])
 case class QueueList(mutations: List[Mutation[_]])
@@ -137,6 +144,7 @@ object CassandraMapping {
   val TIMEUUID = TimeUUIDSerializer.get()
   val STRING = StringSerializer.get()
   val LONG = LongSerializer.get()
+  val INT = IntegerSerializer.get()
 
   val keyspaces = scala.collection.mutable.HashMap[String, Keyspace]()
 
