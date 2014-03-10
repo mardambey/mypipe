@@ -23,7 +23,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
         Conf.FLUSH_INTERVAL_SECS seconds) {
           Conf.binlogFilePosSave(consumer.hostname, consumer.port,
             BinlogFilePos(consumer.client.getBinlogFilename, consumer.client.getBinlogPosition),
-            producer.getClass.getSimpleName)
+            id)
           producer.flush
         })
     }
@@ -35,7 +35,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
         consumer.hostname,
         consumer.port,
         BinlogFilePos(consumer.client.getBinlogFilename, consumer.client.getBinlogPosition),
-        producer.getClass.getSimpleName)
+        id)
       producer.flush
     }
 
@@ -60,7 +60,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
         c.registerListener(listener)
         val t = new Thread() {
           override def run() {
-            Log.info(s"Connecting pipe between ${c} -> ${producer.getClass}")
+            Log.info(s"Connecting pipe between $c -> $producer")
             c.connect()
           }
         }
