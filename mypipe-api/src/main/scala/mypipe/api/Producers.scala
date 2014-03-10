@@ -3,7 +3,6 @@ package mypipe.api
 import java.io.Serializable
 import com.github.shyiko.mysql.binlog.event.TableMapEventData
 import com.github.shyiko.mysql.binlog.event.deserialization.{ ColumnType ⇒ MColumnType }
-import mypipe.mysql.{ Listener, BinlogConsumer }
 import com.typesafe.config.Config
 
 abstract class Mapping {
@@ -13,8 +12,8 @@ abstract class Mapping {
 }
 
 abstract class Producer(mappings: List[Mapping], config: Config) {
-  def queue(mutation: Mutation[_])
-  def queueList(mutation: List[Mutation[_]])
+  def queue(mutation: Mutation[_]): Boolean
+  def queueList(mutation: List[Mutation[_]]): Boolean
   def flush()
 }
 
@@ -72,65 +71,3 @@ case class DeleteMutation(
   }
 }
 
-class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
-
-  var CONSUMER_DISCONNECT_WAIT_SECS = 2
-
-  var threads = List.empty[Thread]
-  val listener = PipeListener(this)
-
-  def connect() {
-
-    if (threads.size > 0) {
-
-      Log.warning("Attempting to reconnect pipe while already connected, aborting!")
-
-    } else {
-
-      threads = consumers.map(c ⇒ {
-        c.registerListener(listener)
-        c.registerProducer(id, producer)
-        val t = new Thread() {
-          override def run() {
-            Log.info(s"Connecting pipe between ${c} -> ${producer.getClass}")
-            c.connect()
-          }
-        }
-
-        t.start()
-        t
-      })
-    }
-  }
-
-  def disconnect() {
-    for (
-      c ← consumers;
-      t ← threads
-    ) {
-      try {
-        Log.info(s"Disconnecting pipe between ${c} -> ${producer}")
-        c.disconnect()
-        t.join(CONSUMER_DISCONNECT_WAIT_SECS * 1000)
-      } catch {
-        case e: Exception ⇒ Log.severe(s"Caught exception while trying to disconnect from ${c.hostname}:${c.port} at binlog position ${c.binlogFileAndPos}.")
-      }
-    }
-  }
-
-  override def toString(): String = id
-}
-
-object PipeListener {
-  def apply(pipe: Pipe) = new PipeListener(pipe)
-}
-
-class PipeListener(pipe: Pipe) extends Listener {
-  def onConnect(consumer: BinlogConsumer) {
-    Log.info(s"Pipe $pipe connected!")
-  }
-
-  def onDisconnect(consumer: BinlogConsumer) {
-    Log.info(s"Pipe $pipe disconnected.")
-  }
-}

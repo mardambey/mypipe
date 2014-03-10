@@ -94,12 +94,14 @@ case class CassandraProducer(mappings: List[Mapping], config: Config) extends Pr
   val system = ActorSystem("mypipe")
   val worker = system.actorOf(CassandraBatchWriter.props(mappings, mutations), "CassandraBatchWriterActor")
 
-  def queue(mutation: Mutation[_]) {
+  def queue(mutation: Mutation[_]): Boolean = {
     worker ! Queue(mutation)
+    true
   }
 
-  def queueList(mutations: List[Mutation[_]]) {
+  def queueList(mutations: List[Mutation[_]]): Boolean = {
     worker ! QueueList(mutations)
+    true
   }
 
   def flush() {

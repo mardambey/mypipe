@@ -2,9 +2,7 @@ package mypipe.samples.mappings
 
 import mypipe.producer.cassandra.CassandraMapping
 import mypipe.producer.cassandra.CassandraMapping._
-import mypipe.api.DeleteMutation
-import mypipe.api.UpdateMutation
-import mypipe.api.InsertMutation
+import mypipe.api.{ DeleteMutation, UpdateMutation, InsertMutation }
 import java.lang.Long
 
 import com.netflix.astyanax.util.TimeUUIDUtils

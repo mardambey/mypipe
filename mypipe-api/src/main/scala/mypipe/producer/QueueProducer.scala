@@ -9,12 +9,14 @@ class QueueProducer(queue: util.Queue[Mutation[_]]) extends Producer(mappings = 
   override def flush() {
   }
 
-  override def queueList(mutationz: List[Mutation[_]]) {
+  override def queueList(mutationz: List[Mutation[_]]): Boolean = {
     queue.addAll(mutationz.asJava)
+    true
   }
 
-  override def queue(mutation: Mutation[_]) {
+  override def queue(mutation: Mutation[_]): Boolean = {
     queue.add(mutation)
+    true
   }
 
   override def toString(): String = {

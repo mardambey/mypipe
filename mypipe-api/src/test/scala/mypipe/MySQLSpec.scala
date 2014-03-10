@@ -86,8 +86,17 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   val consumer = BinlogConsumer(hostname, port, username, password, BinlogFilePos.current)
 
-  consumer.registerProducer("queue", queueProducer)
   consumer.registerListener(new Listener() {
+    def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
+      queueProducer.queue(mutation)
+      true
+    }
+
+    def onMutation(c: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
+      queueProducer.queueList(mutations.toList)
+      true
+    }
+
     def onConnect(c: BinlogConsumer) {
       connected = true
     }

@@ -16,11 +16,12 @@ class StdoutProducer(mappings: List[Mapping], config: Config) extends Producer(m
     }
   }
 
-  override def queueList(mutationz: List[Mutation[_]]) {
+  override def queueList(mutationz: List[Mutation[_]]): Boolean = {
     mutationz.foreach(queue)
+    true
   }
 
-  override def queue(mutation: Mutation[_]) {
+  override def queue(mutation: Mutation[_]): Boolean = {
     mutation match {
 
       case i: InsertMutation ⇒ {
@@ -69,6 +70,8 @@ class StdoutProducer(mappings: List[Mapping], config: Config) extends Producer(m
       }
 
     }
+
+    true
   }
 
   override def toString(): String = {

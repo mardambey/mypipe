@@ -2,7 +2,7 @@ package mypipe
 
 import mypipe.mysql.{ BinlogConsumer, BinlogFilePos, HostPortUserPass }
 import scala.collection.JavaConverters._
-import mypipe.api.{ Pipe, Log, Mapping, Producer }
+import mypipe.api.{ Log, Mapping, Producer }
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 object Mypipe extends App {
@@ -12,14 +12,14 @@ object Mypipe extends App {
   val PRODUCERS = Conf.conf.getObject("mypipe.producers").asScala
   val PIPES = Conf.conf.getObject("mypipe.pipes").asScala
 
-  val producers: Map[String, Class[Producer]] = PRODUCERS.map(kv ⇒ {
+  lazy val producers: Map[String, Class[Producer]] = PRODUCERS.map(kv ⇒ {
     val name = kv._1
     val conf = Conf.conf.getConfig(s"mypipe.producers.$name")
     val clazz = conf.getString("class")
     (name, Class.forName(clazz).asInstanceOf[Class[Producer]])
   }).toMap
 
-  val consumers: Map[String, HostPortUserPass] = CONSUMERS.map(kv ⇒ {
+  lazy val consumers: Map[String, HostPortUserPass] = CONSUMERS.map(kv ⇒ {
     val name = kv._1
     val conf = Conf.conf.getConfig(s"mypipe.consumers.$name")
     val source = conf.getString("source")
@@ -27,7 +27,7 @@ object Mypipe extends App {
     (name, params)
   }).toMap
 
-  val pipes: List[Pipe] = PIPES.map(kv ⇒ {
+  lazy val pipes: List[Pipe] = PIPES.map(kv ⇒ {
 
     val name = kv._1
 

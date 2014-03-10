@@ -38,6 +38,8 @@ object BinlogFilePos {
 trait Listener {
   def onConnect(consumer: BinlogConsumer)
   def onDisconnect(consumer: BinlogConsumer)
+  def onMutation(consumer: BinlogConsumer, mutation: Mutation[_]): Boolean
+  def onMutation(consumer: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean
 }
 
 object MySQLServerId {
@@ -70,16 +72,17 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
   protected var transactionInProgress = false
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
-  protected val producers = new scala.collection.mutable.HashMap[String, Producer]()
   protected val listeners = new scala.collection.mutable.HashSet[Listener]()
   protected val txQueue = new scala.collection.mutable.ListBuffer[Event]
   protected val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
   protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
   protected val system = ActorSystem("mypipe")
   protected implicit val ec = system.dispatcher
-  protected var flusher: Option[Cancellable] = None
-  protected val client = new BinaryLogClient(hostname, port, username, password)
   protected val self = this
+  val client = new BinaryLogClient(hostname, port, username, password)
+
+  // FIXME: this needs to be configurable
+  protected val quitOnEventHandleFailure = true
 
   if (binlogFileAndPos != BinlogFilePos.current) {
     Log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
@@ -98,9 +101,14 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
       eventType match {
         case TABLE_MAP ⇒ handleTableMap(event)
-        case QUERY ⇒ handleQuery(event)
-        case XID ⇒ handleXid(event)
-        case e: EventType if isMutation(eventType) == true ⇒ handleMutation(event)
+        case QUERY     ⇒ handleQuery(event)
+        case XID       ⇒ handleXid(event)
+        case e: EventType if isMutation(eventType) == true ⇒ {
+          if (!handleMutation(event) && quitOnEventHandleFailure) {
+            Log.severe(s"Failed to process event $event and asked to quit on event handler failure.")
+            // FIXME: stop processing events
+          }
+        }
         case _ ⇒ Log.finer(s"Event ignored ${eventType}")
       }
     }
@@ -108,29 +116,10 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   client.registerLifecycleListener(new LifecycleListener {
     override def onDisconnect(client: BinaryLogClient): Unit = {
-      flusher.foreach(_.cancel())
-      producers foreach ({
-        case (n, p) ⇒ {
-          Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition), n)
-          p.flush
-        }
-      })
-
       listeners foreach (l ⇒ l.onDisconnect(self))
     }
 
     override def onConnect(client: BinaryLogClient) {
-      flusher = Some(system.scheduler.schedule(
-        Conf.FLUSH_INTERVAL_SECS seconds,
-        Conf.FLUSH_INTERVAL_SECS seconds) {
-          producers foreach ({
-            case (n, p) ⇒ {
-              Conf.binlogFilePosSave(hostname, port, BinlogFilePos(client.getBinlogFilename, client.getBinlogPosition), n)
-              p.flush
-            }
-          })
-        })
-
       listeners foreach (l ⇒ l.onConnect(self))
     }
 
@@ -138,11 +127,14 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
 
-  protected def handleMutation(event: Event) {
+  protected def handleMutation(event: Event): Boolean = {
     if (groupEventsByTx) {
       txQueue += event
+      true
     } else {
-      producers.values foreach (p ⇒ p.queue(createMutation(event)))
+      listeners.foreach(_.onMutation(self, createMutation(event)))
+      // FIXME: return properly
+      true
     }
   }
 
@@ -264,7 +256,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   protected def commit() {
     val mutations = txQueue.map(createMutation(_))
-    producers.values foreach (p ⇒ p.queueList(mutations.toList))
+    listeners.foreach(_.onMutation(this, mutations))
     txQueue.clear
     transactionInProgress = false
   }
@@ -277,12 +269,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   def disconnect() {
     client.disconnect()
-    flusher.foreach(_.cancel())
-    producers.values foreach (p ⇒ p.flush)
-  }
-
-  def registerProducer(id: String, producer: Producer) {
-    producers += (id -> producer)
   }
 
   def registerListener(listener: Listener) {
