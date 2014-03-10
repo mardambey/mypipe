@@ -105,8 +105,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
         case XID       ⇒ handleXid(event)
         case e: EventType if isMutation(eventType) == true ⇒ {
           if (!handleMutation(event) && quitOnEventHandleFailure) {
-            Log.severe(s"Failed to process event $event and asked to quit on event handler failure.")
-            // FIXME: stop processing events
+            Log.severe(s"Failed to process event $event and asked to quit on event handler failure, disconnecting from $hostname:$port")
+            client.disconnect()
           }
         }
         case _ ⇒ Log.finer(s"Event ignored ${eventType}")
@@ -128,13 +128,25 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   })
 
   protected def handleMutation(event: Event): Boolean = {
+
     if (groupEventsByTx) {
+
       txQueue += event
       true
+
     } else {
-      listeners.foreach(_.onMutation(self, createMutation(event)))
-      // FIXME: return properly
-      true
+
+      val results = listeners.takeWhile(l ⇒ try { l.onMutation(self, createMutation(event)) }
+      catch {
+        case e: Exception ⇒
+          Log.severe("Listener $l failed on mutation from event: $event")
+          false
+      })
+
+      // make sure all listeners have returned true
+      if (results.size == listeners.size) true
+      // TODO: we know which listener failed, we can do something about it
+      else false
     }
   }
 

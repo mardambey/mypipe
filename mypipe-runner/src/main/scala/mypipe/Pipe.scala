@@ -41,14 +41,10 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
 
     override def onMutation(consumer: BinlogConsumer, mutation: Mutation[_]): Boolean = {
       producer.queue(mutation)
-      // FIXME: properly handle return value
-      true
     }
 
     override def onMutation(consumer: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
       producer.queueList(mutations.toList)
-      // FIXME: properly handle return value
-      true
     }
   }
 
