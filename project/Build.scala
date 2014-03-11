@@ -23,6 +23,7 @@ object ApplicationBuild extends Build {
 
   val apiDependencies = Seq(
     akkaActor,
+    akkaAgent,
     commonsLang,
     mysqlAsync,
     mysqlBinlogConnectorJava,
@@ -89,6 +90,7 @@ object Dependencies {
 
     val scalaTest = "org.scalatest" % "scalatest_2.10" % "2.1.0" % "test"
     val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.2.3"
+    val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.2.3"
     val typesafeConfig = "com.typesafe" % "config" % "1.2.0"
     val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0-SNAPSHOT"
     val commonsLang = "commons-lang" % "commons-lang" % "2.6"

@@ -24,11 +24,13 @@ case class Db(hostname: String, port: Int, username: String, password: String, d
   def connect(timeoutMillis: Int = 5000) {
     connection = new MySQLConnection(configuration)
     val future = connection.connect
-    Await.result(future, timeoutMillis seconds)
+    Await.result(future, timeoutMillis millis)
   }
 
-  def disconnect {
-    connection.disconnect
+  def disconnect: Unit = disconnect()
+  def disconnect(timeoutMillis: Int = 5000) {
+    val future = connection.disconnect
+    Await.result(future, timeoutMillis millis)
   }
 }
 
@@ -50,24 +52,26 @@ trait DatabaseSpec {
 }
 
 trait ActorSystemSpec {
-  val system = ActorSystem("mypipe-tests")
+  implicit val system = ActorSystem("mypipe-tests")
   implicit val ec = system.dispatcher
 }
 
 object Queries {
 
   object INSERT {
-    val statement = """INSERT INTO user values (NULL, "username", "password")"""
-    val fields = List("id", "username", "password")
+    def statement: String = statement()
+    def statement(id: String = "NULL", username: String = "username", password: String = "password", loginCount: Int = 0): String =
+      s"""INSERT INTO user values ($id, "$username", "$password", $loginCount)"""
+    val fields = List("id", "username", "password", "login_count")
   }
 
   object UPDATE {
     val statement = """UPDATE user set username = "username2", password = "password2""""
-    val fields = List("id", "username", "password")
+    val fields = List("id", "username", "password", "login_count")
   }
 
   object TRUNCATE {
-    val statment = """TRUNCATE user"""
+    val statement = """TRUNCATE user"""
   }
 
   object DELETE {
