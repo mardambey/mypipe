@@ -12,7 +12,6 @@ import akka.actor.ActorSystem
 import org.scalatest.BeforeAndAfterAll
 import mypipe.api.UpdateMutation
 import scala.Some
-import mypipe.mysql.BinlogConsumer
 import mypipe.api.InsertMutation
 
 case class Db(hostname: String, port: Int, username: String, password: String, dbName: String) {

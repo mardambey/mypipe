@@ -9,13 +9,12 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import mypipe.Conf
 import mypipe.api._
-import com.github.mauricio.async.db.{ QueryResult, Connection, Configuration }
-import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
-import akka.actor.{ Cancellable, ActorSystem }
+import akka.actor._
 import akka.actor.ActorDSL._
 import akka.pattern.ask
 import scala.collection.immutable.ListMap
+import akka.util.Timeout
 import mypipe.api.PrimaryKey
 import mypipe.api.UpdateMutation
 import scala.Some
@@ -24,7 +23,6 @@ import mypipe.api.DeleteMutation
 import mypipe.api.Table
 import mypipe.api.Row
 import mypipe.api.InsertMutation
-import akka.util.Timeout
 
 case class BinlogFilePos(filename: String, pos: Long) {
   override def toString(): String = s"$filename:$pos"
@@ -74,12 +72,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   protected val listeners = new scala.collection.mutable.HashSet[Listener]()
   protected val txQueue = new scala.collection.mutable.ListBuffer[Event]
-  protected val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
-  protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
   protected val system = ActorSystem("mypipe")
   protected implicit val ec = system.dispatcher
   protected val self = this
   val client = new BinaryLogClient(hostname, port, username, password)
+  val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
 
   // FIXME: this needs to be configurable
   protected val quitOnEventHandleFailure = true
@@ -154,7 +151,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     val tableMapEventData: TableMapEventData = event.getData();
 
     if (!tablesById.contains(tableMapEventData.getTableId)) {
-      val columns = getColumns(tableMapEventData.getDatabase(), tableMapEventData.getTable(), tableMapEventData.getColumnTypes())
+      // TODO: make this configurable
+      implicit val timeout = Timeout(2 second)
+
+      val future = ask(dbMetadata, GetColumns(tableMapEventData)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
+      val columns = Await.result(future, 2 seconds)
       val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
       tablesById.put(tableMapEventData.getTableId(), table)
     }
@@ -178,85 +179,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
         } else if ("ROLLBACK".equals(query)) {
           rollback()
         }
-      }
-    }
-  }
-
-  protected def getColumns(db: String, table: String, columnTypes: Array[Byte]): (List[ColumnMetadata], Option[PrimaryKey]) = {
-
-    val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
-      val dbConn = dbConns.getOrElseUpdate(db, {
-        val configuration = new Configuration(username, hostname, port, Some(password), Some("information_schema"))
-        val connection1: Connection = new MySQLConnection(configuration)
-        val connection2: Connection = new MySQLConnection(configuration)
-        val futures = Future.sequence(List(connection1.connect, connection2.connect))
-        Await.result(futures, 5 seconds)
-        List(connection1, connection2)
-      })
-
-      val futureCols: Future[QueryResult] = dbConn(0).sendQuery(
-        s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
-
-      val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
-        case Some(resultSet) ⇒ {
-          resultSet.map(row ⇒ {
-            (row(0).asInstanceOf[String], row(1).equals("PRI"))
-          }).toList
-        }
-
-        case None ⇒ List.empty[(String, Boolean)]
-      })
-
-      val futurePkey: Future[QueryResult] = dbConn(1).sendQuery(
-        s"""SELECT COLUMN_NAME FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION""")
-
-      val pKey: Future[List[String]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
-        case Some(resultSet) ⇒ {
-          resultSet.map(row ⇒ {
-            row(0).asInstanceOf[String]
-          }).toList
-        }
-
-        case None ⇒ List.empty[String]
-      })
-
-      val results = Await.result(Future.sequence(List(mapCols, pKey)), 1 seconds)
-      val results1 = results(0)
-      val results2 = results(1)
-
-      val cols = createColumns(results1.asInstanceOf[List[(String, Boolean)]], columnTypes)
-      val primaryKey: Option[PrimaryKey] = try {
-        val primaryKeys: List[ColumnMetadata] = results2.asInstanceOf[List[String]].map(colName ⇒ cols.find(_.name.equals(colName)).get)
-        Some(PrimaryKey(primaryKeys))
-      } catch {
-        case t: Throwable ⇒ None
-      }
-
-      (cols, primaryKey)
-    })
-
-    cols
-  }
-
-  protected def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {
-    try {
-      // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
-      var cur = 0
-
-      val cols = columns.map(c ⇒ {
-        val colName = c._1
-        val isPrimaryKey = c._2
-        val colType = ColumnMetadata.typeByCode(columnTypes(cur))
-        cur += 1
-        ColumnMetadata(colName, colType, isPrimaryKey)
-      })
-
-      cols
-
-    } catch {
-      case e: Exception ⇒ {
-        Log.severe(s"Failed to determine column names: $columns\n${e.getMessage} -> ${e.getStackTraceString}")
-        List.empty[ColumnMetadata]
       }
     }
   }
@@ -332,7 +254,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
       // zip the names and values from the table's columns and the row's data and
       // create a map that contains column names to Column objects with values
-
       val old = ListMap.empty[String, Column] ++ table.columns.zip(evRow.getKey).map(c ⇒ c._1.name -> Column(c._1, c._2))
       val cur = ListMap.empty[String, Column] ++ table.columns.zip(evRow.getValue).map(c ⇒ c._1.name -> Column(c._1, c._2))
 

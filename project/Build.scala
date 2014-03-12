@@ -9,8 +9,6 @@ object ApplicationBuild extends Build {
       version := "0.0.1",
       organization := "mypipe",
       scalaVersion := "2.10.3",
-      fork in run := true,
-      parallelExecution in Test := false,
       resolvers ++= Seq(Resolver.mavenLocal,
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
         "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
@@ -59,6 +57,7 @@ object ApplicationBuild extends Build {
   lazy val runner = Project(id = "runner",
     base = file("mypipe-runner"),
     settings = Project.defaultSettings ++ Seq(
+      fork in run := true,
       libraryDependencies ++= runnerDependencies
     ) ++ Format.settings
   ) dependsOn(api, producers, samples)
@@ -74,6 +73,7 @@ object ApplicationBuild extends Build {
   lazy val api = Project(id = "api",
     base = file("mypipe-api"),
     settings = Project.defaultSettings ++ Seq(
+      parallelExecution in Test := false,
       libraryDependencies ++= apiDependencies
     ) ++ Format.settings
   )
