@@ -1,4 +1,6 @@
 # TODO:
+- Expose the stdout producer through a some application that accepts the
+	hostname, port, etc. and simply `tails` the binlog.
 - Periodically refresh MySQL table metadata
 - MySQLSpec should create the user table if it is not present.
 - Add metrics into various parts of the pipeline.
