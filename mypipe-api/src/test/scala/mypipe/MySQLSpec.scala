@@ -114,6 +114,8 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
     db.connect
     while (!connected) { Thread.sleep(1) }
+
+    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1 second)
   }
 
   override def afterAll() {

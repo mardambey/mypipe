@@ -19,6 +19,8 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
 
   @volatile var connected = false
 
+  // TODO: fetch form config
+  val maxLatency = 500.0
   val latencies = ListBuffer[Long]()
 
   override def beforeAll() {
@@ -42,7 +44,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
   case object Consume
   case object Quit
 
-  "Mypipe" should "consume messages with a low latency" in {
+  "Mypipe" should s"consume messages with a latency lower than $maxLatency millis" in {
 
     // actor1:
     // add row into local queue
@@ -171,6 +173,6 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
     val latency = latencies.fold(0L)(_ + _) / latencies.size
 
     println(s"Latency: ${latency / 1000000.0} millis ($latency nanos)")
-    assert(latency / 1000000.0 < 500.0)
+    assert(latency / 1000000.0 < maxLatency)
   }
 }
