@@ -3,7 +3,6 @@
 - Expose the stdout producer through a some application that accepts the
 	hostname, port, etc. and simply `tails` the binlog.
 - Periodically refresh MySQL table metadata
-- MySQLSpec should create the user table if it is not present.
 - Add metrics into various parts of the pipeline.
 - HBase producer
 - HDFS producer (through HFile?)
@@ -14,6 +13,7 @@
 
 # DONE:
 - Do not use TableMapEventData in the MySQLMetadataManager (third party API leak into ours)
+- MySQLSpec should create the user table if it is not present.
 - Add MySQLMetadataManagerSpec
 - Split out MySQL table metadata fetcher from BinlogConumer
 - Add a latency test / gauge used to tell us how long it takes for an event
