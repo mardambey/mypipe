@@ -1,6 +1,6 @@
 package mypipe.mysql
 
-import mypipe.api.{ PrimaryKey, Log, ColumnMetadata }
+import mypipe.api.{ ColumnType, PrimaryKey, Log, ColumnMetadata }
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import com.github.mauricio.async.db.{ Configuration, Connection, QueryResult }
@@ -111,7 +111,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
       val cols = columns.map(c ⇒ {
         val colName = c._1
         val isPrimaryKey = c._2
-        val colType = ColumnMetadata.typeByCode(columnTypes(cur))
+        val colType = ColumnType.typeByCode(columnTypes(cur)).getOrElse(ColumnType.UNKNOWN)
         cur += 1
         ColumnMetadata(colName, colType, isPrimaryKey)
       })
