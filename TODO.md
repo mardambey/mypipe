@@ -1,7 +1,5 @@
 # TODO:
-- Do not use TableMapEventData in the MySQLMetadataManager (third party API leak into ours)
 - Logging format should be controlled through config file, not code
-- Add MySQLMetadataManagerSpec
 - Expose the stdout producer through a some application that accepts the
 	hostname, port, etc. and simply `tails` the binlog.
 - Periodically refresh MySQL table metadata
@@ -15,6 +13,8 @@
 - Close db connections on exit
 
 # DONE:
+- Do not use TableMapEventData in the MySQLMetadataManager (third party API leak into ours)
+- Add MySQLMetadataManagerSpec
 - Split out MySQL table metadata fetcher from BinlogConumer
 - Add a latency test / gauge used to tell us how long it takes for an event
 	to enter the MySQL database and get acted upon by a producer (queued, not
