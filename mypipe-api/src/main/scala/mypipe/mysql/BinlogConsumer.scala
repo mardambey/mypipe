@@ -154,7 +154,13 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       // TODO: make this configurable
       implicit val timeout = Timeout(2 second)
 
-      val future = ask(dbMetadata, GetColumns(tableMapEventData)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
+      val db = tableMapEventData.getDatabase
+      val tableName = tableMapEventData.getTable
+
+      val colTypes = tableMapEventData.getColumnTypes.map(
+        colType ⇒ ColumnType.typeByCode(colType.toInt).getOrElse(ColumnType.UNKNOWN)).toArray
+
+      val future = ask(dbMetadata, GetColumns(db, tableName, colTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
       val columns = Await.result(future, 2 seconds)
       val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
       tablesById.put(tableMapEventData.getTableId(), table)

@@ -6,14 +6,13 @@ import scala.concurrent.duration._
 import com.github.mauricio.async.db.{ Configuration, Connection, QueryResult }
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ Props, Actor, OneForOneStrategy }
-import com.github.shyiko.mysql.binlog.event.TableMapEventData
 import com.github.mauricio.async.db.mysql.MySQLConnection
 
 object MySQLMetadataManager {
   def props(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")): Props = Props(new MySQLMetadataManager(hostname, port, username, password, database))
 }
 
-case class GetColumns(tableMapEventData: TableMapEventData)
+case class GetColumns(database: String, table: String, columnTypes: Array[ColumnType.EnumVal])
 
 class MySQLMetadataManager(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")) extends Actor {
 
@@ -31,14 +30,10 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
   protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
 
   def receive = {
-    case GetColumns(tableMapEventData) ⇒ sender ! getTableColumns(tableMapEventData)
+    case GetColumns(db, table, colTypes) ⇒ sender ! getTableColumns(db, table, colTypes)
   }
 
-  protected def getTableColumns(tableMapEventData: TableMapEventData): (List[ColumnMetadata], Option[PrimaryKey]) = {
-
-    val db = tableMapEventData.getDatabase
-    val table = tableMapEventData.getTable
-    val columnTypes = tableMapEventData.getColumnTypes
+  protected def getTableColumns(db: String, table: String, columnTypes: Array[ColumnType.EnumVal]): (List[ColumnMetadata], Option[PrimaryKey]) = {
 
     val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
       val dbConn = dbConns.getOrElseUpdate(db, {
@@ -103,7 +98,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     pKey
   }
 
-  protected def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {
+  protected def createColumns(columns: List[(String, Boolean)], columnTypes: Array[ColumnType.EnumVal]): List[ColumnMetadata] = {
     try {
       // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
       var cur = 0
@@ -111,7 +106,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
       val cols = columns.map(c ⇒ {
         val colName = c._1
         val isPrimaryKey = c._2
-        val colType = ColumnType.typeByCode(columnTypes(cur)).getOrElse(ColumnType.UNKNOWN)
+        val colType = columnTypes(cur)
         cur += 1
         ColumnMetadata(colName, colType, isPrimaryKey)
       })
