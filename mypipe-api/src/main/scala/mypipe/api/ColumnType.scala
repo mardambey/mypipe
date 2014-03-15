@@ -1,22 +1,8 @@
 package mypipe.api
 
-import java.io.Serializable
 import com.github.shyiko.mysql.binlog.event.TableMapEventData
-import com.github.shyiko.mysql.binlog.event.deserialization.{ ColumnType ⇒ MColumnType }
-import com.typesafe.config.Config
 import mypipe.util.Enum
-
-abstract class Mapping {
-  def map(mutation: InsertMutation) {}
-  def map(mutation: UpdateMutation) {}
-  def map(mutation: DeleteMutation) {}
-}
-
-abstract class Producer(mappings: List[Mapping], config: Config) {
-  def queue(mutation: Mutation[_]): Boolean
-  def queueList(mutation: List[Mutation[_]]): Boolean
-  def flush()
-}
+import java.io.Serializable
 
 object ColumnType extends Enum {
   sealed trait EnumVal extends Value /*{ you can define your own methods etc here }*/
@@ -72,38 +58,3 @@ case class Column(metadata: ColumnMetadata, value: Serializable = null) {
     }
   }
 }
-
-sealed abstract class Mutation[T](val table: Table, val rows: T) {
-  def execute()
-}
-
-case class InsertMutation(
-  override val table: Table,
-  override val rows: List[Row])
-    extends Mutation[List[Row]](table, rows) {
-
-  def execute() {
-    Log.info(s"executing insert mutation")
-  }
-}
-
-case class UpdateMutation(
-  override val table: Table,
-  override val rows: List[(Row, Row)])
-    extends Mutation[List[(Row, Row)]](table, rows) {
-
-  def execute() {
-    Log.info(s"executing update mutation")
-  }
-}
-
-case class DeleteMutation(
-  override val table: Table,
-  override val rows: List[Row])
-    extends Mutation[List[Row]](table, rows) {
-
-  def execute() {
-    Log.info(s"executing delete mutation")
-  }
-}
-

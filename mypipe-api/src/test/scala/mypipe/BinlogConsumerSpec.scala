@@ -1,6 +1,6 @@
 package mypipe
 
-import mypipe.mysql.{ Listener, BinlogFilePos, BinlogConsumer }
+import mypipe.mysql.{ BinlogConsumerListener, BinlogFilePos, BinlogConsumer }
 import com.github.mauricio.async.db.{ Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
@@ -97,7 +97,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
 
-  consumer.registerListener(new Listener() {
+  consumer.registerListener(new BinlogConsumerListener() {
     def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
       queueProducer.queue(mutation)
       true

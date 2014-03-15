@@ -1,6 +1,6 @@
 package mypipe
 
-import mypipe.mysql.{ Listener, BinlogFilePos }
+import mypipe.mysql.{ BinlogConsumerListener, BinlogFilePos }
 import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration._
 import mypipe.api._
@@ -79,7 +79,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
       val queueProducer = new QueueProducer(binlogQueue)
       val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
 
-      consumer.registerListener(new Listener() {
+      consumer.registerListener(new BinlogConsumerListener() {
         def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
           queueProducer.queue(mutation)
           true

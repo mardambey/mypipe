@@ -27,3 +27,23 @@ Pipes tie one or more MySQL binary log consumers to a producer. Pipes can be
 used to create a system of fan-in data flow from several MySQL servers to
 other data sources such as Hadoop, Cassandra, Kafka, or other MySQL servers.
 They can also be used to update or flush caches.
+
+## Usage
+
+Look at `mypipe-runner/src/main/resources/application.conf` for a quick example
+on how to configure mypipe to slurp a binlog from a MySQL server then uses the
+stdout producer to display it to standard out and the Cassandra producer with
+some mappings (found in `mypipe-samples/src/main/scala/mypipe/samples/mappings/CassandraMappings.scala`)
+to transform the MySQL row data into Cassandra batch mutations affecting several
+column families.
+
+## Tests
+
+In order to run the tests you need to configure `test.conf` with proper MySQL
+values. You should also make sure there you have a database called `mypipe` with
+the following credentials:
+
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'mypipe'@'%' IDENTIFIED BY 'mypipe'
+    GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
+
+The database must also have binary logging enabled in `row` format.

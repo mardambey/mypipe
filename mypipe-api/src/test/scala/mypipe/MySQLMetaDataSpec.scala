@@ -4,18 +4,11 @@ import mypipe.mysql._
 import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration._
 import mypipe.api._
-import mypipe.producer.QueueProducer
-import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
-import akka.actor.ActorDSL._
 import akka.pattern.ask
 import org.scalatest.BeforeAndAfterAll
-import mypipe.api.InsertMutation
 import akka.util.Timeout
-import akka.agent.Agent
-import scala.collection.mutable.ListBuffer
 import mypipe.api.PrimaryKey
 import mypipe.api.ColumnMetadata
-import scala.Some
 
 class MySQLMetaDataSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 

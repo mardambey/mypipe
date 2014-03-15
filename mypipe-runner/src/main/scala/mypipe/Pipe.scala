@@ -1,7 +1,7 @@
 package mypipe
 
 import scala.concurrent.duration._
-import mypipe.mysql.{ BinlogFilePos, Listener, BinlogConsumer }
+import mypipe.mysql.{ BinlogFilePos, BinlogConsumerListener, BinlogConsumer }
 import mypipe.api.{ Mutation, Log, Producer }
 import akka.actor.{ Cancellable, ActorSystem }
 
@@ -14,7 +14,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
   protected var threads = List.empty[Thread]
   protected var flusher: Option[Cancellable] = None
 
-  protected val listener = new Listener() {
+  protected val listener = new BinlogConsumerListener() {
 
     override def onConnect(consumer: BinlogConsumer) {
       Log.info(s"Pipe $id connected!")

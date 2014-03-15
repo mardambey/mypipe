@@ -1,6 +1,7 @@
 package mypipe.mysql
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient.{ LifecycleListener, EventListener }
+
 import com.github.shyiko.mysql.binlog.BinaryLogClient
 import com.github.shyiko.mysql.binlog.event.EventType._
 import com.github.shyiko.mysql.binlog.event._
@@ -11,7 +12,6 @@ import mypipe.Conf
 import mypipe.api._
 import scala.concurrent.{ Future, Await }
 import akka.actor._
-import akka.actor.ActorDSL._
 import akka.pattern.ask
 import scala.collection.immutable.ListMap
 import akka.util.Timeout
@@ -24,53 +24,12 @@ import mypipe.api.Table
 import mypipe.api.Row
 import mypipe.api.InsertMutation
 
-case class BinlogFilePos(filename: String, pos: Long) {
-  override def toString(): String = s"$filename:$pos"
-  override def equals(o: Any): Boolean = o.asInstanceOf[BinlogFilePos].filename.equals(filename) && o.asInstanceOf[BinlogFilePos].pos == pos
-}
-
-object BinlogFilePos {
-  val current = BinlogFilePos("", 0)
-}
-
-trait Listener {
-  def onConnect(consumer: BinlogConsumer)
-  def onDisconnect(consumer: BinlogConsumer)
-  def onMutation(consumer: BinlogConsumer, mutation: Mutation[_]): Boolean
-  def onMutation(consumer: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean
-}
-
-object MySQLServerId {
-
-  implicit val system = ActorSystem("mypipe")
-  implicit val ec = system.dispatcher
-  implicit val timeout = Timeout(1 second)
-
-  case object Next
-
-  val a = actor(new Act {
-    var id = Conf.MYSQL_SERVER_ID_PREFIX
-    become {
-      case Next ⇒ {
-        id += 1
-        sender ! id
-      }
-    }
-  })
-
-  def next: Int = {
-
-    val n = ask(a, Next)
-    Await.result(n, 1 second).asInstanceOf[Int]
-  }
-}
-
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
   protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
   protected var transactionInProgress = false
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
-  protected val listeners = new scala.collection.mutable.HashSet[Listener]()
+  protected val listeners = new scala.collection.mutable.HashSet[BinlogConsumerListener]()
   protected val txQueue = new scala.collection.mutable.ListBuffer[Event]
   protected val system = ActorSystem("mypipe")
   protected implicit val ec = system.dispatcher
@@ -211,7 +170,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     client.disconnect()
   }
 
-  def registerListener(listener: Listener) {
+  def registerListener(listener: BinlogConsumerListener) {
     listeners += listener
   }
 
@@ -266,15 +225,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       (Row(table, old), Row(table, cur))
 
     }).toList
-  }
-}
-
-class HostPortUserPass(val host: String, val port: Int, val user: String, val password: String)
-object HostPortUserPass {
-
-  def apply(hostPortUserPass: String) = {
-    val params = hostPortUserPass.split(":")
-    new HostPortUserPass(params(0), params(1).toInt, params(2), params(3))
   }
 }
 
