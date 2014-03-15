@@ -13,6 +13,7 @@ import org.scalatest.BeforeAndAfterAll
 import mypipe.api.UpdateMutation
 import scala.Some
 import mypipe.api.InsertMutation
+import com.typesafe.config.ConfigFactory
 
 case class Db(hostname: String, port: Int, username: String, password: String, dbName: String) {
 
@@ -33,14 +34,15 @@ case class Db(hostname: String, port: Int, username: String, password: String, d
   }
 }
 
-trait DatabaseSpec {
+trait ConfigSpec {
+  val conf = ConfigFactory.load("test.conf")
+}
 
-  val name = "mypipe"
-  val hostname = "blackhowler.gene"
-  val port = 3306
-  val username = "root"
-  val password = "foobar"
-  val db = Db(hostname, port, username, password, name)
+trait DatabaseSpec extends ConfigSpec {
+
+  val name = conf.getString("mypipe.test.database.name")
+  val Array(hostname, port, username, password) = conf.getString("mypipe.test.database.host").split(":")
+  val db = Db(hostname, port.toInt, username, password, name)
 
   def withDatabase(testCode: Db ⇒ Any) {
     try {
@@ -56,6 +58,8 @@ trait ActorSystemSpec {
 }
 
 object Queries {
+
+  val conf = ConfigFactory.load("test.conf")
 
   object INSERT {
     def statement: String = statement()
@@ -76,6 +80,10 @@ object Queries {
   object DELETE {
     val statement = """DELETE from user"""
   }
+
+  object CREATE {
+    val statement = conf.getString("mypipe.test.database.create")
+  }
 }
 
 class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
@@ -87,7 +95,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
   val queue = new LinkedBlockingQueue[Mutation[_]]()
   val queueProducer = new QueueProducer(queue)
 
-  val consumer = BinlogConsumer(hostname, port, username, password, BinlogFilePos.current)
+  val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
 
   consumer.registerListener(new Listener() {
     def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
@@ -115,6 +123,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     db.connect
     while (!connected) { Thread.sleep(1) }
 
+    Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1 second)
     Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1 second)
   }
 

@@ -1,4 +1,7 @@
 # TODO:
+- Do not use TableMapEventData in the MySQLMetadataManager (third party API leak into ours)
+- Logging format should be controlled through config file, not code
+- Add MySQLMetadataManagerSpec
 - Expose the stdout producer through a some application that accepts the
 	hostname, port, etc. and simply `tails` the binlog.
 - Periodically refresh MySQL table metadata

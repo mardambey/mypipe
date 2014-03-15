@@ -70,6 +70,22 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     cols
   }
 
+  protected def getTableColumns(db: String, table: String, dbConn: Connection): Future[List[(String, Boolean)]] = {
+    val futureCols: Future[QueryResult] = dbConn.sendQuery(
+      s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
+
+    val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
+      case Some(resultSet) ⇒ {
+        resultSet.map(row ⇒ {
+          (row(0).asInstanceOf[String], row(1).equals("PRI"))
+        }).toList
+      }
+
+      case None ⇒ List.empty[(String, Boolean)]
+    })
+    mapCols
+  }
+
   protected def getPrimaryKey(db: String, table: String, dbConn: Connection): Future[List[String]] = {
     val futurePkey: Future[QueryResult] = dbConn.sendQuery(
       s"""SELECT COLUMN_NAME FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION""")
@@ -85,22 +101,6 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     })
 
     pKey
-  }
-
-  protected def getTableColumns(db: String, table: String, dbConn: Connection): Future[List[(String, Boolean)]] = {
-    val futureCols: Future[QueryResult] = dbConn.sendQuery(
-      s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
-
-    val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
-      case Some(resultSet) ⇒ {
-        resultSet.map(row ⇒ {
-          (row(0).asInstanceOf[String], row(1).equals("PRI"))
-        }).toList
-      }
-
-      case None ⇒ List.empty[(String, Boolean)]
-    })
-    mapCols
   }
 
   protected def createColumns(columns: List[(String, Boolean)], columnTypes: Array[Byte]): List[ColumnMetadata] = {

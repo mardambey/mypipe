@@ -19,8 +19,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
 
   @volatile var connected = false
 
-  // TODO: fetch form config
-  val maxLatency = 500.0
+  val maxLatency = conf.getLong("mypipe.test.max-latency")
   val latencies = ListBuffer[Long]()
 
   override def beforeAll() {
@@ -78,7 +77,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
     val binlogConsumer = actor(new Act {
 
       val queueProducer = new QueueProducer(binlogQueue)
-      val consumer = BinlogConsumer(hostname, port, username, password, BinlogFilePos.current)
+      val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
 
       consumer.registerListener(new Listener() {
         def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
