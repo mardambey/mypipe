@@ -51,8 +51,12 @@ object ApplicationBuild extends Build {
     typesafeConfig
   )
 
+  val avroDependencies = Seq(
+    avro
+  )
+
   lazy val root = Project(id = "mypipe",
-    base = file(".")) aggregate (api, producers, samples, runner)
+    base = file(".")) aggregate(api, producers, samples, runner, myavro)
 
   lazy val runner = Project(id = "runner",
     base = file("mypipe-runner"),
@@ -68,7 +72,7 @@ object ApplicationBuild extends Build {
     settings = Project.defaultSettings ++ Seq(
       libraryDependencies ++= producersDependencies
     ) ++ Format.settings
-  ) dependsOn(api)
+  ) dependsOn (api)
 
   lazy val api = Project(id = "api",
     base = file("mypipe-api"),
@@ -85,6 +89,13 @@ object ApplicationBuild extends Build {
     ) ++ Format.settings
   ) dependsOn(api, producers)
 
+  lazy val myavro = Project(id = "myavro",
+    base = file("mypipe-avro"),
+    settings = Project.defaultSettings ++ Seq(
+      libraryDependencies ++= avroDependencies
+    ) ++ Format.settings
+  )
+}
 
 object Dependencies {
 
@@ -98,7 +109,7 @@ object Dependencies {
     val astyanaxCore = "com.netflix.astyanax" % "astyanax-core" % "1.56.48"
     val astyanaxThrift = "com.netflix.astyanax" % "astyanax-thrift" % "1.56.48"
     val astyanaxCassansra = "com.netflix.astyanax" % "astyanax-cassandra" % "1.56.48"
-  }
+    val avro = "org.apache.avro" % "avro" % "1.7.5"
 }
 
 object Format {
