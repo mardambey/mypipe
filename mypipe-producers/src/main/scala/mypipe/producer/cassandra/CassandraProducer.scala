@@ -44,9 +44,9 @@ case class CassandraProducer(mappings: List[Mapping], config: Config) extends Pr
     true
   }
 
-  def flush() {
+  def flush(): Boolean = {
     val future = worker.ask(Flush)(Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds)
-    val result = Await.result(future, Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds).asInstanceOf[Boolean]
+    Await.result(future, Conf.SHUTDOWN_FLUSH_WAIT_SECS seconds).asInstanceOf[Boolean]
   }
 
   override def toString(): String = {

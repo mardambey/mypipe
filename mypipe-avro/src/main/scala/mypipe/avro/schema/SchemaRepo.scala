@@ -9,7 +9,7 @@ object SchemaRepo
     with ShortSchemaId
     with AvroSchema {
 
-  def getRepositoryURL: String = {
-    ???
-  }
+  private val url = System.getProperty("avro.repo.server-url")
+
+  def getRepositoryURL: String = url
 }

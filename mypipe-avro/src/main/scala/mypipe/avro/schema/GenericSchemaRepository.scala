@@ -3,7 +3,7 @@ package mypipe.avro.schema
 import org.apache.avro.repo.client.RESTRepositoryClient
 import scala.collection.mutable
 import java.util.logging.Logger
-import org.apache.avro.repo.{ SchemaEntry, Subject }
+import org.apache.avro.repo.{ SubjectConfig, SchemaEntry, Subject }
 
 /** Generic implementation of a caching client for an AVRO-1124-style repo which provides strongly-typed APIs.
  *
@@ -105,12 +105,25 @@ abstract class GenericSchemaRepository[ID, SCHEMA] {
    *  @param schema
    *  @return Some(schemaId) if the topic and schema are valid, None otherwise
    */
-  def getSchemaId(topic: String, schema: SCHEMA): Option[ID] = ???
+  def getSchemaId(topic: String, schema: SCHEMA): Option[ID] = {
+    client.lookup(topic).lookupBySchema(schemaToString(schema)) match {
+      case null        ⇒ None
+      case schemaEntry ⇒ Some(stringToId(schemaEntry.getId))
+    }
+  }
 
   /** @param topic
    *  @param schema
    *  @return schemaId, potentially an already existing one, if the schema isn't new.
    *  @throws Exception if registration is unsuccessful
    */
-  def registerSchema(topic: String, schema: SCHEMA): ID = ???
+  def registerSchema(topic: String, schema: SCHEMA): ID = {
+    val subject = client.lookup(topic) match {
+      case null ⇒ client.register(topic, SubjectConfig.emptyConfig())
+      case s    ⇒ s
+    }
+
+    val schemaEntry = subject.register(schemaToString(schema))
+    stringToId(schemaEntry.getId())
+  }
 }

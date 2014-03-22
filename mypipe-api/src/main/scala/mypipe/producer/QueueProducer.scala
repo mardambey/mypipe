@@ -6,8 +6,7 @@ import collection.JavaConverters._
 
 class QueueProducer(queue: util.Queue[Mutation[_]]) extends Producer(mappings = null, config = null) {
 
-  override def flush() {
-  }
+  override def flush() = true
 
   override def queueList(mutationz: List[Mutation[_]]): Boolean = {
     queue.addAll(mutationz.asJava)

@@ -24,6 +24,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
           Conf.binlogFilePosSave(consumer.hostname, consumer.port,
             BinlogFilePos(consumer.client.getBinlogFilename, consumer.client.getBinlogPosition),
             id)
+          // TODO: if flush fails, stop and disconnect
           producer.flush
         })
     }

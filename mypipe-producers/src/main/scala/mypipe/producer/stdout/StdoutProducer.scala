@@ -9,11 +9,13 @@ class StdoutProducer(mappings: List[Mapping], config: Config) extends Producer(m
 
   val mutations = scala.collection.mutable.ListBuffer[String]()
 
-  override def flush() {
+  override def flush(): Boolean = {
     if (mutations.size > 0) {
       Log.info("\n" + mutations.mkString("\n"))
       mutations.clear()
     }
+
+    true
   }
 
   override def queueList(mutationz: List[Mutation[_]]): Boolean = {
