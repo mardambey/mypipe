@@ -1,41 +1,46 @@
 package mypipe.kafka
 
-import kafka.producer.{Producer ⇒ KProducer, KeyedMessage, ProducerConfig}
+import kafka.producer.{ Producer ⇒ KProducer, KeyedMessage, ProducerConfig }
 
-import mypipe.api.{InsertMutation, UpdateMutation, DeleteMutation, Mutation}
+import mypipe.api.{ InsertMutation, UpdateMutation, DeleteMutation, Mutation }
 
 import java.util.Properties
 import mypipe.kafka.types._
 
 trait MessageQueue[MESSAGE] {
-  def produce(message: MESSAGE)
+  def produce(message: MESSAGE*)
 }
 
 abstract class Producer[OUTPUT] {
 
-  def serialize(input: Mutation[_]) : OUTPUT
+  def serialize(input: Mutation[_]): OUTPUT
 
   def send(message: Mutation[_]) {
     val m = serialize(message)
     produce(m)
   }
 
-  def produce(message: OUTPUT)
+  def send(messages: Array[Mutation[_]]) {
+    val m = messages.map(serialize(_))
+    produce(m: _*)
+  }
+
+  def produce(message: OUTPUT*)
 }
 
 trait MutationSerializer[OUTPUT] {
-  def serialize(input: Mutation[_]) : OUTPUT
+  def serialize(input: Mutation[_]): OUTPUT
 }
 
 trait BinaryKeyedMessageMutationSerializer[PKEY, MESSAGE] extends MutationSerializer[BinaryKeyedMessage] {
 
-  def serialize(mutation: Mutation[_]) : BinaryKeyedMessage = {
+  def serialize(mutation: Mutation[_]): BinaryKeyedMessage = {
 
     mutation match {
 
-      case i: InsertMutation => new KeyedMessage[Array[Byte], Array[Byte]](s"${i.table.db}:{$i.table.name}")
-      case u: UpdateMutation =>
-      case d: DeleteMutation =>
+      case i: InsertMutation ⇒ new KeyedMessage[Array[Byte], Array[Byte]](s"${i.table.db}:{$i.table.name}", "1".getBytes, i.rows.head.columns.map(_._2.value).mkString(",").toString.getBytes())
+      case u: UpdateMutation ⇒ new KeyedMessage[Array[Byte], Array[Byte]](s"${u.table.db}:{$u.table.name}", "1".getBytes, u.rows.head._2.columns.map(_._2.value).mkString(",").toString.getBytes())
+      case d: DeleteMutation ⇒ new KeyedMessage[Array[Byte], Array[Byte]](s"${d.table.db}:{$d.table.name}", "1".getBytes, d.rows.head.columns.map(_._2.value).mkString(",").toString.getBytes())
     }
 
   }
@@ -52,10 +57,9 @@ trait KafkaMessageQueue[PKEY, MESSAGE] extends MessageQueue[KeyedMessage[PKEY, M
 
   val producer = new KProducer[PKEY, MESSAGE](conf)
 
-  def produce(message: KeyedMessage[PKEY, MESSAGE]) {
-    producer.send(message)
+  def produce(message: KeyedMessage[PKEY, MESSAGE]*) {
+    producer.send(message: _*)
   }
-
 }
 
 package object types {
