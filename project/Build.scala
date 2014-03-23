@@ -55,8 +55,13 @@ object ApplicationBuild extends Build {
     avro
   )
 
+  val kafkaDependencies = Seq(
+    avro,
+    kafka
+  )
+
   lazy val root = Project(id = "mypipe",
-    base = file(".")) aggregate(api, producers, samples, runner, myavro)
+    base = file(".")) aggregate(api, producers, samples, runner, myavro, mykafka)
 
   lazy val runner = Project(id = "runner",
     base = file("mypipe-runner"),
@@ -95,6 +100,13 @@ object ApplicationBuild extends Build {
       libraryDependencies ++= avroDependencies
     ) ++ Format.settings
   )
+
+  lazy val mykafka = Project(id = "mykafka",
+    base = file("mypipe-kafka"),
+    settings = Project.defaultSettings ++ Seq(
+      libraryDependencies ++= kafkaDependencies
+    ) ++ Format.settings
+  ) dependsOn(api, myavro)
 }
 
 object Dependencies {
@@ -110,6 +122,7 @@ object Dependencies {
     val astyanaxThrift = "com.netflix.astyanax" % "astyanax-thrift" % "1.56.48"
     val astyanaxCassansra = "com.netflix.astyanax" % "astyanax-cassandra" % "1.56.48"
     val avro = "org.apache.avro" % "avro" % "1.7.5"
+    val kafka = "org.apache.kafka" %% "kafka" % "0.8.1" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
 }
 
 object Format {
