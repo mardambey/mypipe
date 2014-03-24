@@ -1,4 +1,5 @@
 # TODO:
+- Add Kafka 0.8 producer
 - Logging format should be controlled through config file, not code
 - Expose the stdout producer through a some application that accepts the
 	hostname, port, etc. and simply `tails` the binlog.
