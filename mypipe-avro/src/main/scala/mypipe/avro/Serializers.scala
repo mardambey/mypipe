@@ -53,7 +53,6 @@ trait AvroGenericRecordMutationSerializer extends MutationSerializer[Array[Byte]
 
       case (ColumnType.INT24, columns) ⇒
         val map = columns.map(c ⇒ c.metadata.name -> c.value[Int]).toMap.asJava
-        println("integers: " + map)
         record.put("integers", map)
 
       case (ColumnType.VARCHAR, columns) ⇒
