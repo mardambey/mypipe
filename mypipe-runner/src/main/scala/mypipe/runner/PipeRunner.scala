@@ -103,7 +103,11 @@ object PipeRunnerUtil {
 
   protected def createProducer(id: String, config: Config, mappings: List[Mapping] = List.empty[Mapping], clazz: Class[Producer]): Producer = {
     try {
-      val producer = clazz.getConstructor(classOf[List[Mapping]], classOf[Config]).newInstance(mappings, config)
+      val ctor = clazz.getConstructor(classOf[List[Mapping]], classOf[Config])
+
+      if (ctor == null) throw new NullPointerException("Could not load ctor for class ${clazz}, aborting.")
+
+      val producer = ctor.newInstance(mappings, config)
       producer
     } catch {
       case e: Exception ⇒ {

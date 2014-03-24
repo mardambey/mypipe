@@ -34,3 +34,6 @@ case class DeleteMutation(
   }
 }
 
+trait MutationSerializer[OUTPUT] {
+  protected def serialize(input: Mutation[_]): OUTPUT
+}

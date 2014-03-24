@@ -1,0 +1,23 @@
+{
+  "namespace": "mypipe.avro",
+  "type": "record",
+  "name": "DeleteMutation",
+  "fields": [
+	    {
+			"name": "database",
+			"type": "string"
+		},
+		{
+			"name": "table",
+			"type": "string"
+		},
+		{
+			"name": "integers",
+			"type": {"type": "map", "values": "int"}
+		},
+		{
+			"name": "strings",
+			"type": {"type": "map", "values": "string"}
+		}
+	]
+}
