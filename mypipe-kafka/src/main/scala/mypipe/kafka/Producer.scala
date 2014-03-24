@@ -47,7 +47,7 @@ abstract class KafkaProducer(metadataBrokers: String)
     queue.add(new BinaryKeyedMessage(topic, null, bytes))
   }
 
-  override def getTopic(message: Mutation[_]): String = message.table.db + ":" + message.table.name
+  override def getTopic(message: Mutation[_]): String = message.table.db + "__" + message.table.name
 
   override def flush: Boolean = {
     val s = new util.HashSet[BinaryKeyedMessage]
