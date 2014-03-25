@@ -4,6 +4,7 @@ import org.apache.avro.repo.client.RESTRepositoryClient
 import scala.collection.mutable
 import java.util.logging.Logger
 import org.apache.avro.repo.{ SubjectConfig, SchemaEntry, Subject }
+import java.util.concurrent.ConcurrentHashMap
 
 /** Generic implementation of a caching client for an AVRO-1124-style repo which provides strongly-typed APIs.
  *
@@ -32,6 +33,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] {
   // Internal state
   private val cache = mutable.Map[String, mutable.Map[ID, SCHEMA]]()
   private val latestSchemaCache = mutable.Map[String, SCHEMA]()
+  private val topicToIdCache = new ConcurrentHashMap[String, ID]()
 
   /** Utility function to DRY up the getSchema and getLatestSchema code.
    *
@@ -106,9 +108,17 @@ abstract class GenericSchemaRepository[ID, SCHEMA] {
    *  @return Some(schemaId) if the topic and schema are valid, None otherwise
    */
   def getSchemaId(topic: String, schema: SCHEMA): Option[ID] = {
-    client.lookup(topic).lookupBySchema(schemaToString(schema)) match {
-      case null        ⇒ None
-      case schemaEntry ⇒ Some(stringToId(schemaEntry.getId))
+
+    val id = topicToIdCache.putIfAbsent(topic, {
+      client.lookup(topic).lookupBySchema(schemaToString(schema)) match {
+        case null        ⇒ null.asInstanceOf[ID]
+        case schemaEntry ⇒ stringToId(schemaEntry.getId)
+      }
+    })
+
+    id match {
+      case null ⇒ None
+      case i    ⇒ Some(i)
     }
   }
 

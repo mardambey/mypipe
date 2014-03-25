@@ -18,6 +18,10 @@
 		{
 			"name": "strings",
 			"type": {"type": "map", "values": "string"}
+		},
+		{
+			"name": "longs",
+			"type": {"type": "map", "values": "long"}
 		}
 	]
 }

@@ -59,6 +59,12 @@ object ApplicationBuild extends Build {
     kafka
   )
 
+  val cassandraDependencies = Seq(
+    astyanaxCassansra,
+    astyanaxCore,
+    astyanaxThrift
+  )
+
   lazy val root = Project(id = "mypipe",
     base = file(".")) aggregate(api, producers, samples, runner, myavro, mykafka)
 
@@ -68,7 +74,7 @@ object ApplicationBuild extends Build {
       fork in run := true,
       libraryDependencies ++= runnerDependencies
     ) ++ Format.settings
-  ) dependsOn(api, producers, myavro, mykafka, samples)
+  ) dependsOn(api, producers, myavro, mykafka)
 
 
   lazy val producers = Project(id = "producers",
@@ -91,7 +97,7 @@ object ApplicationBuild extends Build {
     settings = Project.defaultSettings ++ Seq(
       libraryDependencies ++= samplesDependencies
     ) ++ Format.settings
-  ) dependsOn(api, producers)
+  ) dependsOn(api, producers, mycassandra)
 
   lazy val myavro = Project(id = "myavro",
     base = file("mypipe-avro"),
@@ -106,6 +112,13 @@ object ApplicationBuild extends Build {
       libraryDependencies ++= kafkaDependencies
     ) ++ Format.settings
   ) dependsOn(api, myavro)
+
+  lazy val mycassandra = Project(id = "mycassandra",
+    base = file("mypipe-cassandra"),
+    settings = Project.defaultSettings ++ Seq(
+      libraryDependencies ++= cassandraDependencies
+    ) ++ Format.settings
+  ) dependsOn(api)
 }
 
 object Dependencies {
