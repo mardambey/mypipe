@@ -1,7 +1,5 @@
 package mypipe.util
 
-/** Created by hisham on 3/15/14.
- */
 trait Enum { //DIY enum type
   import java.util.concurrent.atomic.AtomicReference //Concurrency paranoia
 

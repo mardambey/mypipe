@@ -5,7 +5,7 @@ import mypipe.util.Enum
 import java.io.Serializable
 
 object ColumnType extends Enum {
-  sealed trait EnumVal extends Value /*{ you can define your own methods etc here }*/
+  sealed trait EnumVal extends Value
 
   val DECIMAL = new EnumVal { val value = 0 }
   val TINY = new EnumVal { val value = 1 }
