@@ -2,7 +2,7 @@ package mypipe.api
 
 sealed abstract class Mutation[T](val table: Table, val rows: T)
 
-case class SingleValuedMutation(
+abstract class SingleValuedMutation(
   override val table: Table,
   override val rows: List[Row])
     extends Mutation[List[Row]](table, rows)

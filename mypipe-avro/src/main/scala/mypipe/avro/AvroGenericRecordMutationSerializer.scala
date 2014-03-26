@@ -6,7 +6,7 @@ import mypipe.api.UpdateMutation
 import scala.Some
 import mypipe.api.DeleteMutation
 import mypipe.api.InsertMutation
-import org.apache.avro.generic.{GenericRecord, GenericDatumWriter, GenericData}
+import org.apache.avro.generic.{ GenericRecord, GenericDatumWriter, GenericData }
 import java.io.ByteArrayOutputStream
 import org.apache.avro.io.EncoderFactory
 
@@ -56,7 +56,7 @@ trait AvroGenericRecordMutationSerializer extends AvroRecordMutationSerializer {
           // this damn thing can come in as an Integer or Long
           val v = c.value match {
             case i: java.lang.Integer ⇒ new java.lang.Long(i.toLong)
-            case l: java.lang.Long ⇒ l
+            case l: java.lang.Long    ⇒ l
           }
 
           longs.put(c.metadata.name, v)

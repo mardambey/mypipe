@@ -8,7 +8,7 @@ import mypipe.kafka.types._
 import kafka.producer.KeyedMessage
 import java.util.concurrent.LinkedBlockingQueue
 import java.util
-import mypipe.avro.{ AvroVersionedSpecificRecordMutationSerializer, AvroGenericRecordMutationSerializer }
+import mypipe.avro.{ AvroVersionedGenericRecordMutationSerializer, AvroGenericRecordMutationSerializer }
 
 abstract class Producer[OUTPUT] extends MutationSerializer[OUTPUT] {
 
@@ -79,4 +79,4 @@ class KafkaAvroGenericProducer(metadataBrokers: String)
  */
 class KafkaAvroVersionedSpecificProducer(metadataBrokers: String)
   extends KafkaProducer(metadataBrokers)
-  with AvroVersionedSpecificRecordMutationSerializer
+  with AvroVersionedGenericRecordMutationSerializer

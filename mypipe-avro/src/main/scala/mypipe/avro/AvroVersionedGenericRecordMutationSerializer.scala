@@ -29,9 +29,8 @@ trait AvroVersionedGenericRecordMutationSerializer extends AvroRecordMutationSer
 
   override protected def writeColumns(record: GenericData.Record, columns: Map[String, Column], nameMapper: NameMapper = IdentityNameMapper) {
     columns.foreach(
-      column => {
+      column ⇒ {
         record.put(nameMapper(column._1), column._2.value)
-      }
-    )
+      })
   }
 }

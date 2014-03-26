@@ -4,7 +4,7 @@ import mypipe.api._
 import mypipe.api.UpdateMutation
 import mypipe.api.InsertMutation
 import org.apache.avro.Schema
-import org.apache.avro.generic.{GenericRecord, GenericDatumWriter, GenericData}
+import org.apache.avro.generic.{ GenericRecord, GenericDatumWriter, GenericData }
 import java.io.ByteArrayOutputStream
 import org.apache.avro.io.EncoderFactory
 
@@ -33,7 +33,7 @@ trait AvroRecordMutationSerializer extends MutationSerializer[Array[Byte]] {
     }
   }
 
-  type NameMapper = (String*) => String
+  type NameMapper = (String) ⇒ String
 
   def IdentityNameMapper(s: String) = s
   def PrependingNameMapper(prepend: String)(s: String) = prepend + s
@@ -57,7 +57,7 @@ trait AvroRecordMutationSerializer extends MutationSerializer[Array[Byte]] {
     out.toByteArray
   }
 
-  protected def toByteArray(schema: Schema, record: GenericData.Record, mutation: SingleValuedMutation)(code: => Unit) = {
+  protected def toByteArray(schema: Schema, record: GenericData.Record, mutation: SingleValuedMutation)(code: ⇒ Unit) = {
     val writer = new GenericDatumWriter[GenericRecord](schema)
     code
     writeColumns(record, mutation.rows.head.columns)
