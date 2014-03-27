@@ -1,10 +1,11 @@
 # TODO:
-- Split off Cassandra producer into mypipe-cassandra
-- Add Kafka 0.8 producer
+- Periodically refresh MySQL table metadata -> instead, handle ALTER events
+- If the MySQL tables have less fields then the Avro schema we get an NPE,
+	only set fields that are present, and attempt to set some default values
+	on fields that we do not get from the database
 - Logging format should be controlled through config file, not code
 - Expose the stdout producer through a some application that accepts the
 	hostname, port, etc. and simply `tails` the binlog.
-- Periodically refresh MySQL table metadata
 - Add metrics into various parts of the pipeline.
 - HBase producer
 - HDFS producer (through HFile?)
@@ -14,6 +15,8 @@
 - Close db connections on exit
 
 # DONE:
+- Split off Cassandra producer into mypipe-cassandra
+- Add Kafka 0.8 producer
 - Do not use TableMapEventData in the MySQLMetadataManager (third party API leak into ours)
 - MySQLSpec should create the user table if it is not present.
 - Add MySQLMetadataManagerSpec
