@@ -70,7 +70,7 @@ object ApplicationBuild extends Build {
   lazy val runner = Project(id = "runner",
     base = file("mypipe-runner"),
     settings = Project.defaultSettings ++ Seq(
-      fork in run := true,
+      fork in run := false,
       libraryDependencies ++= runnerDependencies
     ) ++ Format.settings
   ) dependsOn(api, producers, myavro, mykafka)
