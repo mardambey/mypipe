@@ -44,15 +44,14 @@ object ApplicationBuild extends Build {
 
   val producersDependencies = Seq(
     akkaActor,
-    astyanaxCassansra,
-    astyanaxCore,
-    astyanaxThrift,
-    mysqlAsync,
     typesafeConfig
   )
 
   val avroDependencies = Seq(
-    avro
+    avro,
+		guava,
+    xinject,
+    jsr305
   )
 
   val kafkaDependencies = Seq(
@@ -135,6 +134,9 @@ object Dependencies {
     val astyanaxCassansra = "com.netflix.astyanax" % "astyanax-cassandra" % "1.56.48"
     val avro = "org.apache.avro" % "avro" % "1.7.5"
     val kafka = "org.apache.kafka" %% "kafka" % "0.8.1" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
+		val guava = "com.google.guava" % "guava" % "14.0.1"
+    val xinject = "javax.inject" % "javax.inject" % "1"
+    val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
 }
 
 object Format {
