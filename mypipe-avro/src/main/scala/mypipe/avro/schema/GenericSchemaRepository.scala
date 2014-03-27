@@ -118,6 +118,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] {
                                          schemaEntryToStringFunction: SchemaEntry ⇒ String,
                                          stringToValueFunction: String ⇒ VALUE,
                                          createMissingSubject: Boolean = false,
+                                         flushCache: Boolean = false,
                                          throwException: Boolean = false): Option[VALUE] = {
       def specificRetrieveFunction(cachedMap: java.util.Map[KEY, VALUE]): Option[VALUE] = {
         retrieveUnknownEntity[KEY, VALUE](
@@ -133,8 +134,9 @@ abstract class GenericSchemaRepository[ID, SCHEMA] {
 
     mainCache.get(topic) match {
       case Some(existingCachedMap) ⇒ Option(existingCachedMap.get(key)) match {
-        case None       ⇒ specificRetrieveFunction(existingCachedMap)
-        case someSchema ⇒ someSchema
+        case None                       ⇒ specificRetrieveFunction(existingCachedMap)
+        case someSchema if (flushCache) ⇒ specificRetrieveFunction(existingCachedMap)
+        case someSchema                 ⇒ someSchema
       }
       case None ⇒ {
         val newMapToCache = HashBiMap.create[KEY, VALUE]()
@@ -163,18 +165,23 @@ abstract class GenericSchemaRepository[ID, SCHEMA] {
   /** @param topic
    *  @return Some(schema) if the topic exists, None otherwise
    */
-  def getLatestSchema(topic: String): Option[SCHEMA] = {
-    Option(latestSchemaCache.get(topic)) match {
-      case None ⇒ {
-        retrieveUnknownEntity[String, SCHEMA](
-          topic,
-          topic,
-          latestSchemaCache,
-          entityRetrievalFunction = _.latest,
-          schemaEntryToStringFunction = _.getSchema,
-          stringToValueFunction = stringToSchema)
+  def getLatestSchema(topic: String, flushCache: Boolean = false): Option[SCHEMA] = {
+
+      def retrieve = retrieveUnknownEntity[String, SCHEMA](
+        topic,
+        topic,
+        latestSchemaCache,
+        entityRetrievalFunction = _.latest,
+        schemaEntryToStringFunction = _.getSchema,
+        stringToValueFunction = stringToSchema)
+
+    if (flushCache) {
+      retrieve
+    } else {
+      Option(latestSchemaCache.get(topic)) match {
+        case None       ⇒ retrieve
+        case someSchema ⇒ someSchema
       }
-      case someSchema ⇒ someSchema
     }
   }
 

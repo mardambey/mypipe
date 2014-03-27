@@ -27,7 +27,6 @@ import mypipe.api.InsertMutation
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
   protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
-  protected val tablesByName = scala.collection.mutable.HashMap[String, Table]()
   protected var transactionInProgress = false
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   protected val listeners = new scala.collection.mutable.HashSet[BinlogConsumerListener]()
@@ -125,7 +124,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
       val tableKey = tableMapEventData.getDatabase + ":" + tableMapEventData.getTable
       tablesById.put(tableMapEventData.getTableId(), table)
-      tablesByName.put(tableKey, table)
     }
   }
 
