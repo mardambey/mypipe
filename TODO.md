@@ -1,4 +1,5 @@
 # TODO:
+- Add ability to create and register avro schemas dynamically as tables change
 - Periodically refresh MySQL table metadata -> instead, handle ALTER events
 - If the MySQL tables have less fields then the Avro schema we get an NPE,
 	only set fields that are present, and attempt to set some default values

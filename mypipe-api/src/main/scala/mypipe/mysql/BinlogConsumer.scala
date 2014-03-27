@@ -27,6 +27,7 @@ import mypipe.api.InsertMutation
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
   protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
+  protected val tablesByName = scala.collection.mutable.HashMap[String, Table]()
   protected var transactionInProgress = false
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   protected val listeners = new scala.collection.mutable.HashSet[BinlogConsumerListener]()
@@ -122,7 +123,9 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val future = ask(dbMetadata, GetColumns(db, tableName, colTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
       val columns = Await.result(future, 2 seconds)
       val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
+      val tableKey = tableMapEventData.getDatabase + ":" + tableMapEventData.getTable
       tablesById.put(tableMapEventData.getTableId(), table)
+      tablesByName.put(tableKey, table)
     }
   }
 
@@ -133,19 +136,20 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   }
 
   protected def handleQuery(event: Event) {
-    if (groupEventsByTx) {
-      val queryEventData: QueryEventData = event.getData()
-      val query = queryEventData.getSql()
-      if (groupEventsByTx) {
-        if ("BEGIN".equals(query)) {
-          transactionInProgress = true
-        } else if ("COMMIT".equals(query)) {
-          commit()
-        } else if ("ROLLBACK".equals(query)) {
-          rollback()
-        }
-      }
+    val queryEventData: QueryEventData = event.getData()
+    val query = queryEventData.getSql()
+
+    query match {
+      case "BEGIN" if groupEventsByTx    ⇒ transactionInProgress = true
+      case "COMMIT" if groupEventsByTx   ⇒ commit()
+      case "ROLLBACK" if groupEventsByTx ⇒ rollback()
+      case q if q.indexOf("ALTER") == 0  ⇒ handleAlter(event)
+      case _                             ⇒
     }
+  }
+
+  protected def handleAlter(event: Event) {
+
   }
 
   protected def rollback() {

@@ -12,7 +12,7 @@ object MySQLMetadataManager {
   def props(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")): Props = Props(new MySQLMetadataManager(hostname, port, username, password, database))
 }
 
-case class GetColumns(database: String, table: String, columnTypes: Array[ColumnType.EnumVal])
+case class GetColumns(database: String, table: String, columnTypes: Array[ColumnType.EnumVal], flushCache: Boolean = false)
 
 class MySQLMetadataManager(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")) extends Actor {
 
@@ -30,10 +30,12 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
   protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
 
   def receive = {
-    case GetColumns(db, table, colTypes) ⇒ sender ! getTableColumns(db, table, colTypes)
+    case GetColumns(db, table, colTypes, flushCache) ⇒ sender ! getTableColumns(db, table, colTypes, flushCache)
   }
 
-  protected def getTableColumns(db: String, table: String, columnTypes: Array[ColumnType.EnumVal]): (List[ColumnMetadata], Option[PrimaryKey]) = {
+  protected def getTableColumns(db: String, table: String, columnTypes: Array[ColumnType.EnumVal], flushCache: Boolean): (List[ColumnMetadata], Option[PrimaryKey]) = {
+
+    if (flushCache) dbTableCols.remove(s"$db.$table")
 
     val cols = dbTableCols.getOrElseUpdate(s"$db.$table", {
       val dbConn = dbConns.getOrElseUpdate(db, {
