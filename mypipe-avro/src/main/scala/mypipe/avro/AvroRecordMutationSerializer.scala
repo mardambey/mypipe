@@ -13,8 +13,11 @@ trait AvroRecordMutationSerializer extends MutationSerializer[Array[Byte]] {
 
   // TODO: copying sucks, re-implement this
   protected def addHeader(schemaId: Short, bytes: Array[Byte]): Array[Byte] = {
-    Array(MAGIC, schemaId.toByte) ++ bytes
+    Array(MAGIC) ++ short2ByteArray(schemaId) ++ bytes
   }
+
+  protected def short2ByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
+  protected def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
 
   def serialize(mutation: Mutation[_]): Array[Byte] = {
 
