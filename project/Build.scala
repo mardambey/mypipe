@@ -51,7 +51,8 @@ object ApplicationBuild extends Build {
     avro,
 		guava,
     xinject,
-    jsr305
+    jsr305,
+    scalaTest
   )
 
   val kafkaDependencies = Seq(
@@ -101,9 +102,10 @@ object ApplicationBuild extends Build {
   lazy val myavro = Project(id = "myavro",
     base = file("mypipe-avro"),
     settings = Project.defaultSettings ++ Seq(
+      parallelExecution in Test := false,
       libraryDependencies ++= avroDependencies
     ) ++ Format.settings
-  ) dependsOn(api)
+  ) dependsOn(api % "compile->compile;test->test")
 
   lazy val mykafka = Project(id = "mykafka",
     base = file("mypipe-kafka"),
