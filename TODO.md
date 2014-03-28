@@ -1,10 +1,11 @@
 # TODO:
-- Add ability to create and register avro schemas dynamically as tables change
-- Periodically refresh MySQL table metadata -> instead, handle ALTER events
+- Create a tool that facilitates altering a MySQL table and pushes the
+	corresponding Avro schema to the repository.
 - If the MySQL tables have less fields then the Avro schema we get an NPE,
 	only set fields that are present, and attempt to set some default values
 	on fields that we do not get from the database
 - Logging format should be controlled through config file, not code
+- Add ability to create and register avro schemas dynamically as tables change
 - Expose the stdout producer through a some application that accepts the
 	hostname, port, etc. and simply `tails` the binlog.
 - Add metrics into various parts of the pipeline.
@@ -16,6 +17,9 @@
 - Close db connections on exit
 
 # DONE:
+- Periodically refresh MySQL table metadata -> instead, handle ALTER events.
+	This is taken care of since we cache tables by MySQL table ID which will
+	chanage when the tables meta data changes.
 - Split off Cassandra producer into mypipe-cassandra
 - Add Kafka 0.8 producer
 - Do not use TableMapEventData in the MySQLMetadataManager (third party API leak into ours)
