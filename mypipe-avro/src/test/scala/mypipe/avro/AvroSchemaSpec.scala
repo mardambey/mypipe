@@ -18,7 +18,7 @@ class AvroSchemaSpec extends UnitSpec with BeforeAndAfterAll {
   var server: RepositoryServer = _
 
   // load up multiple versions of a schema
-  val schemas = Array("/User-1.avsc", "/User-2.avsc", "/User-3.avsc").map(
+  val schemas = Array("/User-1-insert.avsc", "/User-2-insert.avsc", "/User-3-insert.avsc").map(
     schema ⇒ try {
       Some(new Parser().parse(getClass.getResourceAsStream(schema)))
     } catch {

@@ -3,7 +3,7 @@
   "type": "record",
   "name": "User",
   "fields": [
-	    {
+	  {
 			"name": "database",
 			"type": "string"
 		},
@@ -12,23 +12,35 @@
 			"type": "string"
 		},
 		{
-			"name": "id",
+			"name": "old.id",
 			"type": "int"
 		},
 		{
-			"name": "username",
+			"name": "old.username",
 			"type": "string"
 		},
 		{
-			"name": "password",
+			"name": "old.password",
 			"type": "string"
 		},
 		{
-			"name": "email",
+			"name": "old.login_count",
+			"type": "int"
+		},
+		{
+			"name": "new.id",
+			"type": "int"
+		},
+		{
+			"name": "new.username",
 			"type": "string"
 		},
 		{
-			"name": "login_count",
+			"name": "new.password",
+			"type": "string"
+		},
+		{
+			"name": "new.login_count",
 			"type": "int"
 		}
 	]

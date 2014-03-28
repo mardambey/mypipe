@@ -1,0 +1,64 @@
+{
+  "namespace": "mypipe.avro",
+  "type": "record",
+  "name": "User",
+  "fields": [
+	  {
+			"name": "database",
+			"type": "string"
+		},
+		{
+			"name": "table",
+			"type": "string"
+		},
+		{
+			"name": "old.id",
+			"type": "int"
+		},
+		{
+			"name": "old.username",
+			"type": "string"
+		},
+		{
+			"name": "old.password",
+			"type": "string"
+		},
+		{
+			"name": "old.login_count",
+			"type": "int"
+		},
+		{
+			"name": "old.email",
+			"type": "int"
+		},
+		{
+			"name": "old.avatar",
+			"type": "string"
+		},
+
+		{
+			"name": "new.id",
+			"type": "int"
+		},
+		{
+			"name": "new.username",
+			"type": "string"
+		},
+		{
+			"name": "new.password",
+			"type": "string"
+		},
+		{
+			"name": "new.login_count",
+			"type": "int"
+		},
+		{
+			"name": "new.email",
+			"type": "int"
+		},
+		{
+			"name": "new.avatar",
+			"type": "string"
+		}
+	]
+}

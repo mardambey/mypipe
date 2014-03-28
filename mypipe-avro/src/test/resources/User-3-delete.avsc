@@ -1,0 +1,39 @@
+{
+  "namespace": "mypipe.avro",
+  "type": "record",
+  "name": "User",
+  "fields": [
+	    {
+			"name": "database",
+			"type": "string"
+		},
+		{
+			"name": "table",
+			"type": "string"
+		},
+		{
+			"name": "id",
+			"type": "int"
+		},
+		{
+			"name": "username",
+			"type": "string"
+		},
+		{
+			"name": "password",
+			"type": "string"
+		},
+		{
+			"name": "login_count",
+			"type": "int"
+		},
+		{
+			"name": "email",
+			"type": "string"
+		},
+		{
+			"name": "avatar",
+			"type": "string"
+		}
+	]
+}
