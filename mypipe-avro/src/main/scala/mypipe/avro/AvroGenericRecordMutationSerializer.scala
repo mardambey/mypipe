@@ -9,6 +9,7 @@ import mypipe.api.InsertMutation
 import org.apache.avro.generic.{ GenericRecord, GenericDatumWriter, GenericData }
 import java.io.ByteArrayOutputStream
 import org.apache.avro.io.EncoderFactory
+import mypipe.avro.schema.{ ShortSchemaId, SchemaRepository }
 
 trait AvroGenericRecordMutationSerializer extends AvroRecordMutationSerializer {
 

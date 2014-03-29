@@ -48,7 +48,7 @@ object ColumnType extends Enum {
 case class PrimaryKey(columns: List[ColumnMetadata])
 case class ColumnMetadata(name: String, colType: ColumnType.EnumVal, isPrimaryKey: Boolean)
 case class Row(table: Table, columns: Map[String, Column])
-case class Table(id: java.lang.Long, name: String, db: String, evData: TableMapEventData, columns: List[ColumnMetadata], primaryKey: Option[PrimaryKey])
+case class Table(id: java.lang.Long, name: String, db: String, columns: List[ColumnMetadata], primaryKey: Option[PrimaryKey])
 
 case class Column(metadata: ColumnMetadata, value: Serializable = null) {
   def value[T]: T = {

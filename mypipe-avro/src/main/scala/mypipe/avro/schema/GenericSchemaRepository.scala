@@ -6,12 +6,39 @@ import java.util.logging.Logger
 import org.apache.avro.repo.{ SchemaEntry, Subject }
 import com.google.common.collect.{ HashBiMap, BiMap }
 
+trait SchemaRepository[ID, SCHEMA] {
+
+  /** @param topic
+   *  @param schemaId
+   *  @return Some(schema) if the topic and schemaId are valid, None otherwise
+   */
+  def getSchema(topic: String, schemaId: ID): Option[SCHEMA]
+
+  /** @param topic
+   *  @return Some(schema) if the topic exists, None otherwise
+   */
+  def getLatestSchema(topic: String, flushCache: Boolean = false): Option[SCHEMA]
+
+  /** @param topic
+   *  @param schema
+   *  @return Some(schemaId) if the topic and schema are valid, None otherwise
+   */
+  def getSchemaId(topic: String, schema: SCHEMA): Option[ID]
+
+  /** @param topic
+   *  @param schema
+   *  @return schemaId, potentially an already existing one, if the schema isn't new.
+   *  @throws Exception if registration is unsuccessful
+   */
+  def registerSchema(topic: String, schema: SCHEMA): ID
+}
+
 /** Generic implementation of a caching client for an AVRO-1124-style repo which provides strongly-typed APIs.
  *
  *  @tparam ID
  *  @tparam SCHEMA
  */
-abstract class GenericSchemaRepository[ID, SCHEMA] {
+abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, SCHEMA] {
 
   // Abstract functions which need to be overridden using traits or custom implementations.
 

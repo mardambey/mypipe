@@ -121,7 +121,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
       val future = ask(dbMetadata, GetColumns(db, tableName, colTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
       val columns = Await.result(future, 2 seconds)
-      val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), tableMapEventData, columns._1, columns._2)
+      val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), columns._1, columns._2)
       val tableKey = tableMapEventData.getDatabase + ":" + tableMapEventData.getTable
       tablesById.put(tableMapEventData.getTableId(), table)
     }

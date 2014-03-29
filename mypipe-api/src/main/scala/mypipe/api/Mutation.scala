@@ -25,3 +25,7 @@ case class DeleteMutation(
 trait MutationSerializer[OUTPUT] {
   protected def serialize(input: Mutation[_]): OUTPUT
 }
+
+trait MutationDeserializer[INPUT] {
+  protected def deserialize(input: INPUT): Mutation[_]
+}

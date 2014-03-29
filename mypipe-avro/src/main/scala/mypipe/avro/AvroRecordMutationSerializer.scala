@@ -17,7 +17,6 @@ trait AvroRecordMutationSerializer extends MutationSerializer[Array[Byte]] {
   }
 
   protected def short2ByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
-  protected def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
 
   def serialize(mutation: Mutation[_]): Array[Byte] = {
 

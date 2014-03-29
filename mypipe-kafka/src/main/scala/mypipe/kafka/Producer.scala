@@ -12,8 +12,6 @@ import mypipe.avro.{ AvroVersionedGenericRecordMutationSerializer, AvroGenericRe
 
 abstract class Producer[OUTPUT] extends MutationSerializer[OUTPUT] {
 
-  protected def serialize(input: Mutation[_]): OUTPUT
-
   def send(message: Mutation[_]) {
     val m = serialize(message)
     queue(getTopic(message), m)
