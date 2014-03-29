@@ -1,8 +1,8 @@
 package mypipe.api
 
-import com.github.shyiko.mysql.binlog.event.TableMapEventData
 import mypipe.util.Enum
 import java.io.Serializable
+import java.lang.{Long => JLong}
 
 object ColumnType extends Enum {
   sealed trait EnumVal extends Value
@@ -46,11 +46,27 @@ object ColumnType extends Enum {
 }
 
 case class PrimaryKey(columns: List[ColumnMetadata])
-case class ColumnMetadata(name: String, colType: ColumnType.EnumVal, isPrimaryKey: Boolean)
-case class Row(table: Table, columns: Map[String, Column])
-case class Table(id: java.lang.Long, name: String, db: String, columns: List[ColumnMetadata], primaryKey: Option[PrimaryKey])
 
-case class Column(metadata: ColumnMetadata, value: Serializable = null) {
+case class ColumnMetadata(
+  name: String,
+  colType: ColumnType.EnumVal,
+  isPrimaryKey: Boolean)
+
+case class Row(
+  table: Table,
+  columns: Map[String, Column])
+
+case class Table(
+  id: JLong,
+  name: String,
+  db: String,
+  columns: List[ColumnMetadata],
+  primaryKey: Option[PrimaryKey])
+
+case class Column(
+  metadata: ColumnMetadata,
+  value: Serializable = null) {
+
   def value[T]: T = {
     value match {
       case null ⇒ null.asInstanceOf[T]
