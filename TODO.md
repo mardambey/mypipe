@@ -1,4 +1,5 @@
 # TODO:
+- Create Kafka consumer
 - Create a tool that facilitates altering a MySQL table and pushes the
 	corresponding Avro schema to the repository.
 - If the MySQL tables have less fields then the Avro schema we get an NPE,

@@ -12,12 +12,20 @@
 			"type": "string"
 		},
 		{
+			"name": "tableId",
+			"type": "long"
+		},
+		{
 			"name": "integers",
 			"type": {"type": "map", "values": "int"}
 		},
 		{
 			"name": "strings",
 			"type": {"type": "map", "values": "string"}
+		},
+		{
+			"name": "longs",
+			"type": {"type": "map", "values": "long"}
 		}
 	]
 }

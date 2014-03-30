@@ -12,12 +12,34 @@
 			"type": "string"
 		},
 		{
-			"name": "integers",
+			"name": "tableId",
+			"type": "long"
+		},
+		{
+			"name": "old.integers",
 			"type": {"type": "map", "values": "int"}
 		},
 		{
-			"name": "strings",
+			"name": "old.strings",
 			"type": {"type": "map", "values": "string"}
+		},
+		{
+
+			"name": "old.longs",
+			"type": {"type": "map", "values": "long"}
+		},
+		{
+			"name": "new.integers",
+			"type": {"type": "map", "values": "int"}
+		},
+		{
+			"name": "new.strings",
+			"type": {"type": "map", "values": "string"}
+		},
+		{
+
+			"name": "new.longs",
+			"type": {"type": "map", "values": "long"}
 		}
 	]
 }

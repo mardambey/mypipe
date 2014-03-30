@@ -12,6 +12,10 @@
 			"type": "string"
 		},
 		{
+			"name": "tableId",
+			"type": "long"
+		},
+		{
 			"name": "integers",
 			"type": {"type": "map", "values": "int"}
 		},
