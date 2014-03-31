@@ -4,8 +4,8 @@ import mypipe.api._
 import java.util.logging.Logger
 import scala.concurrent._
 import ExecutionContext.Implicits.global
-import mypipe.avro.{AvroVersionedSpecificRecordMutationDeserializer, AvroGenericRecordMutationDeserializer}
-import kafka.consumer.{ConsumerIterator, ConsumerConfig, Consumer, ConsumerConnector}
+import mypipe.avro.{ AvroVersionedSpecificRecordMutationDeserializer, AvroGenericRecordMutationDeserializer }
+import kafka.consumer.{ ConsumerIterator, ConsumerConfig, Consumer, ConsumerConnector }
 import java.util.Properties
 
 abstract class Consumer[INPUT](topic: String) extends MutationDeserializer[INPUT] {

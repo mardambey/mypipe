@@ -2,7 +2,7 @@ package mypipe.api
 
 import mypipe.util.Enum
 import java.io.Serializable
-import java.lang.{Long => JLong}
+import java.lang.{ Long ⇒ JLong }
 
 object ColumnType extends Enum {
   sealed trait EnumVal extends Value
@@ -64,8 +64,8 @@ case class Table(
   primaryKey: Option[PrimaryKey])
 
 case class Column(
-  metadata: ColumnMetadata,
-  value: Serializable = null) {
+    metadata: ColumnMetadata,
+    value: Serializable = null) {
 
   def value[T]: T = {
     value match {

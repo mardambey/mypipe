@@ -54,7 +54,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
   // Concrete implementation !
 
   // Utilities
-  private lazy val client = new RESTRepositoryClient(getRepositoryURL)
+  protected lazy val client = new RESTRepositoryClient(getRepositoryURL)
   private val logger = Logger.getLogger(classOf[GenericSchemaRepository[ID, SCHEMA]].getName)
 
   // Internal state
