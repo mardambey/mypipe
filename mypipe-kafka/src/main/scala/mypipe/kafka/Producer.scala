@@ -4,34 +4,32 @@ import kafka.producer.{ Producer ⇒ KProducer, ProducerConfig }
 
 import mypipe.api._
 import java.util.Properties
-import mypipe.kafka.types._
 import kafka.producer.KeyedMessage
 import java.util.concurrent.LinkedBlockingQueue
 import java.util
-import mypipe.avro.{ AvroVersionedGenericRecordMutationSerializer, AvroGenericRecordMutationSerializer }
+import java.util.logging.Logger
+import org.apache.avro.specific.SpecificRecord
+import org.apache.avro.Schema
+import mypipe.avro.schema.SchemaRepository
+import mypipe.avro.AvroVersionedRecordSerializer
 
-abstract class Producer[OUTPUT] extends MutationSerializer[OUTPUT] {
+abstract class Producer[InputMessageType, OutputMessageType] {
 
-  def send(message: Mutation[_]) {
-    val m = serialize(message)
-    queue(getTopic(message), m)
-  }
+  val log = Logger.getLogger(getClass.getName)
+  val serializer: Serializer[InputMessageType, OutputMessageType]
 
-  def send(messages: Array[Mutation[_]]) {
-    messages.foreach(m ⇒ queue(getTopic(m), serialize(m)))
+  def send(topic: String, message: InputMessageType) {
+    val m = serializer.serialize(topic, message)
+    if (m.isDefined) queue(topic, m.get)
   }
 
   def flush: Boolean
-  protected def queue(topic: String, message: OUTPUT)
-  protected def getTopic(message: Mutation[_]): String
+  protected def queue(topic: String, message: OutputMessageType)
 }
 
-package object types {
-  type BinaryKeyedMessage = KeyedMessage[Array[Byte], Array[Byte]]
-}
+abstract class KafkaProducer[InputMessageType, OutputMessageType](metadataBrokers: String) extends Producer[InputMessageType, OutputMessageType] {
 
-abstract class KafkaProducer(metadataBrokers: String)
-    extends Producer[Array[Byte]] {
+  type KeyType = Array[Byte]
 
   val properties = new Properties()
   properties.put("request.required.acks", "1")
@@ -39,16 +37,14 @@ abstract class KafkaProducer(metadataBrokers: String)
 
   val conf = new ProducerConfig(properties)
   val producer = new KProducer[Array[Byte], Array[Byte]](conf)
-  val queue = new LinkedBlockingQueue[BinaryKeyedMessage]()
+  val queue = new LinkedBlockingQueue[KeyedMessage[KeyType, OutputMessageType]]()
 
-  override def queue(topic: String, bytes: Array[Byte]) {
-    queue.add(new BinaryKeyedMessage(topic, null, bytes))
+  override def queue(topic: String, bytes: OutputMessageType) {
+    queue.add(new KeyedMessage[KeyType, OutputMessageType](topic, bytes))
   }
 
-  override def getTopic(message: Mutation[_]): String = message.table.db + "__" + message.table.name
-
   override def flush: Boolean = {
-    val s = new util.HashSet[BinaryKeyedMessage]
+    val s = new util.HashSet[KeyedMessage[KeyType, OutputMessageType]]
     queue.drainTo(s)
     val a = s.toArray[KeyedMessage[Array[Byte], Array[Byte]]](Array[KeyedMessage[Array[Byte], Array[Byte]]]())
     producer.send(a: _*)
@@ -64,17 +60,10 @@ abstract class KafkaProducer(metadataBrokers: String)
  *
  *  @param metadataBrokers where to find metadata about the Kafka cluster
  */
-class KafkaAvroGenericProducer(metadataBrokers: String)
-    extends KafkaProducer(metadataBrokers)
-    with AvroGenericRecordMutationSerializer {
+class KafkaAvroVersionedProducer[InputRecord <: SpecificRecord](metadataBrokers: String,
+                                                                schemaRepoClient: SchemaRepository[Short, Schema])
+    extends KafkaProducer[InputRecord, Array[Byte]](metadataBrokers) {
+
+  override val serializer: Serializer[InputRecord, Array[Byte]] = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
 }
 
-/** Producers messages into Kafka with binary Avro
- *  encoding via specific records that have to be
- *  registered in an Avro Schema repository.
- *
- *  @param metadataBrokers where to find metadata about the Kafka cluster
- */
-class KafkaAvroVersionedSpecificProducer(metadataBrokers: String)
-  extends KafkaProducer(metadataBrokers)
-  with AvroVersionedGenericRecordMutationSerializer

@@ -3,7 +3,7 @@ package mypipe.avro.schema
 import org.apache.avro.repo.client.RESTRepositoryClient
 import scala.collection.mutable
 import java.util.logging.Logger
-import org.apache.avro.repo.{ SchemaEntry, Subject }
+import org.apache.avro.repo.{ Repository, SchemaEntry, Subject }
 import com.google.common.collect.{ HashBiMap, BiMap }
 
 trait SchemaRepository[ID, SCHEMA] {
@@ -54,7 +54,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
   // Concrete implementation !
 
   // Utilities
-  protected lazy val client = new RESTRepositoryClient(getRepositoryURL)
+  protected lazy val client: Repository = new RESTRepositoryClient(getRepositoryURL)
   private val logger = Logger.getLogger(classOf[GenericSchemaRepository[ID, SCHEMA]].getName)
 
   // Internal state

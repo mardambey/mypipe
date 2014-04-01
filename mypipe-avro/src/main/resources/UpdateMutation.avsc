@@ -16,29 +16,29 @@
 			"type": "long"
 		},
 		{
-			"name": "old.integers",
+			"name": "old_integers",
 			"type": {"type": "map", "values": "int"}
 		},
 		{
-			"name": "old.strings",
+			"name": "old_strings",
 			"type": {"type": "map", "values": "string"}
 		},
 		{
 
-			"name": "old.longs",
+			"name": "old_longs",
 			"type": {"type": "map", "values": "long"}
 		},
 		{
-			"name": "new.integers",
+			"name": "new_integers",
 			"type": {"type": "map", "values": "int"}
 		},
 		{
-			"name": "new.strings",
+			"name": "new_strings",
 			"type": {"type": "map", "values": "string"}
 		},
 		{
 
-			"name": "new.longs",
+			"name": "new_longs",
 			"type": {"type": "map", "values": "long"}
 		}
 	]

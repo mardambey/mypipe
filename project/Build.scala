@@ -52,7 +52,8 @@ object ApplicationBuild extends Build {
 		guava,
     xinject,
     jsr305,
-    scalaTest
+    scalaTest,
+    scalaReflect
   )
 
   val kafkaDependencies = Seq(
@@ -139,6 +140,7 @@ object Dependencies {
 		val guava = "com.google.guava" % "guava" % "14.0.1"
     val xinject = "javax.inject" % "javax.inject" % "1"
     val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
+    val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.10.3"
 }
 
 object Format {

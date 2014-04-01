@@ -1,13 +1,12 @@
 package mypipe.avro
 
 import org.apache.avro.Schema
-import mypipe.avro.schema.{AvroSchema, ShortSchemaId}
+import mypipe.avro.schema.{ AvroSchema, ShortSchemaId }
 
-/**
- * An in memory Avro schema repository that maps 3 topics: insert, update, delete.
- * The schemas returned are InsertMutation,UpdateMutation,DeleteMutation.avsc that
- * allow for generic storage of insertions, updates, and deletes as Avro serialized
- * data.
+/** An in memory Avro schema repository that maps 3 topics: insert, update, delete.
+ *  The schemas returned are InsertMutation,UpdateMutation,DeleteMutation.avsc that
+ *  allow for generic storage of insertions, updates, and deletes as Avro serialized
+ *  data.
  *
  */
 class GenericInMemorySchemaRepo extends InMemorySchemaRepo[Short, Schema] with ShortSchemaId with AvroSchema {
