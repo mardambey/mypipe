@@ -9,7 +9,7 @@ import mypipe.avro.schema.{ AvroSchema, ShortSchemaId }
  *  data.
  *
  */
-class GenericInMemorySchemaRepo extends InMemorySchemaRepo[Short, Schema] with ShortSchemaId with AvroSchema {
+object GenericInMemorySchemaRepo extends InMemorySchemaRepo[Short, Schema] with ShortSchemaId with AvroSchema {
   // Avro schemas to be used when serializing mutations
   val insertSchemaFile: String = "/InsertMutation.avsc"
   val updateSchemaFile: String = "/UpdateMutation.avsc"
