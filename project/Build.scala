@@ -113,7 +113,7 @@ object ApplicationBuild extends Build {
     settings = Project.defaultSettings ++ Seq(
       libraryDependencies ++= kafkaDependencies
     ) ++ Format.settings
-  ) dependsOn(api, myavro)
+  ) dependsOn(api % "compile->compile;test->test", myavro)
 
   lazy val mycassandra = Project(id = "mycassandra",
     base = file("mypipe-cassandra"),
