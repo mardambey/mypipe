@@ -6,6 +6,7 @@ import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration._
 import mypipe.api._
+import mypipe.Pipe
 import mypipe.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import akka.actor.ActorSystem
@@ -90,47 +91,25 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   @volatile var connected = false
 
-  var f: Future[Unit] = _
-
   val queue = new LinkedBlockingQueue[Mutation[_]]()
   val queueProducer = new QueueProducer(queue)
-
   val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
-
-  consumer.registerListener(new BinlogConsumerListener() {
-    def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
-      queueProducer.queue(mutation)
-      true
-    }
-
-    def onMutation(c: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
-      queueProducer.queueList(mutations.toList)
-      true
-    }
-
-    def onConnect(c: BinlogConsumer) {
-      connected = true
-    }
-
-    def onDisconnect(c: BinlogConsumer) = {}
-  })
+  val pipe = new Pipe("test-pipe", List(consumer), queueProducer)
 
   override def beforeAll() {
-    f = Future {
-      consumer.connect()
-    }
 
     db.connect
-    while (!connected) { Thread.sleep(1) }
+    pipe.connect()
+
+    while (!db.connection.isConnected || !pipe.isConnected) { Thread.sleep(1) }
 
     Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1 second)
     Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1 second)
   }
 
   override def afterAll() {
+    pipe.disconnect()
     db.disconnect
-    consumer.disconnect()
-    Await.result(f, 30 seconds)
   }
 
   "A binlog consumer" should "properly consume insert events" in withDatabase { db ⇒

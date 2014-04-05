@@ -11,6 +11,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
   protected val system = ActorSystem("mypipe")
   implicit val ec = system.dispatcher
 
+  @volatile protected var _connected: Boolean = false
   protected var threads = List.empty[Thread]
   protected var flusher: Option[Cancellable] = None
 
@@ -18,6 +19,8 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
 
     override def onConnect(consumer: BinlogConsumer) {
       Log.info(s"Pipe $id connected!")
+
+      _connected = true
 
       flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS seconds,
         Conf.FLUSH_INTERVAL_SECS seconds) {
@@ -31,6 +34,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
 
     override def onDisconnect(consumer: BinlogConsumer) {
       Log.info(s"Pipe $id disconnected!")
+      _connected = false
       flusher.foreach(_.cancel())
       Conf.binlogFilePosSave(
         consumer.hostname,
@@ -48,6 +52,8 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
       producer.queueList(mutations.toList)
     }
   }
+
+  def isConnected = _connected
 
   def connect() {
 

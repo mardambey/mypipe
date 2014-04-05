@@ -34,9 +34,10 @@ abstract class Consumer[INPUT, OUTPUT](topic: String) {
 
         next && loop
       })
+
+      shutdown
     }
 
-    shutdown
   }
 
   def stop {
