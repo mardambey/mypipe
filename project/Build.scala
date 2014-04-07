@@ -57,7 +57,8 @@ object ApplicationBuild extends Build {
   )
 
   val kafkaDependencies = Seq(
-    kafka
+    kafka,
+    scalaTest
   )
 
   val cassandraDependencies = Seq(
@@ -111,6 +112,7 @@ object ApplicationBuild extends Build {
   lazy val mykafka = Project(id = "mykafka",
     base = file("mypipe-kafka"),
     settings = Project.defaultSettings ++ Seq(
+      parallelExecution in Test := false,
       libraryDependencies ++= kafkaDependencies
     ) ++ Format.settings
   ) dependsOn(api % "compile->compile;test->test", myavro)

@@ -15,8 +15,6 @@ class AvroVersionedRecordSerializer[InputRecord <: SpecificRecord](schemaRepoCli
   protected val magicByteForVersionZero: Byte = 0x0.toByte
   protected val headerLengthForVersionZero: Int = 3
   protected val encoderFactory = EncoderFactory.get()
-  protected val encoder = encoderFactory.binaryEncoder(new ByteArrayOutputStream(), null)
-  protected val writer = new SpecificDatumWriter[InputRecord]()
 
   private def short2ByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
@@ -25,11 +23,13 @@ class AvroVersionedRecordSerializer[InputRecord <: SpecificRecord](schemaRepoCli
       schema ← schemaRepoClient.getLatestSchema(topic);
       schemaId ← schemaRepoClient.getSchemaId(topic, schema)
     ) yield {
-      writer.setSchema(schema)
+      val writer = new SpecificDatumWriter[InputRecord](schema)
       val out = new ByteArrayOutputStream()
-      out.write(new Array[Byte](magicByteForVersionZero))
+      out.write(magicByteForVersionZero)
       out.write(short2ByteArray(schemaId))
-      writer.write(inputRecord, encoderFactory.binaryEncoder(out, encoder))
+      val enc = encoderFactory.binaryEncoder(out, null)
+      writer.write(inputRecord, enc)
+      enc.flush
       out.toByteArray
     }
   }

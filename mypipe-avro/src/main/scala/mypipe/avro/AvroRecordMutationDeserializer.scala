@@ -17,11 +17,22 @@ class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](schemaRepoC
   protected val logger = Logger.getLogger(getClass.getName)
   protected val magicByteForVersionZero: Byte = 0x0.toByte
   protected val headerLengthForVersionZero: Int = 3
-  protected val inputRecordInstance: InputRecord = getInputRecordInstance
-  protected val readerSchema = inputRecordInstance.getSchema
-  protected val decoderFactory: DecoderFactory = DecoderFactory.get()
-  protected val decoder: BinaryDecoder = decoderFactory.binaryDecoder(Array[Byte](), null)
-  protected val reader: DatumReader[InputRecord] = new SpecificDatumReader[InputRecord](readerSchema)
+  lazy protected val inputRecordInstance: InputRecord = getInstanceByReflection[InputRecord]
+  lazy protected val readerSchema = inputRecordInstance.getSchema
+  lazy protected val decoderFactory: DecoderFactory = DecoderFactory.get()
+  lazy protected val decoder: BinaryDecoder = decoderFactory.binaryDecoder(Array[Byte](), null)
+  lazy protected val reader: DatumReader[InputRecord] = new SpecificDatumReader[InputRecord](readerSchema)
+
+  protected def getInstanceByReflection[InstanceType](implicit instanceTypeTag: TypeTag[InstanceType]): InstanceType = {
+
+    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
+    val inputRecordClass = universe.typeOf[InstanceType].typeSymbol.asClass
+    val inputRecordClassMirror = runtimeMirror.reflectClass(inputRecordClass)
+    val inputRecordConstructor = universe.typeOf[InstanceType].declaration(universe.nme.CONSTRUCTOR).asTerm.alternatives.head.asMethod
+    val inputRecordConstructorMirror = inputRecordClassMirror.reflectConstructor(inputRecordConstructor)
+
+    inputRecordConstructorMirror().asInstanceOf[InstanceType]
+  }
 
   protected def getInputRecordInstance: InputRecord = {
 
@@ -63,7 +74,7 @@ class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](schemaRepoC
       }
     } catch {
       case e: Exception ⇒
-        logger.severe("Got an exception while trying to decode a versioned avro event! Exception: ${e.getMessage}\n${e.getStackTraceString}")
+        logger.severe(s"Got an exception while trying to decode a versioned avro event! Exception: ${e.getMessage}\n${e.getStackTraceString}")
         false
     }
 

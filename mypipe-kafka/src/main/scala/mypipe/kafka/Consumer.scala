@@ -11,44 +11,63 @@ import java.util.Properties
 import org.apache.avro.Schema
 import mypipe.avro.schema.SchemaRepository
 import org.apache.avro.specific.SpecificRecord
+import scala.annotation.tailrec
 
-abstract class Consumer[INPUT, OUTPUT](topic: String) {
+abstract class KafkaConsumer[OUTPUT](topic: String, zkConnect: String, groupId: String) {
+
+  type INPUT = Array[Byte]
 
   protected val log = Logger.getLogger(getClass.getName)
-  protected val iterator: Iterator[INPUT]
   protected val deserializer: Deserializer[INPUT, OUTPUT]
   protected var future: Future[Unit] = _
   @volatile protected var loop = true
 
-  def start {
+  protected val consumerConnector = createConsumerConnector(zkConnect, groupId)
+  protected val mapStreams = consumerConnector.createMessageStreams(Map(topic -> 1))
+  protected val stream = mapStreams.get(topic).get.head
+  protected val consumerIterator = stream.iterator()
+
+  @tailrec private def consume {
+    val message = consumerIterator.next()
+
+    if (message != null) {
+      val next = try {
+        // topic here is wrong if this is using generic record,s it needs to be "insert" only
+
+        val data = deserializer.deserialize(sanitizeTopicForDeserializer(topic), message.message())
+        // TODO: handle failure better
+        if (data.isDefined) onEvent(data.get) else true
+      } catch {
+        case e: Exception ⇒ log.severe("Failed deserializing or processing message."); false
+      }
+
+      if (next && loop) consume
+    } else {
+      Unit
+    }
+  }
+
+  def start: Future[Unit] = {
 
     future = Future {
-      iterator.takeWhile(message ⇒ {
-        val next = try {
-          val data = deserializer.deserialize(topic, message)
-          // TODO: handle failure better
-          if (data.isDefined) onEvent(data.get) else true
-        } catch {
-          case e: Exception ⇒ log.severe("Failed deserializing or processing message."); false
-        }
-
-        next && loop
-      })
-
-      shutdown
+      try {
+        consume
+        stop
+      } catch {
+        case e: Exception ⇒ stop
+      }
     }
 
+    future
   }
 
   def stop {
     loop = false
+    consumerConnector.shutdown()
   }
 
-  def shutdown
-  protected def onEvent(output: OUTPUT): Boolean
-}
-
-abstract class KafkaConsumer[OUTPUT](topic: String, zkConnect: String, groupId: String) extends Consumer[Array[Byte], OUTPUT](topic) {
+  def onEvent(inputRecord: OUTPUT): Boolean
+  protected def sanitizeTopicForDeserializer(topic: String): String
 
   protected def createConsumerConnector(zkConnect: String, groupId: String): ConsumerConnector = {
     val props = new Properties()
@@ -58,21 +77,6 @@ abstract class KafkaConsumer[OUTPUT](topic: String, zkConnect: String, groupId: 
     props.put("zookeeper.sync.time.ms", "200")
     props.put("auto.commit.interval.ms", "1000")
     KConsumer.create(new ConsumerConfig(props))
-  }
-
-  protected def createIterator(iter: ConsumerIterator[Array[Byte], Array[Byte]]): Iterator[Array[Byte]] = new Iterator[Array[Byte]]() {
-    override def next(): Array[Byte] = iter.next().message()
-    override def hasNext: Boolean = iter.hasNext
-  }
-
-  protected val consumerConnector = createConsumerConnector(zkConnect, groupId)
-  protected val mapStreams = consumerConnector.createMessageStreams(Map(topic -> 1))
-  protected val stream = mapStreams.get(topic).get.head
-  protected val consumerIterator = stream.iterator()
-  override protected val iterator: Iterator[Array[Byte]] = createIterator(consumerIterator)
-
-  override def shutdown {
-    consumerConnector.shutdown()
   }
 }
 
@@ -89,6 +93,12 @@ class KafkaAvroRecordConsumer[InputRecord <: SpecificRecord](topic: String, zkCo
     extends KafkaConsumer[InputRecord](topic, zkConnect, groupId) {
 
   override val deserializer = new AvroVersionedRecordDeserializer[InputRecord](schemaRepoClient)
+
+  override protected def sanitizeTopicForDeserializer(topic: String): String = topic match {
+    case t if t.endsWith("_insert") ⇒ "insert"
+    case t if t.endsWith("_delete") ⇒ "delete"
+    case t if t.endsWith("_update") ⇒ "update"
+  }
 
   override def onEvent(inputRecord: InputRecord): Boolean = try {
     callback(inputRecord)
