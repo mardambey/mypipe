@@ -186,10 +186,16 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
     cols.foreach(_ match {
 
       case (ColumnType.INT24, columns) ⇒
-        columns.foreach(c ⇒ integers.put(c.metadata.name, c.value[Int]))
+        columns.foreach(c ⇒ {
+          val v = c.valueOption[Int]
+          if (v.isDefined) integers.put(c.metadata.name, v.get)
+        })
 
       case (ColumnType.VARCHAR, columns) ⇒
-        columns.foreach(c ⇒ strings.put(c.metadata.name, c.value[String]))
+        columns.foreach(c ⇒ {
+          val v = c.valueOption[String]
+          if (v.isDefined) strings.put(c.metadata.name, v.get)
+        })
 
       case (ColumnType.LONG, columns) ⇒
         columns.foreach(c ⇒ {
@@ -197,9 +203,10 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
           val v = c.value match {
             case i: java.lang.Integer ⇒ new java.lang.Long(i.toLong)
             case l: java.lang.Long    ⇒ l
+            case null                 ⇒ null
           }
 
-          longs.put(c.metadata.name, v)
+          if (v != null) longs.put(c.metadata.name, v)
         })
 
       case _ ⇒ // unsupported

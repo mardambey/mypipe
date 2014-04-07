@@ -73,4 +73,11 @@ case class Column(
       case v    ⇒ v.asInstanceOf[T]
     }
   }
+
+  def valueOption[T]: Option[T] = {
+    value match {
+      case null ⇒ None
+      case v    ⇒ Some(v.asInstanceOf[T])
+    }
+  }
 }
