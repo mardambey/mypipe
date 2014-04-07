@@ -1,5 +1,6 @@
 package mypipe.kafka
 
+import scala.reflect.runtime.universe._
 import scala.concurrent.duration._
 import mypipe.avro.GenericInMemorySchemaRepo
 import mypipe._
@@ -9,6 +10,7 @@ import mypipe.mysql.BinlogFilePos
 import scala.concurrent.Await
 import mypipe.mysql.BinlogConsumer
 import org.scalatest.BeforeAndAfterAll
+import org.apache.avro.specific.SpecificRecord
 
 class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
@@ -38,7 +40,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   "A generic Kafka Avro producer and consumer" should "properly produce and consume insert events" in withDatabase { db ⇒
 
-    val kafkaConsumer = new InsertKafkaAvroGenericConsumer("mypipe_user_insert", "localhost:2181", s"mypipe_user_insert-${System.currentTimeMillis()}")({
+    val kafkaConsumer = new KafkaAvroGenericConsumer[mypipe.avro.InsertMutation]("mypipe_user_insert", "localhost:2181", s"mypipe_user_insert-${System.currentTimeMillis()}")({
       insertMutation: mypipe.avro.InsertMutation ⇒
         {
           Log.info("consumed insert mutation: " + insertMutation)
@@ -60,7 +62,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   it should "properly produce and consume update events" in withDatabase { db ⇒
 
-    val kafkaConsumer = new UpdateKafkaAvroGenericConsumer("mypipe_user_update", "localhost:2181", s"mypipe_user_update-${System.currentTimeMillis()}")({
+    val kafkaConsumer = new KafkaAvroGenericConsumer[mypipe.avro.UpdateMutation]("mypipe_user_update", "localhost:2181", s"mypipe_user_update-${System.currentTimeMillis()}")({
       updateMutation: mypipe.avro.UpdateMutation ⇒
         {
           Log.info("consumed update mutation: " + updateMutation)
@@ -83,7 +85,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   it should "properly produce and consume delete events" in withDatabase { db ⇒
 
-    val kafkaConsumer = new DeleteKafkaAvroGenericConsumer("mypipe_user_delete", "localhost:2181", s"mypipe_user_delete-${System.currentTimeMillis()}")({
+    val kafkaConsumer = new KafkaAvroGenericConsumer[mypipe.avro.DeleteMutation]("mypipe_user_delete", "localhost:2181", s"mypipe_user_delete-${System.currentTimeMillis()}")({
       deleteMutation: mypipe.avro.DeleteMutation ⇒
         {
           Log.info("consumed delete mutation: " + deleteMutation)
@@ -104,17 +106,8 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
   }
 }
 
-class InsertKafkaAvroGenericConsumer(
-  topic: String, zkConnect: String, groupId: String)(callback: (mypipe.avro.InsertMutation) ⇒ Boolean)
-    extends KafkaAvroRecordConsumer[mypipe.avro.InsertMutation](
+class KafkaAvroGenericConsumer[InputRecord <: SpecificRecord](
+  topic: String, zkConnect: String, groupId: String)(callback: (InputRecord) ⇒ Boolean)(implicit val tag: TypeTag[InputRecord])
+    extends KafkaAvroRecordConsumer[InputRecord](
       topic, zkConnect, groupId, GenericInMemorySchemaRepo)(callback)
 
-class UpdateKafkaAvroGenericConsumer(
-  topic: String, zkConnect: String, groupId: String)(callback: (mypipe.avro.UpdateMutation) ⇒ Boolean)
-    extends KafkaAvroRecordConsumer[mypipe.avro.UpdateMutation](
-      topic, zkConnect, groupId, GenericInMemorySchemaRepo)(callback)
-
-class DeleteKafkaAvroGenericConsumer(
-  topic: String, zkConnect: String, groupId: String)(callback: (mypipe.avro.DeleteMutation) ⇒ Boolean)
-    extends KafkaAvroRecordConsumer[mypipe.avro.DeleteMutation](
-      topic, zkConnect, groupId, GenericInMemorySchemaRepo)(callback)
