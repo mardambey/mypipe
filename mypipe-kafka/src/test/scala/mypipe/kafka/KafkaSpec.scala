@@ -1,20 +1,13 @@
 package mypipe.kafka
 
-import scala.concurrent.{ ExecutionContext, Await }
-import ExecutionContext.Implicits.global
-import scala.reflect.runtime.universe.TypeTag
 import scala.concurrent.duration._
 import mypipe.avro.GenericInMemorySchemaRepo
 import mypipe._
-import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import mypipe.api._
-import mypipe.producer.{ KafkaMutationGenericAvroProducer, QueueProducer }
-import mypipe.mysql.{ BinlogFilePos, BinlogConsumer }
+import mypipe.producer.KafkaMutationGenericAvroProducer
+import mypipe.mysql.BinlogFilePos
 import scala.concurrent.Await
 import mypipe.mysql.BinlogConsumer
-import mypipe.mysql.BinlogConsumer
-import mypipe.api.UpdateMutation
-import mypipe.api.InsertMutation
 import org.scalatest.BeforeAndAfterAll
 
 class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
