@@ -471,11 +471,19 @@ public class FileRepository implements Repository, Closeable {
       }
     }
 
+    private final String endOfLine = System.getProperty("line.separator");
+
     private String readAllAsString(File file) throws FileNotFoundException {
-      // a scanner that will read a whole file
-      Scanner s = new Scanner(file, "UTF-8").useDelimiter("\\A");
+      Scanner s = new Scanner(file, "UTF-8").useDelimiter(endOfLine);
+      StringBuilder strBuilder = new StringBuilder();
       try {
-        return s.nextLine();
+        while (s.hasNext()) {
+          strBuilder.append(s.nextLine());
+          if (s.hasNext()) {
+            strBuilder.append(endOfLine);
+          }
+        }
+        return strBuilder.toString();
       } catch (NoSuchElementException e) {
         throw new RuntimeException(
             "file is empty: " + file.getAbsolutePath(), e);
