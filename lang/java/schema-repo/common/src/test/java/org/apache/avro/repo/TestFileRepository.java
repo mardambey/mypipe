@@ -110,6 +110,49 @@ public class TestFileRepository extends AbstractTestRepository<FileRepository> {
     }
   }
 
+  @Test
+  public void testReadWrittenMultiLineSchema() throws SchemaValidationException {
+    String path = TEST_PATH + "/readWriteMultiLine";
+
+    String endOfLine = System.getProperty("line.separator");
+
+    String multiLineSchema1 = "first line" + endOfLine + "second line";
+    String multiLineSchema2 = "first line" + endOfLine + "second line" + endOfLine;
+
+    FileRepository r = newRepo(path);
+    try {
+      r.register("sub1", null).register(multiLineSchema1);
+      r.register("sub1", null).register(multiLineSchema2);
+    } finally {
+      r.close();
+    }
+    r = newRepo(path);
+    try {
+      Subject s1 = r.lookup("sub1");
+      Assert.assertNotNull(s1);
+
+      SchemaEntry schemaEntry1ById = s1.lookupById("0");
+      Assert.assertNotNull(schemaEntry1ById);
+      Assert.assertEquals(multiLineSchema1, schemaEntry1ById.getSchema());
+
+      SchemaEntry schemaEntryBy1Schema = s1.lookupBySchema(multiLineSchema1);
+      Assert.assertNotNull(schemaEntryBy1Schema);
+      Assert.assertEquals(multiLineSchema1, schemaEntryBy1Schema.getSchema());
+
+      SchemaEntry schemaEntry2ById = s1.lookupById("1");
+      Assert.assertNotNull(schemaEntry2ById);
+      Assert.assertEquals(multiLineSchema1, schemaEntry2ById.getSchema());
+
+      SchemaEntry schemaEntry2BySchema = s1.lookupBySchema(multiLineSchema1);
+      Assert.assertNotNull(schemaEntry2BySchema);
+      Assert.assertEquals(multiLineSchema1, schemaEntry2BySchema.getSchema());
+
+    } finally {
+      r.close();
+    }
+  }
+
+
   @Test(expected = RuntimeException.class)
   public void testInvalidDir() throws IOException {
     String badPath = TEST_PATH + "/bad";

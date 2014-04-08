@@ -62,7 +62,7 @@
     <commons-compress.version>1.4.1</commons-compress.version>
     <easymock.version>3.0</easymock.version>
     <hamcrest.version>1.1</hamcrest.version>
-    <jetty-8.version>8.1.8.v20121106</jetty-8.version>
+    <jetty-8.version>8.1.14.v20131031</jetty-8.version>
     <jersey.version>1.15</jersey.version>
     <guice.version>3.0</guice.version>
     <commons-httpclient.version>3.1</commons-httpclient.version>
