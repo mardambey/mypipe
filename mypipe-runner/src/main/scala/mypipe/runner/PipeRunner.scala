@@ -1,37 +1,42 @@
 package mypipe.runner
 
 import mypipe.mysql.{ BinlogConsumer, BinlogFilePos, HostPortUserPass }
+
 import scala.collection.JavaConverters._
-import mypipe.api.{ Log, Mapping, Producer }
+import mypipe.api.{ Mapping, Producer }
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 import mypipe.{ Conf, Pipe }
+import org.slf4j.LoggerFactory
 
 object PipeRunner extends App {
 
   import PipeRunnerUtil._
 
-  val conf = ConfigFactory.load()
+  protected val log = LoggerFactory.getLogger(getClass)
+  protected val conf = ConfigFactory.load()
 
   lazy val producers: Map[String, Class[Producer]] = loadProducerClasses(conf, "mypipe.producers")
   lazy val consumers: Map[String, HostPortUserPass] = loadConsumerConfigs(conf, "mypipe.consumers")
   lazy val pipes: Seq[Pipe] = createPipes(conf, "mypipe.pipes", producers, consumers)
 
   if (pipes.isEmpty) {
-    Log.info("No pipes defined, exiting.")
+    log.info("No pipes defined, exiting.")
     sys.exit()
   }
 
   sys.addShutdownHook({
-    Log.info("Shutting down...")
+    log.info("Shutting down...")
     pipes.foreach(p ⇒ p.disconnect())
   })
 
-  Log.info(s"Connecting ${pipes.size} pipes...")
+  log.info(s"Connecting ${pipes.size} pipes...")
   pipes.foreach(_.connect())
 }
 
 object PipeRunnerUtil {
+
+  protected val log = LoggerFactory.getLogger(getClass)
 
   def loadProducerClasses(conf: Config, key: String): Map[String, Class[Producer]] = {
     val PRODUCERS = conf.getObject("mypipe.producers").asScala
@@ -65,7 +70,7 @@ object PipeRunnerUtil {
 
       val name = kv._1
 
-      Log.info(s"Loading configuration for $name pipe")
+      log.info(s"Loading configuration for $name pipe")
 
       val pipeConf = conf.getConfig(s"mypipe.pipes.$name")
       val enabled = if (pipeConf.hasPath("enabled")) pipeConf.getBoolean("enabled") else true
@@ -111,7 +116,7 @@ object PipeRunnerUtil {
       producer
     } catch {
       case e: Exception ⇒ {
-        Log.severe(s"Failed to configure producer $id: ${e.getMessage}\n${e.getStackTraceString}")
+        log.error(s"Failed to configure producer $id: ${e.getMessage}\n${e.getStackTraceString}")
         null
       }
     }

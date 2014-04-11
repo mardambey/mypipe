@@ -11,9 +11,11 @@ import scala.concurrent.Await
 import mypipe.mysql.BinlogConsumer
 import org.scalatest.BeforeAndAfterAll
 import org.apache.avro.specific.SpecificRecord
+import org.slf4j.LoggerFactory
 
 class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
+  val log = LoggerFactory.getLogger(getClass)
   @volatile var connected = false
   val kafkaProducer = new KafkaMutationGenericAvroProducer(
     List.empty[Mapping],
@@ -43,7 +45,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     val kafkaConsumer = new KafkaAvroGenericConsumer[mypipe.avro.InsertMutation]("mypipe_user_insert", "localhost:2181", s"mypipe_user_insert-${System.currentTimeMillis()}")({
       insertMutation: mypipe.avro.InsertMutation ⇒
         {
-          Log.info("consumed insert mutation: " + insertMutation)
+          log.debug("consumed insert mutation: " + insertMutation)
           // TODO: don't hardcode this
           assert(insertMutation.getDatabase == "mypipe")
           assert(insertMutation.getTable == "user")
@@ -65,7 +67,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     val kafkaConsumer = new KafkaAvroGenericConsumer[mypipe.avro.UpdateMutation]("mypipe_user_update", "localhost:2181", s"mypipe_user_update-${System.currentTimeMillis()}")({
       updateMutation: mypipe.avro.UpdateMutation ⇒
         {
-          Log.info("consumed update mutation: " + updateMutation)
+          log.debug("consumed update mutation: " + updateMutation)
           // TODO: don't hardcode this
           assert(updateMutation.getDatabase == "mypipe")
           assert(updateMutation.getTable == "user")
@@ -88,7 +90,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     val kafkaConsumer = new KafkaAvroGenericConsumer[mypipe.avro.DeleteMutation]("mypipe_user_delete", "localhost:2181", s"mypipe_user_delete-${System.currentTimeMillis()}")({
       deleteMutation: mypipe.avro.DeleteMutation ⇒
         {
-          Log.info("consumed delete mutation: " + deleteMutation)
+          log.debug("consumed delete mutation: " + deleteMutation)
           // TODO: don't hardcode this
           assert(deleteMutation.getDatabase == "mypipe")
           assert(deleteMutation.getTable == "user")

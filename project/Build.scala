@@ -9,6 +9,7 @@ object ApplicationBuild extends Build {
       version := "0.0.1",
       organization := "mypipe",
       scalaVersion := "2.10.3",
+      parallelExecution in ThisBuild := false,
       resolvers ++= Seq(Resolver.mavenLocal,
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
         "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
@@ -26,7 +27,8 @@ object ApplicationBuild extends Build {
     mysqlAsync,
     mysqlBinlogConnectorJava,
     scalaTest,
-    typesafeConfig
+    typesafeConfig,
+    logback
   )
 
   val samplesDependencies = Seq(
@@ -143,6 +145,7 @@ object Dependencies {
     val xinject = "javax.inject" % "javax.inject" % "1"
     val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
     val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.10.3"
+    val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
 }
 
 object Format {

@@ -1,6 +1,7 @@
 package mypipe.mysql
 
-import mypipe.api.{ ColumnType, PrimaryKey, Log, ColumnMetadata }
+import mypipe.api.{ ColumnType, PrimaryKey, ColumnMetadata }
+import org.slf4j.LoggerFactory
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import com.github.mauricio.async.db.{ Configuration, Connection, QueryResult }
@@ -17,6 +18,7 @@ case class GetColumns(database: String, table: String, columnTypes: Array[Column
 class MySQLMetadataManager(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")) extends Actor {
 
   import context.dispatcher
+  protected val log = LoggerFactory.getLogger(getClass)
 
   override val supervisorStrategy =
     OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
@@ -117,7 +119,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
 
     } catch {
       case e: Exception ⇒ {
-        Log.severe(s"Failed to determine column names: $columns\n${e.getMessage} -> ${e.getStackTraceString}")
+        log.error(s"Failed to determine column names: $columns\n${e.getMessage} -> ${e.getStackTraceString}")
         List.empty[ColumnMetadata]
       }
     }

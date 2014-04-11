@@ -14,11 +14,13 @@ import mypipe.api.InsertMutation
 import akka.util.Timeout
 import akka.agent.Agent
 import scala.collection.mutable.ListBuffer
+import org.slf4j.LoggerFactory
 
 class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
   @volatile var connected = false
 
+  val log = LoggerFactory.getLogger(getClass)
   val maxLatency = conf.getLong("mypipe.test.max-latency")
   val latencies = ListBuffer[Long]()
 
@@ -132,7 +134,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
                 latencies += System.nanoTime() - id._2
                 found = true
               } else {
-                Log.fine(s"Did not find a matching mutation with id = $id, cur val is $primaryKey, will keep looking.")
+                log.debug(s"Did not find a matching mutation with id = $id, cur val is $primaryKey, will keep looking.")
               }
 
             }
@@ -162,7 +164,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
     try {
       Await.result(future, 30 seconds)
     } catch {
-      case e: Exception ⇒ Log.warning("Timed out waiting for actors to shutdown, proceeding anyway.")
+      case e: Exception ⇒ log.debug("Timed out waiting for actors to shutdown, proceeding anyway.")
     }
 
     system.stop(insertProducer)

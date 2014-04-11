@@ -3,10 +3,11 @@ package mypipe
 import com.typesafe.config.ConfigFactory
 import java.io.{ PrintWriter, File }
 import mypipe.mysql.BinlogFilePos
-import mypipe.api.Log
+import org.slf4j.LoggerFactory
 
 object Conf {
 
+  val log = LoggerFactory.getLogger(getClass)
   val conf = ConfigFactory.load()
 
   val DATADIR = conf.getString("mypipe.data-dir")
@@ -53,7 +54,7 @@ object Conf {
       val file = new File(fileName)
       val writer = new PrintWriter(file)
 
-      Log.info(s"Saving binlog position for pipe $pipe/$hostname:$port -> $filePos")
+      log.info(s"Saving binlog position for pipe $pipe/$hostname:$port -> $filePos")
       writer.write(s"${filePos.filename}:${filePos.pos}")
       writer.close()
 

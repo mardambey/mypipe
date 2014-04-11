@@ -1,6 +1,7 @@
 package mypipe.mysql
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient.{ LifecycleListener, EventListener }
+import org.slf4j.LoggerFactory
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient
 import com.github.shyiko.mysql.binlog.event.EventType._
@@ -35,17 +36,18 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   protected implicit val ec = system.dispatcher
   protected val self = this
   val client = new BinaryLogClient(hostname, port, username, password)
-  val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
+  protected val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
+  protected val log = LoggerFactory.getLogger(getClass)
 
   // FIXME: this needs to be configurable
   protected val quitOnEventHandleFailure = true
 
   if (binlogFileAndPos != BinlogFilePos.current) {
-    Log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
+    log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
     client.setBinlogFilename(binlogFileAndPos.filename)
     client.setBinlogPosition(binlogFileAndPos.pos)
   } else {
-    Log.info(s"Using current master binlog position for consuming from $hostname:$port")
+    log.info(s"Using current master binlog position for consuming from $hostname:$port")
   }
 
   client.setServerId(MySQLServerId.next)
@@ -61,11 +63,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
         case XID       ⇒ handleXid(event)
         case e: EventType if isMutation(eventType) == true ⇒ {
           if (!handleMutation(event) && quitOnEventHandleFailure) {
-            Log.severe(s"Failed to process event $event and asked to quit on event handler failure, disconnecting from $hostname:$port")
+            log.error(s"Failed to process event $event and asked to quit on event handler failure, disconnecting from $hostname:$port")
             client.disconnect()
           }
         }
-        case _ ⇒ Log.finer(s"Event ignored ${eventType}")
+        case _ ⇒ log.debug(s"Event ignored ${eventType}")
       }
     }
   })
@@ -95,7 +97,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val results = listeners.takeWhile(l ⇒ try { l.onMutation(self, createMutation(event)) }
       catch {
         case e: Exception ⇒
-          Log.severe("Listener $l failed on mutation from event: $event")
+          log.error("Listener $l failed on mutation from event: $event")
           false
       })
 

@@ -1,12 +1,14 @@
 package mypipe
 
 import scala.concurrent.duration._
+import org.slf4j.LoggerFactory
 import mypipe.mysql.{ BinlogFilePos, BinlogConsumerListener, BinlogConsumer }
-import mypipe.api.{ Mutation, Log, Producer }
+import mypipe.api.{ Mutation, Producer }
 import akka.actor.{ Cancellable, ActorSystem }
 
 class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
 
+  protected val log = LoggerFactory.getLogger(getClass)
   protected var CONSUMER_DISCONNECT_WAIT_SECS = 2
   protected val system = ActorSystem("mypipe")
   implicit val ec = system.dispatcher
@@ -18,7 +20,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
   protected val listener = new BinlogConsumerListener() {
 
     override def onConnect(consumer: BinlogConsumer) {
-      Log.info(s"Pipe $id connected!")
+      log.info(s"Pipe $id connected!")
 
       _connected = true
 
@@ -33,7 +35,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
     }
 
     override def onDisconnect(consumer: BinlogConsumer) {
-      Log.info(s"Pipe $id disconnected!")
+      log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
       Conf.binlogFilePosSave(
@@ -59,7 +61,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
 
     if (threads.size > 0) {
 
-      Log.warning("Attempting to reconnect pipe while already connected, aborting!")
+      log.warn("Attempting to reconnect pipe while already connected, aborting!")
 
     } else {
 
@@ -67,7 +69,7 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
         c.registerListener(listener)
         val t = new Thread() {
           override def run() {
-            Log.info(s"Connecting pipe between $c -> $producer")
+            log.info(s"Connecting pipe between $c -> $producer")
             c.connect()
           }
         }
@@ -84,11 +86,11 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
       t ← threads
     ) {
       try {
-        Log.info(s"Disconnecting pipe between ${c} -> ${producer}")
+        log.info(s"Disconnecting pipe between ${c} -> ${producer}")
         c.disconnect()
         t.join(CONSUMER_DISCONNECT_WAIT_SECS * 1000)
       } catch {
-        case e: Exception ⇒ Log.severe(s"Caught exception while trying to disconnect from ${c.hostname}:${c.port} at binlog position ${c.binlogFileAndPos}.")
+        case e: Exception ⇒ log.error(s"Caught exception while trying to disconnect from ${c.hostname}:${c.port} at binlog position ${c.binlogFileAndPos}.")
       }
     }
   }

@@ -1,12 +1,11 @@
 package mypipe
 
-import mypipe.mysql.{ BinlogConsumerListener, BinlogFilePos, BinlogConsumer }
+import mypipe.mysql.{ BinlogFilePos, BinlogConsumer }
 import com.github.mauricio.async.db.{ Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
-import scala.concurrent.{ Future, Await }
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import mypipe.api._
-import mypipe.Pipe
 import mypipe.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import akka.actor.ActorSystem
@@ -15,6 +14,7 @@ import mypipe.api.UpdateMutation
 import scala.Some
 import mypipe.api.InsertMutation
 import com.typesafe.config.ConfigFactory
+import org.slf4j.LoggerFactory
 
 case class Db(hostname: String, port: Int, username: String, password: String, dbName: String) {
 
@@ -89,6 +89,7 @@ object Queries {
 
 class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
+  val log = LoggerFactory.getLogger(getClass)
   @volatile var connected = false
 
   val queue = new LinkedBlockingQueue[Mutation[_]]()
@@ -116,10 +117,11 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
     db.connection.sendQuery(Queries.INSERT.statement)
 
-    Log.info("Waiting for binary log event to arrive.")
+    log.info("Waiting for binary log event to arrive.")
     val mutation = queue.poll(30, TimeUnit.SECONDS)
 
     // expect the row back
+    println("got insertmutation=" + mutation)
     assert(mutation != null)
     assert(mutation.isInstanceOf[InsertMutation])
   }
@@ -128,9 +130,10 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
     db.connection.sendQuery(Queries.UPDATE.statement)
 
-    Log.info("Waiting for binary log event to arrive.")
+    log.info("Waiting for binary log event to arrive.")
     val mutation = queue.poll(30, TimeUnit.SECONDS)
 
+    println("got updatemutation=" + mutation)
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[UpdateMutation])
@@ -140,9 +143,10 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
     db.connection.sendQuery(Queries.DELETE.statement)
 
-    Log.info("Waiting for binary log event to arrive.")
+    log.info("Waiting for binary log event to arrive.")
     val mutation = queue.poll(30, TimeUnit.SECONDS)
 
+    println("got deletemutation=" + mutation)
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[DeleteMutation])
