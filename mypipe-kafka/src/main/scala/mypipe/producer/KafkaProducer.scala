@@ -17,16 +17,16 @@ import java.util.logging.Logger
 /** The base class for a Mypipe producer that encodes Mutation instances
  *  as Avro records and publishes them into Kafka.
  *
- *  @param mappings
- *  @param config
+ *  @param mappings this producer does not use mappings
+ *  @param config configuration must have "metadata-brokers"
  */
-abstract class KafkaMutationAvroProducer(mappings: List[Mapping], config: Config)
+abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], config: Config)
     extends Producer(mappings = null, config = config) {
 
   type InputRecord = SpecificRecord
   type OutputType = Array[Byte]
 
-  protected val schemaRepoClient: GenericSchemaRepository[Short, Schema]
+  protected val schemaRepoClient: GenericSchemaRepository[SchemaId, Schema]
   protected val serializer: Serializer[InputRecord, OutputType]
 
   protected val metadataBrokers = config.getString("metadata-brokers")
@@ -36,8 +36,34 @@ abstract class KafkaMutationAvroProducer(mappings: List[Mapping], config: Config
   protected val Update = classOf[mypipe.api.UpdateMutation]
   protected val Delete = classOf[mypipe.api.DeleteMutation]
 
+  /** Given a Mutation, this method must compute the Kafka
+   *  topic name associated with it.
+   *  @param mutation
+   *  @return the topic name
+   */
   protected def getKafkaTopic(mutation: Mutation[_]): String
+
+  /** Given a Mutation, this method must compute the "topic"
+   *  associated with this mutation in the Avro schema repository.
+   *  @param mutation
+   *  @return the "topic"
+   */
   protected def getAvroSchemaTopic(mutation: Mutation[_]): String
+
+  /** Given a schema ID of type SchemaId, converts it to a byte array.
+   *
+   *  @param schemaId
+   *  @return
+   */
+  protected def schemaIdToByteArray(schemaId: SchemaId): Array[Byte]
+
+  /** Given a Mutation, this method must return the Avro generic
+   *  record associated with it, for the given Avro schema.
+   *
+   *  @param mutation
+   *  @param schema
+   *  @return the Avro generic record
+   */
   protected def getAvroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record
 
   override def flush(): Boolean = {
@@ -50,15 +76,20 @@ abstract class KafkaMutationAvroProducer(mappings: List[Mapping], config: Config
   protected val headerLengthForVersionZero: Int = 3
   protected val encoderFactory = EncoderFactory.get()
 
-  private def short2ByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
-
-  protected def serialize(record: GenericData.Record, schema: Schema, schemaId: Short): Array[Byte] = {
+  /** Given an Avro generic record, schema, and schemaId, serialized
+   *  them into an array of bytes.
+   *  @param record
+   *  @param schema
+   *  @param schemaId
+   *  @return
+   */
+  protected def serialize(record: GenericData.Record, schema: Schema, schemaId: SchemaId): Array[Byte] = {
     val encoderFactory = EncoderFactory.get()
     val writer = new GenericDatumWriter[GenericRecord]()
     writer.setSchema(schema)
     val out = new ByteArrayOutputStream()
     out.write(magicByteForVersionZero)
-    out.write(short2ByteArray(schemaId))
+    out.write(schemaIdToByteArray(schemaId))
     val enc = encoderFactory.binaryEncoder(out, null)
     writer.write(record, enc)
     enc.flush
@@ -103,11 +134,11 @@ abstract class KafkaMutationAvroProducer(mappings: List[Mapping], config: Config
  *  DeleteMutation. The Kafka topic names are calculated as:
  *  dbName_tableName_(insert|update|delete)
  *
- *  @param mappings
- *  @param config
+ *  @param mappings this producer does not use mappings
+ *  @param config configuration must have "metadata-brokers"
  */
 class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
-    extends KafkaMutationAvroProducer(mappings, config) {
+    extends KafkaMutationAvroProducer[Short](mappings, config) {
 
   override protected val schemaRepoClient = GenericInMemorySchemaRepo
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
@@ -118,15 +149,26 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
     case Update ⇒ "update"
   }
 
+  /** Builds the Kafka topic using the mutation's database, table name, and
+   *  the mutation type (insert, update, delete) concatenating them with "_"
+   *  as a delimeter.
+   *
+   *  @param mutation
+   *  @return the topic name
+   */
   override protected def getKafkaTopic(mutation: Mutation[_]): String = mutation.getClass match {
     case Insert ⇒ s"${mutation.table.db}_${mutation.table.name}_insert"
     case Delete ⇒ s"${mutation.table.db}_${mutation.table.name}_delete"
     case Update ⇒ s"${mutation.table.db}_${mutation.table.name}_update"
   }
 
-  override protected def getAvroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record = {
+  /** Given a short, returns a byte array.
+   *  @param s
+   *  @return
+   */
+  override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
-    // use generic records when publishing
+  override protected def getAvroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record = {
 
     mutation.getClass match {
 
@@ -217,7 +259,7 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
 }
 
 class KafkaMutationSpecificAvroProducer(mappings: List[Mapping], config: Config)
-    extends KafkaMutationAvroProducer(mappings, config) {
+    extends KafkaMutationAvroProducer[Short](mappings, config) {
 
   private val schemaRepoClientClassName = config.getString("schema-repo-client")
 
@@ -229,4 +271,5 @@ class KafkaMutationSpecificAvroProducer(mappings: List[Mapping], config: Config)
   override protected def getKafkaTopic(mutation: Mutation[_]): String = ???
   override protected def getAvroSchemaTopic(mutation: Mutation[_]): String = ???
   override protected def getAvroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record = ???
+  override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 }
