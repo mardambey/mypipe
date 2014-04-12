@@ -1,11 +1,10 @@
 # TODO:
-- Create Kafka consumer
+- Use single topic per table for the Kafka generic producer
 - Create a tool that facilitates altering a MySQL table and pushes the
 	corresponding Avro schema to the repository.
 - If the MySQL tables have less fields then the Avro schema we get an NPE,
 	only set fields that are present, and attempt to set some default values
 	on fields that we do not get from the database
-- Logging format should be controlled through config file, not code
 - Add ability to create and register avro schemas dynamically as tables change
 - Expose the stdout producer through a some application that accepts the
 	hostname, port, etc. and simply `tails` the binlog.
@@ -18,6 +17,8 @@
 - Close db connections on exit
 
 # DONE:
+- Logging format should be controlled through config file, not code
+- Create Kafka consumer
 - Periodically refresh MySQL table metadata -> instead, handle ALTER events.
 	This is taken care of since we cache tables by MySQL table ID which will
 	chanage when the tables meta data changes.
