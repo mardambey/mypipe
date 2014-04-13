@@ -9,14 +9,11 @@ import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.TypeTag
 import org.apache.avro.specific.{ SpecificDatumReader, SpecificRecord }
 import java.util.logging.Logger
-import java.nio.ByteBuffer
 
 class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](schemaRepoClient: SchemaRepository[Short, Schema])(implicit tag: TypeTag[InputRecord])
-    extends Deserializer[Array[Byte], InputRecord] {
+    extends Deserializer[Array[Byte], InputRecord, Short] {
 
   protected val logger = Logger.getLogger(getClass.getName)
-  protected val magicByteForVersionZero: Byte = 0x0.toByte
-  protected val headerLengthForVersionZero: Int = 3
   lazy protected val inputRecordInstance: InputRecord = getInstanceByReflection[InputRecord]
   lazy protected val readerSchema = inputRecordInstance.getSchema
   lazy protected val decoderFactory: DecoderFactory = DecoderFactory.get()
@@ -45,31 +42,21 @@ class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](schemaRepoC
     inputRecordConstructorMirror().asInstanceOf[InputRecord]
   }
 
-  override def deserialize(topicName: String, bytes: Array[Byte]): Option[InputRecord] = {
+  override def deserialize(topicName: String, schemaId: Short, bytes: Array[Byte], offset: Int = 0): Option[InputRecord] = {
 
     val decodingSuccess = try {
 
-      val buf = ByteBuffer.wrap(bytes)
-      val magicByte = buf.get()
-
-      if (magicByte != magicByteForVersionZero) {
-        logger.severe(s"We have encountered an unknown magic byte! Magic Byte: $magicByte")
-        false
-      } else {
-        val schemaId: Short = buf.getShort
-
-        schemaRepoClient.getLatestSchema(topicName) match {
-          case Some(schema) ⇒ {
-            reader.setSchema(schema)
-            reader.read(inputRecordInstance,
-              decoderFactory.binaryDecoder(bytes, headerLengthForVersionZero,
-                bytes.length - headerLengthForVersionZero, decoder))
-            true
-          }
-          case None ⇒ {
-            logger.severe(s"We have encountered an unknown schema id! Schema Id: $schemaId")
-            false
-          }
+      schemaRepoClient.getLatestSchema(topicName) match {
+        case Some(schema) ⇒ {
+          reader.setSchema(schema)
+          reader.read(inputRecordInstance,
+            decoderFactory.binaryDecoder(bytes, offset,
+              bytes.length - offset, decoder))
+          true
+        }
+        case None ⇒ {
+          logger.severe(s"We have encountered an unknown schema id! Schema Id: $schemaId")
+          false
         }
       }
     } catch {

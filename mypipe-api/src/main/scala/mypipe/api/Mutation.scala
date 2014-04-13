@@ -47,19 +47,6 @@ case class DeleteMutation(
   override val rows: List[Row])
     extends SingleValuedMutation(table, rows)
 
-/** Serializes a mutation into the given output type.
- *
- *  @tparam Output the type that the Mutation will be serialized to.
- */
-trait MutationSerializer[Output] {
-  /** Serialize the given mutation into the output type.
-   *
-   *  @param input mutation to serialize
-   *  @return the serialized mutation in Output type
-   */
-  protected def serialize(input: Mutation[_]): Output
-}
-
 trait Serializer[Input, Output] {
   def serialize(topic: String, input: Input): Option[Output]
 }
@@ -68,26 +55,15 @@ trait Serializer[Input, Output] {
  *
  *  @tparam Input the input type
  *  @tparam Output the output type
+ *  @tparam SchemaId the schema ID type
  */
-trait Deserializer[Input, Output] {
+trait Deserializer[Input, Output, SchemaId] {
   /** Deserializes the data from Input to Output
    *  @param topic topic that this data is coming from
    *  @param input the data to deserialize
+   *  @param offset the offset to deserialize from with the input array
    *  @return the deserialized data in Output format
    */
-  def deserialize(topic: String, input: Input): Option[Output]
+  def deserialize(topic: String, schemaId: SchemaId, input: Input, offset: Int = 0): Option[Output]
 }
 
-/** Deserializes data returning Mutation instances.
- *
- *  @tparam Input the type of input data to work with.
- */
-trait MutationDeserializer[Input] extends Deserializer[Input, Mutation[_]] {
-  /** Deserialize the given input and return a Mutation instance.
-   *
-   *  @param topic topic that this data is coming from
-   *  @param input to deserialize
-   *  @return a Mutation (InsertMutation, UpdateMutation, DeleteMutation) instance.
-   */
-  override def deserialize(topic: String, input: Input): Option[Mutation[_]]
-}

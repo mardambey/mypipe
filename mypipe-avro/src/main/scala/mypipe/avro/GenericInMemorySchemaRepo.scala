@@ -19,8 +19,8 @@ object GenericInMemorySchemaRepo extends InMemorySchemaRepo[Short, Schema] with 
   val updateSchema = try { Schema.parse(getClass.getResourceAsStream(updateSchemaFile)) } catch { case e: Exception ⇒ println("Failed on update: " + e.getMessage); null }
   val deleteSchema = try { Schema.parse(getClass.getResourceAsStream(deleteSchemaFile)) } catch { case e: Exception ⇒ println("Failed on delete: " + e.getMessage); null }
 
-  registerSchema("insert", insertSchema)
-  registerSchema("update", updateSchema)
-  registerSchema("delete", deleteSchema)
+  val insertSchemaId = registerSchema("insert", insertSchema)
+  val updateSchemaId = registerSchema("update", updateSchema)
+  val deleteSchemaId = registerSchema("delete", deleteSchema)
 }
 

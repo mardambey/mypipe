@@ -13,6 +13,7 @@ import org.apache.avro.generic.{ GenericRecord, GenericDatumWriter, GenericData 
 import org.apache.avro.io.EncoderFactory
 import java.io.ByteArrayOutputStream
 import java.util.logging.Logger
+import mypipe.kafka.{ PROTO_MAGIC_V0, PROTO_INSERT, PROTO_UPDATE, PROTO_DELETE }
 
 /** The base class for a Mypipe producer that encodes Mutation instances
  *  as Avro records and publishes them into Kafka.
@@ -48,7 +49,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
    *  @param mutation
    *  @return the "topic"
    */
-  protected def getAvroSchemaTopic(mutation: Mutation[_]): String
+  protected def getAvroSchemaTopicAndByte(mutation: Mutation[_]): (String, Byte)
 
   /** Given a schema ID of type SchemaId, converts it to a byte array.
    *
@@ -72,8 +73,6 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
   }
 
   protected val logger = Logger.getLogger(getClass.getName)
-  protected val magicByteForVersionZero: Byte = 0x0.toByte
-  protected val headerLengthForVersionZero: Int = 3
   protected val encoderFactory = EncoderFactory.get()
 
   /** Given an Avro generic record, schema, and schemaId, serialized
@@ -83,12 +82,13 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
    *  @param schemaId
    *  @return
    */
-  protected def serialize(record: GenericData.Record, schema: Schema, schemaId: SchemaId): Array[Byte] = {
+  protected def serialize(record: GenericData.Record, schema: Schema, schemaId: SchemaId, mutationType: Byte): Array[Byte] = {
     val encoderFactory = EncoderFactory.get()
     val writer = new GenericDatumWriter[GenericRecord]()
     writer.setSchema(schema)
     val out = new ByteArrayOutputStream()
-    out.write(magicByteForVersionZero)
+    out.write(PROTO_MAGIC_V0)
+    out.write(mutationType)
     out.write(schemaIdToByteArray(schemaId))
     val enc = encoderFactory.binaryEncoder(out, null)
     writer.write(record, enc)
@@ -98,11 +98,11 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
 
   override def queueList(inputList: List[Mutation[_]]): Boolean = {
     inputList.foreach(input ⇒ {
-      val schemaTopic = getAvroSchemaTopic(input)
+      val (schemaTopic, mutationType) = getAvroSchemaTopicAndByte(input)
       val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
       val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
       val record = getAvroRecord(input, schema)
-      val bytes = serialize(record, schema, schemaId.get)
+      val bytes = serialize(record, schema, schemaId.get, mutationType)
 
       producer.send(getKafkaTopic(input), bytes)
     })
@@ -112,11 +112,11 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
   }
 
   override def queue(input: Mutation[_]): Boolean = {
-    val schemaTopic = getAvroSchemaTopic(input)
+    val (schemaTopic, mutationType) = getAvroSchemaTopicAndByte(input)
     val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
     val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
     val record = getAvroRecord(input, schema)
-    val bytes = serialize(record, schema, schemaId.get)
+    val bytes = serialize(record, schema, schemaId.get, mutationType)
 
     producer.send(getKafkaTopic(input), bytes)
     true
@@ -143,10 +143,10 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
   override protected val schemaRepoClient = GenericInMemorySchemaRepo
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
 
-  override protected def getAvroSchemaTopic(mutation: Mutation[_]): String = mutation.getClass match {
-    case Insert ⇒ "insert"
-    case Delete ⇒ "delete"
-    case Update ⇒ "update"
+  override protected def getAvroSchemaTopicAndByte(mutation: Mutation[_]): (String, Byte) = mutation.getClass match {
+    case Insert ⇒ ("insert", PROTO_INSERT)
+    case Update ⇒ ("update", PROTO_UPDATE)
+    case Delete ⇒ ("delete", PROTO_DELETE)
   }
 
   /** Builds the Kafka topic using the mutation's database, table name, and
@@ -156,11 +156,8 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
    *  @param mutation
    *  @return the topic name
    */
-  override protected def getKafkaTopic(mutation: Mutation[_]): String = mutation.getClass match {
-    case Insert ⇒ s"${mutation.table.db}_${mutation.table.name}_insert"
-    case Delete ⇒ s"${mutation.table.db}_${mutation.table.name}_delete"
-    case Update ⇒ s"${mutation.table.db}_${mutation.table.name}_update"
-  }
+  override protected def getKafkaTopic(mutation: Mutation[_]): String =
+    s"${mutation.table.db}_${mutation.table.name}"
 
   /** Given a short, returns a byte array.
    *  @param s
@@ -269,7 +266,7 @@ class KafkaMutationSpecificAvroProducer(mappings: List[Mapping], config: Config)
     .asInstanceOf[GenericSchemaRepository[Short, Schema]]
 
   override protected def getKafkaTopic(mutation: Mutation[_]): String = ???
-  override protected def getAvroSchemaTopic(mutation: Mutation[_]): String = ???
+  override protected def getAvroSchemaTopicAndByte(mutation: Mutation[_]): (String, Byte) = ???
   override protected def getAvroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record = ???
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 }
