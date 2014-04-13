@@ -1,5 +1,4 @@
 # TODO:
-- Use single topic per table for the Kafka generic producer
 - Create a tool that facilitates altering a MySQL table and pushes the
 	corresponding Avro schema to the repository.
 - If the MySQL tables have less fields then the Avro schema we get an NPE,
@@ -17,6 +16,7 @@
 - Close db connections on exit
 
 # DONE:
+- Use single topic per table for the Kafka generic producer
 - Logging format should be controlled through config file, not code
 - Create Kafka consumer
 - Periodically refresh MySQL table metadata -> instead, handle ALTER events.
