@@ -172,25 +172,16 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
       case Insert ⇒ {
         val (integers, strings, longs) = columnsToMaps(mutation.asInstanceOf[InsertMutation].rows.head.columns)
         val record = new GenericData.Record(schema)
-        record.put("database", mutation.table.db)
-        record.put("table", mutation.table.name)
-        record.put("tableId", mutation.table.id)
-        record.put("integers", integers)
-        record.put("strings", strings)
-        record.put("longs", longs)
-
+        header(record, mutation)
+        body(record, mutation, integers, strings, longs)
         record
       }
 
       case Delete ⇒ {
         val (integers, strings, longs) = columnsToMaps(mutation.asInstanceOf[DeleteMutation].rows.head.columns)
         val record = new GenericData.Record(schema)
-        record.put("database", mutation.table.db)
-        record.put("table", mutation.table.name)
-        record.put("tableId", mutation.table.id)
-        record.put("integers", integers)
-        record.put("strings", strings)
-        record.put("longs", longs)
+        header(record, mutation)
+        body(record, mutation, integers, strings, longs)
 
         record
       }
@@ -199,19 +190,28 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
         val (integersOld, stringsOld, longsOld) = columnsToMaps(mutation.asInstanceOf[UpdateMutation].rows.head._1.columns)
         val (integersNew, stringsNew, longsNew) = columnsToMaps(mutation.asInstanceOf[UpdateMutation].rows.head._2.columns)
         val record = new GenericData.Record(schema)
-        record.put("database", mutation.table.db)
-        record.put("table", mutation.table.name)
-        record.put("tableId", mutation.table.id)
-        record.put("old_integers", integersOld)
-        record.put("old_strings", stringsOld)
-        record.put("old_longs", longsOld)
-        record.put("new_integers", integersNew)
-        record.put("new_strings", stringsNew)
-        record.put("new_longs", longsNew)
+        header(record, mutation)
+        body(record, mutation, integersOld, stringsOld, longsOld) { s ⇒ "old_" + s }
+        body(record, mutation, integersNew, stringsNew, longsNew) { s ⇒ "new_" + s }
 
         record
       }
     }
+  }
+
+  protected def body(record: GenericData.Record, mutation: Mutation[_],
+                     integers: JMap[CharSequence, Integer],
+                     strings: JMap[CharSequence, CharSequence],
+                     longs: JMap[CharSequence, JLong])(implicit keyOp: String ⇒ String = s ⇒ s) {
+    record.put(keyOp("integers"), integers)
+    record.put(keyOp("strings"), strings)
+    record.put(keyOp("longs"), longs)
+  }
+
+  protected def header(record: GenericData.Record, mutation: Mutation[_]) {
+    record.put("database", mutation.table.db)
+    record.put("table", mutation.table.name)
+    record.put("tableId", mutation.table.id)
   }
 
   protected def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {

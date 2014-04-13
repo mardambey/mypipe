@@ -86,7 +86,6 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 2 seconds)
     Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2 seconds)
     Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2 seconds)
-    println("issued queries...")
     Await.result(Future { while (!done) Thread.sleep(100) }, 20 seconds)
 
     try {
