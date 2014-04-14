@@ -55,15 +55,14 @@ trait Serializer[Input, Output] {
  *
  *  @tparam Input the input type
  *  @tparam Output the output type
- *  @tparam SchemaId the schema ID type
+ *  @tparam Schema the schema type
  */
-trait Deserializer[Input, Output, SchemaId] {
+trait Deserializer[Input, Output, Schema] {
   /** Deserializes the data from Input to Output
-   *  @param topic topic that this data is coming from
    *  @param input the data to deserialize
    *  @param offset the offset to deserialize from with the input array
    *  @return the deserialized data in Output format
    */
-  def deserialize(topic: String, schemaId: SchemaId, input: Input, offset: Int = 0): Option[Output]
+  def deserialize(schema: Schema, input: Input, offset: Int = 0): Option[Output]
 }
 

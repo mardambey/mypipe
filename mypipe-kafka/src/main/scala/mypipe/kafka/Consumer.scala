@@ -3,17 +3,23 @@ package mypipe.kafka
 import org.slf4j.LoggerFactory
 import scala.concurrent._
 import ExecutionContext.Implicits.global
-import mypipe.avro.{ GenericInMemorySchemaRepo, AvroVersionedRecordDeserializer }
+import mypipe.avro.AvroVersionedRecordDeserializer
 import kafka.consumer.{ ConsumerConfig, Consumer ⇒ KConsumer, ConsumerConnector }
 import java.util.Properties
 import scala.annotation.tailrec
-import java.nio.ByteBuffer
 import mypipe.avro.schema.GenericSchemaRepository
 import org.apache.avro.Schema
 
+/** Abstract class that consumers messages for the given topic from
+ *  the Kafka cluster running on the provided zkConnect settings. The
+ *  groupId is used to controll if the consumer resumes from it's saved
+ *  offset or not.
+ *
+ *  @param topic to read messages from
+ *  @param zkConnect containing the kafka brokers
+ *  @param groupId used to identify the consumer
+ */
 abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) {
-
-  type INPUT = Array[Byte]
 
   protected val log = LoggerFactory.getLogger(getClass.getName)
   protected var future: Future[Unit] = _
@@ -23,6 +29,14 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
   protected val mapStreams = consumerConnector.createMessageStreams(Map(topic -> 1))
   protected val stream = mapStreams.get(topic).get.head
   protected val consumerIterator = stream.iterator()
+
+  /** Called every time a new message is pulled from
+   *  the Kafka topic.
+   *
+   *  @param bytes the message
+   *  @return true to continue reading messages, false to stop
+   */
+  def onEvent(bytes: Array[Byte]): Boolean
 
   @tailrec private def consume {
     val message = consumerIterator.next()
@@ -59,8 +73,6 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
     consumerConnector.shutdown()
   }
 
-  def onEvent(bytes: Array[Byte]): Boolean
-
   protected def createConsumerConnector(zkConnect: String, groupId: String): ConsumerConnector = {
     val props = new Properties()
     props.put("zookeeper.connect", zkConnect)
@@ -94,9 +106,9 @@ abstract class KafkaGenericMutationAvroConsumer[SchemaId](
   protected val logger = LoggerFactory.getLogger(getClass.getName)
   protected val headerLength = PROTO_HEADER_LEN_V0 + schemaIdSizeInBytes
 
-  lazy val insertDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.InsertMutation, SchemaId](schemaRepoClient)
-  lazy val updateDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.UpdateMutation, SchemaId](schemaRepoClient)
-  lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.DeleteMutation, SchemaId](schemaRepoClient)
+  lazy val insertDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.InsertMutation]()
+  lazy val updateDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.UpdateMutation]()
+  lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.DeleteMutation]()
 
   override def onEvent(bytes: Array[Byte]): Boolean = try {
 
@@ -110,23 +122,27 @@ abstract class KafkaGenericMutationAvroConsumer[SchemaId](
       val schemaId = bytesToSchemaId(bytes, PROTO_HEADER_LEN_V0)
 
       val continue = mutationType match {
+        case PROTO_INSERT ⇒ schemaRepoClient
+          .getSchema("insert", schemaId)
+          .map(insertDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ insertCallback(m)))
+          .getOrElse(None)
 
-        case PROTO_INSERT ⇒
-          insertDeserializer.deserialize("insert", schemaId, bytes, headerLength)
-            .map(insertCallback(_))
-        case PROTO_UPDATE ⇒
-          updateDeserializer.deserialize("update", schemaId, bytes, headerLength)
-            .map(updateCallback)
-        case PROTO_DELETE ⇒
-          deleteDeserializer.deserialize("delete", schemaId, bytes, headerLength)
-            .map(deleteCallback)
+        case PROTO_UPDATE ⇒ schemaRepoClient
+          .getSchema("update", schemaId)
+          .map(updateDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ updateCallback(m)))
+          .getOrElse(None)
+
+        case PROTO_DELETE ⇒ schemaRepoClient
+          .getSchema("delete", schemaId)
+          .map(deleteDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ deleteCallback(m)))
+          .getOrElse(None)
       }
 
       continue.getOrElse(false)
     }
   } catch {
     case e: Exception ⇒
-      log.error("Could not run callback on " + bytes + " => " + e.getMessage + "\n" + e.getStackTraceString)
+      log.error("Could not run callback on " + bytes.mkString + " => " + e.getMessage + "\n" + e.getStackTraceString)
       false
   }
 }
