@@ -1,9 +1,6 @@
 package mypipe.kafka
 
-import java.lang.String
-import scala.reflect.runtime.universe._
 import scala.concurrent.duration._
-import mypipe.avro.GenericInMemorySchemaRepo
 import mypipe._
 import mypipe.api._
 import mypipe.producer.KafkaMutationGenericAvroProducer
@@ -13,6 +10,7 @@ import mypipe.mysql.BinlogConsumer
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 import org.apache.avro.util.Utf8
+import mypipe.avro.GenericInMemorySchemaRepo
 
 class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
@@ -46,8 +44,11 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
     val username = new Utf8("username")
 
-    val kafkaConsumer = new KafkaGenericMutationAvroConsumer(
-      "mypipe_user", "localhost:2181", s"mypipe_user_insert-${System.currentTimeMillis()}")(
+    val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
+      "mypipe_user",
+      "localhost:2181",
+      s"mypipe_user_insert-${System.currentTimeMillis()}",
+      schemaIdSizeInBytes = 2)(
 
       insertCallback = { insertMutation: mypipe.avro.InsertMutation ⇒
         log.debug("consumed insert mutation: " + insertMutation)
@@ -79,7 +80,12 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
         }
         done = true
         true
-      })
+      }) {
+
+      protected val schemaRepoClient = GenericInMemorySchemaRepo
+      override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
+      private def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
+    }
 
     val future = kafkaConsumer.start
 

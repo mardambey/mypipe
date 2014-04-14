@@ -10,8 +10,8 @@ import scala.reflect.runtime.universe.TypeTag
 import org.apache.avro.specific.{ SpecificDatumReader, SpecificRecord }
 import java.util.logging.Logger
 
-class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](schemaRepoClient: SchemaRepository[Short, Schema])(implicit tag: TypeTag[InputRecord])
-    extends Deserializer[Array[Byte], InputRecord, Short] {
+class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord, SchemaId](schemaRepoClient: SchemaRepository[SchemaId, Schema])(implicit tag: TypeTag[InputRecord])
+    extends Deserializer[Array[Byte], InputRecord, SchemaId] {
 
   protected val logger = Logger.getLogger(getClass.getName)
   lazy protected val inputRecordInstance: InputRecord = getInstanceByReflection[InputRecord]
@@ -31,22 +31,11 @@ class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](schemaRepoC
     inputRecordConstructorMirror().asInstanceOf[InstanceType]
   }
 
-  protected def getInputRecordInstance: InputRecord = {
-
-    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-    val inputRecordClass = universe.typeOf[InputRecord].typeSymbol.asClass
-    val inputRecordClassMirror = runtimeMirror.reflectClass(inputRecordClass)
-    val inputRecordConstructor = universe.typeOf[InputRecord].declaration(universe.nme.CONSTRUCTOR).asMethod
-    val inputRecordConstructorMirror = inputRecordClassMirror.reflectConstructor(inputRecordConstructor)
-
-    inputRecordConstructorMirror().asInstanceOf[InputRecord]
-  }
-
-  override def deserialize(topicName: String, schemaId: Short, bytes: Array[Byte], offset: Int = 0): Option[InputRecord] = {
+  override def deserialize(topicName: String, schemaId: SchemaId, bytes: Array[Byte], offset: Int = 0): Option[InputRecord] = {
 
     val decodingSuccess = try {
 
-      schemaRepoClient.getLatestSchema(topicName) match {
+      schemaRepoClient.getSchema(topicName, schemaId) match {
         case Some(schema) ⇒ {
           reader.setSchema(schema)
           reader.read(inputRecordInstance,

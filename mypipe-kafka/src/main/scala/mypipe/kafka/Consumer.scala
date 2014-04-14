@@ -1,18 +1,15 @@
 package mypipe.kafka
 
-import mypipe.api._
 import org.slf4j.LoggerFactory
 import scala.concurrent._
 import ExecutionContext.Implicits.global
-import scala.reflect.runtime.universe.TypeTag
 import mypipe.avro.{ GenericInMemorySchemaRepo, AvroVersionedRecordDeserializer }
-import kafka.consumer.{ ConsumerIterator, ConsumerConfig, Consumer ⇒ KConsumer, ConsumerConnector }
+import kafka.consumer.{ ConsumerConfig, Consumer ⇒ KConsumer, ConsumerConnector }
 import java.util.Properties
-import org.apache.avro.Schema
-import mypipe.avro.schema.SchemaRepository
-import org.apache.avro.specific.SpecificRecord
 import scala.annotation.tailrec
 import java.nio.ByteBuffer
+import mypipe.avro.schema.GenericSchemaRepository
+import org.apache.avro.Schema
 
 abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) {
 
@@ -81,42 +78,47 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
  *  @param zkConnect
  *  @param groupId
  */
-class KafkaGenericMutationAvroConsumer(topic: String, zkConnect: String, groupId: String)(insertCallback: (mypipe.avro.InsertMutation) ⇒ Boolean,
-                                                                                          updateCallback: (mypipe.avro.UpdateMutation) ⇒ Boolean,
-                                                                                          deleteCallback: (mypipe.avro.DeleteMutation) ⇒ Boolean)
+abstract class KafkaGenericMutationAvroConsumer[SchemaId](
+  topic: String,
+  zkConnect: String,
+  groupId: String,
+  schemaIdSizeInBytes: Int)(insertCallback: (mypipe.avro.InsertMutation) ⇒ Boolean,
+                            updateCallback: (mypipe.avro.UpdateMutation) ⇒ Boolean,
+                            deleteCallback: (mypipe.avro.DeleteMutation) ⇒ Boolean)
     extends KafkaConsumer(topic, zkConnect, groupId) {
 
-  protected val schemaIdLength = 2 // schema ID is a Short
+  // abstract fields and methods
+  protected val schemaRepoClient: GenericSchemaRepository[SchemaId, Schema]
+  protected def bytesToSchemaId(bytes: Array[Byte], offset: Int): SchemaId
+
   protected val logger = LoggerFactory.getLogger(getClass.getName)
-  protected val schemaRepoClient = GenericInMemorySchemaRepo
-  protected val headerLength = PROTO_HEADER_LEN_V0 + schemaIdLength
+  protected val headerLength = PROTO_HEADER_LEN_V0 + schemaIdSizeInBytes
 
-  val insertDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.InsertMutation](schemaRepoClient)
-  val updateDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.UpdateMutation](schemaRepoClient)
-  val deleteDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.DeleteMutation](schemaRepoClient)
+  lazy val insertDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.InsertMutation, SchemaId](schemaRepoClient)
+  lazy val updateDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.UpdateMutation, SchemaId](schemaRepoClient)
+  lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.DeleteMutation, SchemaId](schemaRepoClient)
 
-  override def onEvent(inputRecord: Array[Byte]): Boolean = try {
+  override def onEvent(bytes: Array[Byte]): Boolean = try {
 
-    val buf = ByteBuffer.wrap(inputRecord)
-    val magicByte = buf.get()
+    val magicByte = bytes(0)
 
     if (magicByte != PROTO_MAGIC_V0) {
       logger.error(s"We have encountered an unknown magic byte! Magic Byte: $magicByte")
       false
     } else {
-      val mutationType = buf.get()
-      val schemaId: Short = buf.getShort
+      val mutationType = bytes(1)
+      val schemaId = bytesToSchemaId(bytes, PROTO_HEADER_LEN_V0)
 
       val continue = mutationType match {
 
         case PROTO_INSERT ⇒
-          insertDeserializer.deserialize("insert", schemaId, inputRecord, headerLength)
+          insertDeserializer.deserialize("insert", schemaId, bytes, headerLength)
             .map(insertCallback(_))
         case PROTO_UPDATE ⇒
-          updateDeserializer.deserialize("update", schemaId, inputRecord, headerLength)
+          updateDeserializer.deserialize("update", schemaId, bytes, headerLength)
             .map(updateCallback)
         case PROTO_DELETE ⇒
-          deleteDeserializer.deserialize("delete", schemaId, inputRecord, headerLength)
+          deleteDeserializer.deserialize("delete", schemaId, bytes, headerLength)
             .map(deleteCallback)
       }
 
@@ -124,7 +126,7 @@ class KafkaGenericMutationAvroConsumer(topic: String, zkConnect: String, groupId
     }
   } catch {
     case e: Exception ⇒
-      log.error("Could not run callback on " + inputRecord + " => " + e.getMessage + "\n" + e.getStackTraceString)
+      log.error("Could not run callback on " + bytes + " => " + e.getMessage + "\n" + e.getStackTraceString)
       false
   }
 }
