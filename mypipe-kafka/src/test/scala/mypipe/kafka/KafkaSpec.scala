@@ -11,6 +11,8 @@ import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 import org.apache.avro.util.Utf8
 import mypipe.avro.GenericInMemorySchemaRepo
+import mypipe.avro.schema.GenericSchemaRepository
+import org.apache.avro.Schema
 
 class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
@@ -50,7 +52,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
       s"mypipe_user_insert-${System.currentTimeMillis()}",
       schemaIdSizeInBytes = 2)(
 
-      insertCallback = { insertMutation: mypipe.avro.InsertMutation ⇒
+      insertCallback = { insertMutation ⇒
         log.debug("consumed insert mutation: " + insertMutation)
         try {
           assert(insertMutation.getDatabase.toString == "mypipe")
@@ -60,7 +62,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
         true
       },
 
-      updateCallback = { updateMutation: mypipe.avro.UpdateMutation ⇒
+      updateCallback = { updateMutation ⇒
         log.debug("consumed update mutation: " + updateMutation)
         try {
           assert(updateMutation.getDatabase.toString == "mypipe")
@@ -71,7 +73,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
         true
       },
 
-      deleteCallback = { deleteMutation: mypipe.avro.DeleteMutation ⇒
+      deleteCallback = { deleteMutation ⇒
         log.debug("consumed delete mutation: " + deleteMutation)
         try {
           assert(deleteMutation.getDatabase.toString == "mypipe")
@@ -82,7 +84,7 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
         true
       }) {
 
-      protected val schemaRepoClient = GenericInMemorySchemaRepo
+      protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
       override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
       private def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
     }

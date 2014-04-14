@@ -1,14 +1,17 @@
 package mypipe.kafka
 
+import scala.reflect.runtime.universe._
 import org.slf4j.LoggerFactory
 import scala.concurrent._
 import ExecutionContext.Implicits.global
-import mypipe.avro.AvroVersionedRecordDeserializer
+import mypipe.avro.{ InsertMutation, UpdateMutation, DeleteMutation, AvroVersionedRecordDeserializer }
 import kafka.consumer.{ ConsumerConfig, Consumer ⇒ KConsumer, ConsumerConnector }
 import java.util.Properties
 import scala.annotation.tailrec
 import mypipe.avro.schema.GenericSchemaRepository
 import org.apache.avro.Schema
+import org.apache.avro.specific.SpecificRecord
+import mypipe.kafka.KafkaGenericMutationAvroConsumer._
 
 /** Abstract class that consumers messages for the given topic from
  *  the Kafka cluster running on the provided zkConnect settings. The
@@ -84,31 +87,29 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
   }
 }
 
-/** Consumes specific Avro records from Kafka.
- *
- *  @param topic
- *  @param zkConnect
- *  @param groupId
- */
-abstract class KafkaGenericMutationAvroConsumer[SchemaId](
+abstract class KafkaMutationAvroConsumer[InsertMutationType <: SpecificRecord, UpdateMutationType <: SpecificRecord, DeleteMutationType <: SpecificRecord, SchemaId](
   topic: String,
   zkConnect: String,
   groupId: String,
-  schemaIdSizeInBytes: Int)(insertCallback: (mypipe.avro.InsertMutation) ⇒ Boolean,
-                            updateCallback: (mypipe.avro.UpdateMutation) ⇒ Boolean,
-                            deleteCallback: (mypipe.avro.DeleteMutation) ⇒ Boolean)
+  schemaIdSizeInBytes: Int)(insertCallback: (InsertMutationType) ⇒ Boolean,
+                            updateCallback: (UpdateMutationType) ⇒ Boolean,
+                            deleteCallback: (DeleteMutationType) ⇒ Boolean,
+                            implicit val insertTag: TypeTag[InsertMutationType],
+                            implicit val updateTag: TypeTag[UpdateMutationType],
+                            implicit val deletetag: TypeTag[DeleteMutationType])
     extends KafkaConsumer(topic, zkConnect, groupId) {
 
   // abstract fields and methods
   protected val schemaRepoClient: GenericSchemaRepository[SchemaId, Schema]
   protected def bytesToSchemaId(bytes: Array[Byte], offset: Int): SchemaId
+  protected def schemaTopicForMutation(byte: Byte): String
 
   protected val logger = LoggerFactory.getLogger(getClass.getName)
   protected val headerLength = PROTO_HEADER_LEN_V0 + schemaIdSizeInBytes
 
-  lazy val insertDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.InsertMutation]()
-  lazy val updateDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.UpdateMutation]()
-  lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[mypipe.avro.DeleteMutation]()
+  lazy val insertDeserializer = new AvroVersionedRecordDeserializer[InsertMutationType]()
+  lazy val updateDeserializer = new AvroVersionedRecordDeserializer[UpdateMutationType]()
+  lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[DeleteMutationType]()
 
   override def onEvent(bytes: Array[Byte]): Boolean = try {
 
@@ -123,17 +124,17 @@ abstract class KafkaGenericMutationAvroConsumer[SchemaId](
 
       val continue = mutationType match {
         case PROTO_INSERT ⇒ schemaRepoClient
-          .getSchema("insert", schemaId)
+          .getSchema(schemaTopicForMutation(PROTO_INSERT), schemaId)
           .map(insertDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ insertCallback(m)))
           .getOrElse(None)
 
         case PROTO_UPDATE ⇒ schemaRepoClient
-          .getSchema("update", schemaId)
+          .getSchema(schemaTopicForMutation(PROTO_UPDATE), schemaId)
           .map(updateDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ updateCallback(m)))
           .getOrElse(None)
 
         case PROTO_DELETE ⇒ schemaRepoClient
-          .getSchema("delete", schemaId)
+          .getSchema(schemaTopicForMutation(PROTO_DELETE), schemaId)
           .map(deleteDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ deleteCallback(m)))
           .getOrElse(None)
       }
@@ -147,3 +148,30 @@ abstract class KafkaGenericMutationAvroConsumer[SchemaId](
   }
 }
 
+object KafkaGenericMutationAvroConsumer {
+  type GenericInsertMutationCallback = (InsertMutation) ⇒ Boolean
+  type GenericUpdateMutationCallback = (UpdateMutation) ⇒ Boolean
+  type GenericDeleteMutationCallback = (DeleteMutation) ⇒ Boolean
+}
+
+abstract class KafkaGenericMutationAvroConsumer[SchemaId](
+  topic: String,
+  zkConnect: String,
+  groupId: String,
+  schemaIdSizeInBytes: Int)(insertCallback: GenericInsertMutationCallback,
+                            updateCallback: GenericUpdateMutationCallback,
+                            deleteCallback: GenericDeleteMutationCallback)
+
+    extends KafkaMutationAvroConsumer[mypipe.avro.InsertMutation, mypipe.avro.UpdateMutation, mypipe.avro.DeleteMutation, SchemaId](
+      topic, zkConnect, groupId, schemaIdSizeInBytes)(
+      insertCallback, updateCallback, deleteCallback,
+      implicitly[TypeTag[InsertMutation]],
+      implicitly[TypeTag[UpdateMutation]],
+      implicitly[TypeTag[DeleteMutation]]) {
+
+  override protected def schemaTopicForMutation(byte: Byte): String = byte match {
+    case PROTO_INSERT ⇒ "insert"
+    case PROTO_UPDATE ⇒ "update"
+    case PROTO_DELETE ⇒ "delete"
+  }
+}
