@@ -12,8 +12,8 @@ import java.util.{ HashMap ⇒ JMap }
 import org.apache.avro.generic.{ GenericRecord, GenericDatumWriter, GenericData }
 import org.apache.avro.io.EncoderFactory
 import java.io.ByteArrayOutputStream
-import java.util.logging.Logger
 import mypipe.kafka.{ PROTO_MAGIC_V0, PROTO_INSERT, PROTO_UPDATE, PROTO_DELETE }
+import org.slf4j.LoggerFactory
 
 /** The base class for a Mypipe producer that encodes Mutation instances
  *  as Avro records and publishes them into Kafka.
@@ -37,15 +37,28 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
   protected val Update = classOf[mypipe.api.UpdateMutation]
   protected val Delete = classOf[mypipe.api.DeleteMutation]
 
-  /** Given a Mutation, this method must compute the Kafka
-   *  topic name associated with it.
+  protected val logger = LoggerFactory.getLogger(getClass)
+  protected val encoderFactory = EncoderFactory.get()
+
+  /** Builds the Kafka topic using the mutation's database, table name, and
+   *  the mutation type (insert, update, delete) concatenating them with "_"
+   *  as a delimeter.
+   *
    *  @param mutation
    *  @return the topic name
    */
-  protected def getKafkaTopic(mutation: Mutation[_]): String
+  protected def getKafkaTopic(mutation: Mutation[_]): String =
+    s"${mutation.table.db}_${mutation.table.name}"
 
   /** Given a Mutation, this method must compute the "topic"
-   *  associated with this mutation in the Avro schema repository.
+   *  associated with this mutation in the Avro schema repository
+   *  as well as the byte that represents it when it is serialized
+   *  into a byte array. The byte is one of:
+   *
+   *  0x0 -> insert
+   *  0x1 -> update
+   *  0x2 -> delete
+   *
    *  @param mutation
    *  @return the "topic"
    */
@@ -58,8 +71,8 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
    */
   protected def schemaIdToByteArray(schemaId: SchemaId): Array[Byte]
 
-  /** Given a Mutation, this method must return the Avro generic
-   *  record associated with it, for the given Avro schema.
+  /** Given a Mutation, this method must convert it into an Avro record
+   *  for the given Avro schema.
    *
    *  @param mutation
    *  @param schema
@@ -68,12 +81,22 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
   protected def getAvroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record
 
   override def flush(): Boolean = {
-    producer.flush
-    true
+    try {
+      producer.flush
+      true
+    } catch {
+      case e: Exception ⇒ {
+        logger.error(s"Could not flush producer queue: ${e.getMessage} -> ${e.getStackTraceString}")
+        false
+      }
+    }
   }
 
-  protected val logger = Logger.getLogger(getClass.getName)
-  protected val encoderFactory = EncoderFactory.get()
+  protected def mutationToStringAndByte(mutation: Mutation[_]): (String, Byte) = mutation.getClass match {
+    case Insert ⇒ "insert" -> PROTO_INSERT
+    case Update ⇒ "update" -> PROTO_UPDATE
+    case Delete ⇒ "delete" -> PROTO_DELETE
+  }
 
   /** Given an Avro generic record, schema, and schemaId, serialized
    *  them into an array of bytes.
@@ -103,11 +126,9 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
       val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
       val record = getAvroRecord(input, schema)
       val bytes = serialize(record, schema, schemaId.get, mutationType)
-
       producer.send(getKafkaTopic(input), bytes)
     })
 
-    // TODO: return properly
     true
   }
 
@@ -143,21 +164,8 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
   override protected val schemaRepoClient = GenericInMemorySchemaRepo
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
 
-  override protected def getAvroSchemaTopicAndByte(mutation: Mutation[_]): (String, Byte) = mutation.getClass match {
-    case Insert ⇒ ("insert", PROTO_INSERT)
-    case Update ⇒ ("update", PROTO_UPDATE)
-    case Delete ⇒ ("delete", PROTO_DELETE)
-  }
-
-  /** Builds the Kafka topic using the mutation's database, table name, and
-   *  the mutation type (insert, update, delete) concatenating them with "_"
-   *  as a delimeter.
-   *
-   *  @param mutation
-   *  @return the topic name
-   */
-  override protected def getKafkaTopic(mutation: Mutation[_]): String =
-    s"${mutation.table.db}_${mutation.table.name}"
+  override protected def getAvroSchemaTopicAndByte(mutation: Mutation[_]): (String, Byte) =
+    mutationToStringAndByte(mutation)
 
   /** Given a short, returns a byte array.
    *  @param s
@@ -265,8 +273,11 @@ class KafkaMutationSpecificAvroProducer(mappings: List[Mapping], config: Config)
     .newInstance()
     .asInstanceOf[GenericSchemaRepository[Short, Schema]]
 
-  override protected def getKafkaTopic(mutation: Mutation[_]): String = ???
-  override protected def getAvroSchemaTopicAndByte(mutation: Mutation[_]): (String, Byte) = ???
+  override protected def getAvroSchemaTopicAndByte(mutation: Mutation[_]): (String, Byte) = {
+    val t = mutationToStringAndByte(mutation)
+    s"${mutation.table.db}_${mutation.table.name}_${t._1}" -> t._2
+  }
+
   override protected def getAvroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record = ???
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 }
