@@ -133,7 +133,7 @@ object Dependencies {
     val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.2.3"
     val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.2.3"
     val typesafeConfig = "com.typesafe" % "config" % "1.2.0"
-    val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0-SNAPSHOT"
+    val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0"
     val commonsLang = "commons-lang" % "commons-lang" % "2.6"
     val mysqlAsync = "com.github.mauricio" %% "mysql-async" % "0.2.12"
     val astyanaxCore = "com.netflix.astyanax" % "astyanax-core" % "1.56.48"
