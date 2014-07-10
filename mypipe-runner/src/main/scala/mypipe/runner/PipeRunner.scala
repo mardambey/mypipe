@@ -87,9 +87,7 @@ object PipeRunnerUtil {
         val producers = pipeConf.getObject("producer")
         val producerName = producers.entrySet().asScala.head.getKey()
         val producerConfig = pipeConf.getConfig(s"producer.${producerName}")
-        val producerMappingClasses = if (producerConfig.hasPath("mappings")) producerConfig.getStringList("mappings").asScala else List[String]()
-        val producerMappings = producerMappingClasses.map(m ⇒ Class.forName(m).newInstance()).toList.asInstanceOf[List[Mapping]]
-        val producerInstance = createProducer(producerName, producerConfig, producerMappings, producerClasses(producerName))
+        val producerInstance = createProducer(producerName, producerConfig, producerClasses(producerName))
 
         new Pipe(name, consumerInstances, producerInstance)
 
@@ -106,13 +104,13 @@ object PipeRunnerUtil {
     consumer
   }
 
-  protected def createProducer(id: String, config: Config, mappings: List[Mapping] = List.empty[Mapping], clazz: Class[Producer]): Producer = {
+  protected def createProducer(id: String, config: Config, clazz: Class[Producer]): Producer = {
     try {
-      val ctor = clazz.getConstructor(classOf[List[Mapping]], classOf[Config])
+      val ctor = clazz.getConstructor(classOf[Config])
 
       if (ctor == null) throw new NullPointerException("Could not load ctor for class ${clazz}, aborting.")
 
-      val producer = ctor.newInstance(mappings, config)
+      val producer = ctor.newInstance(config)
       producer
     } catch {
       case e: Exception ⇒ {

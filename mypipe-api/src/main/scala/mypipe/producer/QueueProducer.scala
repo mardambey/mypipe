@@ -4,7 +4,7 @@ import mypipe.api._
 import java.util
 import collection.JavaConverters._
 
-class QueueProducer(queue: util.Queue[Mutation[_]]) extends Producer(mappings = null, config = null) {
+class QueueProducer(queue: util.Queue[Mutation[_]]) extends Producer(config = null) {
 
   override def flush() = true
 

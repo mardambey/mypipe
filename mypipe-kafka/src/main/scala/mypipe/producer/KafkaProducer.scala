@@ -18,11 +18,10 @@ import org.slf4j.LoggerFactory
 /** The base class for a Mypipe producer that encodes Mutation instances
  *  as Avro records and publishes them into Kafka.
  *
- *  @param mappings this producer does not use mappings
  *  @param config configuration must have "metadata-brokers"
  */
-abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], config: Config)
-    extends Producer(mappings = null, config = config) {
+abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
+    extends Producer(config = config) {
 
   type InputRecord = SpecificRecord
   type OutputType = Array[Byte]
@@ -155,11 +154,10 @@ abstract class KafkaMutationAvroProducer[SchemaId](mappings: List[Mapping], conf
  *  DeleteMutation. The Kafka topic names are calculated as:
  *  dbName_tableName_(insert|update|delete)
  *
- *  @param mappings this producer does not use mappings
  *  @param config configuration must have "metadata-brokers"
  */
-class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
-    extends KafkaMutationAvroProducer[Short](mappings, config) {
+class KafkaMutationGenericAvroProducer(config: Config)
+    extends KafkaMutationAvroProducer[Short](config) {
 
   override protected val schemaRepoClient = GenericInMemorySchemaRepo
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
@@ -263,8 +261,8 @@ class KafkaMutationGenericAvroProducer(mappings: List[Mapping], config: Config)
   }
 }
 
-class KafkaMutationSpecificAvroProducer(mappings: List[Mapping], config: Config)
-    extends KafkaMutationAvroProducer[Short](mappings, config) {
+class KafkaMutationSpecificAvroProducer(config: Config)
+    extends KafkaMutationAvroProducer[Short](config) {
 
   private val schemaRepoClientClassName = config.getString("schema-repo-client")
 

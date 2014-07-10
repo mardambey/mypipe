@@ -20,7 +20,6 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
   @volatile var connected = false
   @volatile var done = false
   val kafkaProducer = new KafkaMutationGenericAvroProducer(
-    List.empty[Mapping],
     conf.getConfig("mypipe.test.kafka-generic-producer"))
 
   val binlogConsumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)

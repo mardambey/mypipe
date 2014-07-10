@@ -6,7 +6,7 @@ import mypipe.api.UpdateMutation
 import mypipe.api.InsertMutation
 import com.typesafe.config.Config
 
-class StdoutProducer(mappings: List[Mapping], config: Config) extends Producer(mappings, config) {
+class StdoutProducer(config: Config) extends Producer(config) {
 
   protected val mutations = scala.collection.mutable.ListBuffer[String]()
   protected val log = LoggerFactory.getLogger(getClass)
