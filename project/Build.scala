@@ -31,15 +31,6 @@ object ApplicationBuild extends Build {
     logback
   )
 
-  val samplesDependencies = Seq(
-    commonsLang,
-    astyanaxCassansra,
-    astyanaxCore,
-    astyanaxThrift,
-    mysqlAsync,
-    mysqlBinlogConnectorJava
-  )
-
   val runnerDependencies = Seq(
     typesafeConfig
   )
@@ -61,12 +52,6 @@ object ApplicationBuild extends Build {
   val kafkaDependencies = Seq(
     kafka,
     scalaTest
-  )
-
-  val cassandraDependencies = Seq(
-    astyanaxCassansra,
-    astyanaxCore,
-    astyanaxThrift
   )
 
   lazy val root = Project(id = "mypipe",
@@ -96,13 +81,6 @@ object ApplicationBuild extends Build {
     ) ++ Format.settings
   )
 
-  lazy val samples = Project(id = "samples",
-    base = file("mypipe-samples"),
-    settings = Project.defaultSettings ++ Seq(
-      libraryDependencies ++= samplesDependencies
-    ) ++ Format.settings
-  ) dependsOn(api, producers, mycassandra)
-
   lazy val myavro = Project(id = "myavro",
     base = file("mypipe-avro"),
     settings = Project.defaultSettings ++ Seq(
@@ -118,13 +96,6 @@ object ApplicationBuild extends Build {
       libraryDependencies ++= kafkaDependencies
     ) ++ Format.settings
   ) dependsOn(api % "compile->compile;test->test", myavro)
-
-  lazy val mycassandra = Project(id = "mycassandra",
-    base = file("mypipe-cassandra"),
-    settings = Project.defaultSettings ++ Seq(
-      libraryDependencies ++= cassandraDependencies
-    ) ++ Format.settings
-  ) dependsOn(api)
 }
 
 object Dependencies {
@@ -138,7 +109,6 @@ object Dependencies {
     val mysqlAsync = "com.github.mauricio" %% "mysql-async" % "0.2.12"
     val astyanaxCore = "com.netflix.astyanax" % "astyanax-core" % "1.56.48"
     val astyanaxThrift = "com.netflix.astyanax" % "astyanax-thrift" % "1.56.48"
-    val astyanaxCassansra = "com.netflix.astyanax" % "astyanax-cassandra" % "1.56.48"
     val avro = "org.apache.avro" % "avro" % "1.7.5"
     val kafka = "org.apache.kafka" %% "kafka" % "0.8.1" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
 		val guava = "com.google.guava" % "guava" % "14.0.1"
