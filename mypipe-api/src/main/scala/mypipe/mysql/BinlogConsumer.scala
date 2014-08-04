@@ -8,17 +8,11 @@ import com.github.shyiko.mysql.binlog.event.EventType._
 import com.github.shyiko.mysql.binlog.event._
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
 import mypipe.Conf
 import mypipe.api._
-import scala.concurrent.{ Future, Await }
 import akka.actor._
-import akka.pattern.ask
 import scala.collection.immutable.ListMap
-import akka.util.Timeout
-import mypipe.api.PrimaryKey
 import mypipe.api.UpdateMutation
-import scala.Some
 import mypipe.api.Column
 import mypipe.api.DeleteMutation
 import mypipe.api.Table
@@ -27,7 +21,7 @@ import mypipe.api.InsertMutation
 
 case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
 
-  protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
+  protected var tableCache = new TableCache(hostname, port, username, password)
   protected var transactionInProgress = false
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   protected val listeners = new scala.collection.mutable.HashSet[BinlogConsumerListener]()
@@ -58,7 +52,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
 
       eventType match {
-        case TABLE_MAP ⇒ handleTableMap(event)
+        case TABLE_MAP ⇒ tableCache.addTableByEvent(event)
         case QUERY     ⇒ handleQuery(event)
         case XID       ⇒ handleXid(event)
         case e: EventType if isMutation(eventType) == true ⇒ {
@@ -105,27 +99,6 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       if (results.size == listeners.size) true
       // TODO: we know which listener failed, we can do something about it
       else false
-    }
-  }
-
-  protected def handleTableMap(event: Event) {
-    val tableMapEventData: TableMapEventData = event.getData();
-
-    if (!tablesById.contains(tableMapEventData.getTableId)) {
-      // TODO: make this configurable
-      implicit val timeout = Timeout(2 second)
-
-      val db = tableMapEventData.getDatabase
-      val tableName = tableMapEventData.getTable
-
-      val colTypes = tableMapEventData.getColumnTypes.map(
-        colType ⇒ ColumnType.typeByCode(colType.toInt).getOrElse(ColumnType.UNKNOWN)).toArray
-
-      val future = ask(dbMetadata, GetColumns(db, tableName, colTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
-      val columns = Await.result(future, 2 seconds)
-      val table = Table(tableMapEventData.getTableId(), tableMapEventData.getTable(), tableMapEventData.getDatabase(), columns._1, columns._2)
-      val tableKey = tableMapEventData.getDatabase + ":" + tableMapEventData.getTable
-      tablesById.put(tableMapEventData.getTableId(), table)
     }
   }
 
@@ -188,19 +161,19 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   protected def createMutation(event: Event): Mutation[_] = event.getHeader().asInstanceOf[EventHeader].getEventType() match {
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒ {
       val evData = event.getData[WriteRowsEventData]()
-      val table = tablesById.get(evData.getTableId).get
+      val table = tableCache.getTable(evData.getTableId()).get
       InsertMutation(table, createRows(table, evData.getRows()))
     }
 
     case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒ {
       val evData = event.getData[UpdateRowsEventData]()
-      val table = tablesById.get(evData.getTableId).get
+      val table = tableCache.getTable(evData.getTableId).get
       UpdateMutation(table, createRowsUpdate(table, evData.getRows()))
     }
 
     case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
       val evData = event.getData[DeleteRowsEventData]()
-      val table = tablesById.get(evData.getTableId).get
+      val table = tableCache.getTable(evData.getTableId).get
       DeleteMutation(table, createRows(table, evData.getRows()))
     }
   }
