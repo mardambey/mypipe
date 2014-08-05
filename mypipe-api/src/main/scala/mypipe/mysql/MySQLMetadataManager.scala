@@ -1,19 +1,23 @@
 package mypipe.mysql
 
 import mypipe.api.{ ColumnType, PrimaryKey, ColumnMetadata }
+
 import org.slf4j.LoggerFactory
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import com.github.mauricio.async.db.{ Configuration, Connection, QueryResult }
 import akka.actor.SupervisorStrategy.Restart
-import akka.actor.{ Props, Actor, OneForOneStrategy }
+import akka.actor._
 import com.github.mauricio.async.db.mysql.MySQLConnection
 
-object MySQLMetadataManager {
-  def props(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")): Props = Props(new MySQLMetadataManager(hostname, port, username, password, database))
-}
-
 case class GetColumns(database: String, table: String, columnTypes: Array[ColumnType.EnumVal], flushCache: Boolean = false)
+
+object MySQLMetadataManager {
+  protected val system = ActorSystem("mypipe")
+  def props(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")): Props = Props(new MySQLMetadataManager(hostname, port, username, password, database))
+  def apply(hostname: String, port: Int, username: String, password: Option[String] = None, instanceName: Option[String] = None) =
+    system.actorOf(MySQLMetadataManager.props(hostname, port, username, password), instanceName.getOrElse(s"DBMetadataActor-$hostname:$port"))
+}
 
 class MySQLMetadataManager(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")) extends Actor {
 
@@ -27,8 +31,6 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
 
   val configuration = new Configuration(username, hostname, port, password, database)
   protected val dbConns = scala.collection.mutable.HashMap[String, List[Connection]]()
-
-  // TODO: periodically refresh the metadata
   protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
 
   def receive = {

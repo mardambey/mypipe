@@ -10,7 +10,6 @@ import com.github.shyiko.mysql.binlog.event._
 import scala.collection.JavaConverters._
 import mypipe.Conf
 import mypipe.api._
-import akka.actor._
 import scala.collection.immutable.ListMap
 import mypipe.api.UpdateMutation
 import mypipe.api.Column
@@ -26,11 +25,9 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   protected val listeners = new scala.collection.mutable.HashSet[BinlogConsumerListener]()
   protected val txQueue = new scala.collection.mutable.ListBuffer[Event]
-  protected val system = ActorSystem("mypipe")
-  protected implicit val ec = system.dispatcher
   protected val self = this
   val client = new BinaryLogClient(hostname, port, username, password)
-  protected val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
+  protected val dbMetadata = MySQLMetadataManager(hostname, port, username, Some(password))
   protected val log = LoggerFactory.getLogger(getClass)
 
   // FIXME: this needs to be configurable
