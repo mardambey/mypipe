@@ -62,16 +62,19 @@ object Queries {
 
   val conf = ConfigFactory.load("test.conf")
 
+  object TABLE {
+    val name = "user"
+    val fields = List("id", "username", "password", "login_count")
+  }
+
   object INSERT {
     def statement: String = statement()
     def statement(id: String = "NULL", username: String = "username", password: String = "password", loginCount: Int = 0): String =
       s"""INSERT INTO user values ($id, "$username", "$password", $loginCount)"""
-    val fields = List("id", "username", "password", "login_count")
   }
 
   object UPDATE {
     val statement = """UPDATE user set username = "username2", password = "password2""""
-    val fields = List("id", "username", "password", "login_count")
   }
 
   object TRUNCATE {
@@ -121,7 +124,6 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     val mutation = queue.poll(30, TimeUnit.SECONDS)
 
     // expect the row back
-    println("got insertmutation=" + mutation)
     assert(mutation != null)
     assert(mutation.isInstanceOf[InsertMutation])
   }
@@ -133,7 +135,6 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     log.info("Waiting for binary log event to arrive.")
     val mutation = queue.poll(30, TimeUnit.SECONDS)
 
-    println("got updatemutation=" + mutation)
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[UpdateMutation])
@@ -146,7 +147,6 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     log.info("Waiting for binary log event to arrive.")
     val mutation = queue.poll(30, TimeUnit.SECONDS)
 
-    println("got deletemutation=" + mutation)
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[DeleteMutation])

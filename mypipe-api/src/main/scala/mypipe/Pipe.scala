@@ -3,7 +3,7 @@ package mypipe
 import scala.concurrent.duration._
 import org.slf4j.LoggerFactory
 import mypipe.mysql.{ BinlogFilePos, BinlogConsumerListener, BinlogConsumer }
-import mypipe.api.{ Mutation, Producer }
+import mypipe.api.{ Table, Mutation, Producer }
 import akka.actor.{ Cancellable, ActorSystem }
 
 class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {

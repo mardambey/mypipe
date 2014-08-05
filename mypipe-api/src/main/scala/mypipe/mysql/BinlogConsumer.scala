@@ -49,7 +49,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
       val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
 
       eventType match {
-        case TABLE_MAP ⇒ tableCache.addTableByEvent(event)
+        case TABLE_MAP ⇒ handleTableMap(event)
         case QUERY     ⇒ handleQuery(event)
         case XID       ⇒ handleXid(event)
         case e: EventType if isMutation(eventType) == true ⇒ {
@@ -75,6 +75,11 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
+
+  protected def handleTableMap(event: Event) {
+    val table = tableCache.addTableByEvent(event)
+    listeners.foreach(_.onTableMap(this, table))
+  }
 
   protected def handleMutation(event: Event): Boolean = {
 

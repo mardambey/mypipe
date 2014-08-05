@@ -82,18 +82,17 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
       val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
 
       consumer.registerListener(new BinlogConsumerListener() {
-        def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
+        override def onMutation(c: BinlogConsumer, mutation: Mutation[_]): Boolean = {
           queueProducer.queue(mutation)
           true
         }
 
-        def onMutation(c: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
+        override def onMutation(c: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
           queueProducer.queueList(mutations.toList)
           true
         }
 
-        def onConnect(c: BinlogConsumer) { connected = true }
-        def onDisconnect(c: BinlogConsumer) {}
+        override def onConnect(c: BinlogConsumer) { connected = true }
       })
 
       val f = Future { consumer.connect() }
