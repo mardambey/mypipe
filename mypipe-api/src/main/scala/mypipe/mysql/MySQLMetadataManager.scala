@@ -15,8 +15,8 @@ case class GetColumns(database: String, table: String, columnTypes: Array[Column
 object MySQLMetadataManager {
   protected val system = ActorSystem("mypipe")
   def props(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")): Props = Props(new MySQLMetadataManager(hostname, port, username, password, database))
-  def apply(hostname: String, port: Int, username: String, password: Option[String] = None, instanceName: Option[String] = None) =
-    system.actorOf(MySQLMetadataManager.props(hostname, port, username, password), instanceName.getOrElse(s"DBMetadataActor-$hostname:$port"))
+  def apply(hostname: String, port: Int, username: String, password: Option[String] = None) =
+    system.actorOf(MySQLMetadataManager.props(hostname, port, username, password))
 }
 
 class MySQLMetadataManager(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")) extends Actor {
