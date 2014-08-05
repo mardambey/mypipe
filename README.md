@@ -56,3 +56,53 @@ the following credentials:
     GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
 
 The database must also have binary logging enabled in `row` format.
+
+## sample application.conf
+
+    mypipe {
+    
+      # consumers represent sources for mysql binary logs
+      consumers {
+    
+        consumer1 {
+          # database "host:port:user:pass" array
+          source = "localhost:3306:root:root"
+        }
+    
+      }
+    
+      # data producers export data out (stdout, other stores, external services, etc.)
+      producers {
+    
+        stdout {
+           class = "mypipe.producer.stdout.StdoutProducer"
+        }
+    
+    	  kafka-generic {
+    	    class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+    	  }
+      }
+    
+      # pipes join consumers and producers
+      pipes {
+    
+        stdout {
+          consumers = ["consumer1"]
+          producer {
+            stdout {}
+          }
+        }
+    
+      	kafka-generic {
+      		enabled = true
+      	  consumers = ["consumer1"]
+      	  producer {
+      	    kafka-generic {
+      	      metadata-brokers = "localhost:9092"
+      	    }
+      	  }
+      	 }
+      }
+    }
+    
+
