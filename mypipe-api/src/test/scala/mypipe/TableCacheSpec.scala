@@ -3,7 +3,7 @@ package mypipe
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 
 import akka.util.Timeout
-import mypipe.api.{ Mutation, Table }
+import mypipe.api.Table
 import mypipe.mysql._
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
@@ -29,7 +29,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
   implicit val timeout = Timeout(1 second)
 
-  "TableCache" should "be able to add tables to the cache" in {
+  "TableCache" should "be able to add and get tables to and from the cache" in {
 
     val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
 
@@ -53,8 +53,12 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       Await.result(insertFuture, 2000 millis)
 
       val table = queue.poll(10, TimeUnit.SECONDS)
-      assert(table.name == Queries.TABLE.name)
-
+      tableCache.addTableByEvent(Long.unbox(table.id), table.name, table.db, table.columns.map(_.colType.value.toByte).toArray)
+      val table2 = tableCache.getTable(table.id)
+      assert(table2.isDefined)
+      assert(table2.get.name == Queries.TABLE.name)
+      assert(table2.get.db == table.db)
+      assert(table2.get.columns == table.columns)
       true
     }
 

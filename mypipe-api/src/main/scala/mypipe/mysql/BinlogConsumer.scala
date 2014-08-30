@@ -77,7 +77,12 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   })
 
   protected def handleTableMap(event: Event) {
-    val table = tableCache.addTableByEvent(event)
+
+    val tableMapEventData: TableMapEventData = event.getData()
+    val table = tableCache.addTableByEvent(tableMapEventData.getTableId,
+      tableMapEventData.getTable,
+      tableMapEventData.getDatabase,
+      tableMapEventData.getColumnTypes)
     listeners.foreach(_.onTableMap(this, table))
   }
 
