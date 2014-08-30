@@ -100,15 +100,13 @@ object ApplicationBuild extends Build {
 
 object Dependencies {
 
-    val scalaTest = "org.scalatest" %% "scalatest" % "2.1.0" % "test"
-    val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.4"
-    val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.2.3"
-    val typesafeConfig = "com.typesafe" % "config" % "1.2.0"
+    val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
+    val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.5"
+    val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.3.5"
+    val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
     val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0"
     val commonsLang = "commons-lang" % "commons-lang" % "2.6"
     val mysqlAsync = "com.github.mauricio" %% "mysql-async" % "0.2.12"
-    val astyanaxCore = "com.netflix.astyanax" % "astyanax-core" % "1.56.48"
-    val astyanaxThrift = "com.netflix.astyanax" % "astyanax-thrift" % "1.56.48"
     val avro = "org.apache.avro" % "avro" % "1.7.5"
     val kafka = "org.apache.kafka" %% "kafka" % "0.8.1" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
 		val guava = "com.google.guava" % "guava" % "14.0.1"
