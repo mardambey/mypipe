@@ -1,5 +1,7 @@
 package mypipe.kafka
 
+import mypipe.api.Mutation
+
 import scala.reflect.runtime.universe._
 import org.slf4j.LoggerFactory
 import mypipe.avro.schema.GenericSchemaRepository
@@ -43,18 +45,18 @@ abstract class KafkaMutationAvroConsumer[InsertMutationType <: SpecificRecord, U
       val schemaId = bytesToSchemaId(bytes, PROTO_HEADER_LEN_V0)
 
       val continue = mutationType match {
-        case PROTO_INSERT ⇒ schemaRepoClient
-          .getSchema(schemaTopicForMutation(PROTO_INSERT), schemaId)
+        case Mutation.InsertByte ⇒ schemaRepoClient
+          .getSchema(schemaTopicForMutation(Mutation.InsertByte), schemaId)
           .map(insertDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ insertCallback(m)))
           .getOrElse(None)
 
-        case PROTO_UPDATE ⇒ schemaRepoClient
-          .getSchema(schemaTopicForMutation(PROTO_UPDATE), schemaId)
+        case Mutation.UpdateByte ⇒ schemaRepoClient
+          .getSchema(schemaTopicForMutation(Mutation.UpdateByte), schemaId)
           .map(updateDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ updateCallback(m)))
           .getOrElse(None)
 
-        case PROTO_DELETE ⇒ schemaRepoClient
-          .getSchema(schemaTopicForMutation(PROTO_DELETE), schemaId)
+        case Mutation.DeleteByte ⇒ schemaRepoClient
+          .getSchema(schemaTopicForMutation(Mutation.DeleteByte), schemaId)
           .map(deleteDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ deleteCallback(m)))
           .getOrElse(None)
       }

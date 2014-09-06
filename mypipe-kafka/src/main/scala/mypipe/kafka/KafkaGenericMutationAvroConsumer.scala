@@ -1,5 +1,7 @@
 package mypipe.kafka
 
+import mypipe.api.Mutation
+
 import scala.reflect.runtime.universe._
 import mypipe.avro.{ InsertMutation, UpdateMutation, DeleteMutation }
 
@@ -26,10 +28,6 @@ abstract class KafkaGenericMutationAvroConsumer[SchemaId](
       implicitly[TypeTag[UpdateMutation]],
       implicitly[TypeTag[DeleteMutation]]) {
 
-  override protected def schemaTopicForMutation(byte: Byte): String = byte match {
-    case PROTO_INSERT ⇒ "insert"
-    case PROTO_UPDATE ⇒ "update"
-    case PROTO_DELETE ⇒ "delete"
-  }
+  override protected def schemaTopicForMutation(byte: Byte): String = Mutation.byteToString(byte)
 }
 

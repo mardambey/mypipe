@@ -82,7 +82,9 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
         }).toList
       }
 
-      case None ⇒ List.empty[(String, Boolean)]
+      case None ⇒ {
+        List.empty[(String, Boolean)]
+      }
     })
     mapCols
   }
@@ -98,7 +100,10 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
         }).toList
       }
 
-      case None ⇒ List.empty[String]
+      case None ⇒ {
+        log.error(s"Failed to determine primary key for $db:$table")
+        List.empty[String]
+      }
     })
 
     pKey

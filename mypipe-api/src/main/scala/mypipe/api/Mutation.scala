@@ -1,5 +1,57 @@
 package mypipe.api
 
+/** General purpose Mutation helpers.
+ */
+object Mutation {
+
+  val InsertClass = classOf[mypipe.api.InsertMutation]
+  val UpdateClass = classOf[mypipe.api.UpdateMutation]
+  val DeleteClass = classOf[mypipe.api.DeleteMutation]
+
+  val UnknownByte = 0x0.toByte
+  val InsertByte = 0x1.toByte
+  val UpdateByte = 0x2.toByte
+  val DeleteByte = 0x3.toByte
+
+  val InsertString = "insert"
+  val UpdateString = "update"
+  val DeleteString = "delete"
+  val UnknownString = "unknown"
+
+  /** Given a mutation returns a string representing it's type
+   *  @param mutation
+   *  @return string representing the mutation's type
+   */
+  def typeAsString(mutation: Mutation[_]): String = mutation.getClass match {
+    case InsertClass ⇒ InsertString
+    case UpdateClass ⇒ UpdateString
+    case DeleteClass ⇒ DeleteString
+    case _           ⇒ UnknownString
+  }
+
+  /** Given a mutation returns a magic byte based on it's type.
+   *  @param mutation
+   *  @return a magic byte
+   */
+  def getMagicByte(mutation: Mutation[_]): Byte = mutation.getClass match {
+    case InsertClass ⇒ InsertByte
+    case UpdateClass ⇒ UpdateByte
+    case DeleteClass ⇒ DeleteByte
+    case _           ⇒ UnknownByte
+  }
+
+  /** Given a mutation's magic byte, returns the string
+   *  representing this mutation's type.
+   *
+   *  @param byte
+   *  @return string representing the mutation's type
+   */
+  def byteToString(byte: Byte): String = byte match {
+    case Mutation.InsertByte ⇒ Mutation.InsertString
+    case Mutation.UpdateByte ⇒ Mutation.UpdateString
+    case Mutation.DeleteByte ⇒ Mutation.DeleteString
+  }
+}
 /** Represents a row change event (Insert, Update, or Delete).
  *
  *  @param table that the row belongs to

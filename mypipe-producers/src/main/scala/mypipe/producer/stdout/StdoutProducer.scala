@@ -73,6 +73,9 @@ class StdoutProducer(config: Config) extends Producer(config) {
         })
       }
 
+      case _ ⇒ {
+      }
+
     }
 
     true

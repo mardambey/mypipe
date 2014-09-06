@@ -22,8 +22,4 @@ package object kafka {
 
   val PROTO_MAGIC_V0: Byte = 0x0.toByte
   val PROTO_HEADER_LEN_V0: Int = 2
-
-  val PROTO_INSERT = 0x0.toByte
-  val PROTO_UPDATE = 0x1.toByte
-  val PROTO_DELETE = 0x2.toByte
 }
