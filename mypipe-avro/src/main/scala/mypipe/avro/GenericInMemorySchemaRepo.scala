@@ -1,7 +1,8 @@
 package mypipe.avro
 
+import mypipe.api.Mutation
 import org.apache.avro.Schema
-import mypipe.avro.schema.{ AvroSchema, ShortSchemaId }
+import mypipe.avro.schema.{ AvroSchemaUtils, AvroSchema, ShortSchemaId }
 
 /** An in memory Avro schema repository that maps 3 topics: insert, update, delete.
  *  The schemas returned are InsertMutation,UpdateMutation,DeleteMutation.avsc that
@@ -19,8 +20,8 @@ object GenericInMemorySchemaRepo extends InMemorySchemaRepo[Short, Schema] with 
   val updateSchema = try { Schema.parse(getClass.getResourceAsStream(updateSchemaFile)) } catch { case e: Exception ⇒ println("Failed on update: " + e.getMessage); null }
   val deleteSchema = try { Schema.parse(getClass.getResourceAsStream(deleteSchemaFile)) } catch { case e: Exception ⇒ println("Failed on delete: " + e.getMessage); null }
 
-  val insertSchemaId = registerSchema("insert", insertSchema)
-  val updateSchemaId = registerSchema("update", updateSchema)
-  val deleteSchemaId = registerSchema("delete", deleteSchema)
+  val insertSchemaId = registerSchema(AvroSchemaUtils.genericSubject(Mutation.InsertString), insertSchema)
+  val updateSchemaId = registerSchema(AvroSchemaUtils.genericSubject(Mutation.UpdateString), updateSchema)
+  val deleteSchemaId = registerSchema(AvroSchemaUtils.genericSubject(Mutation.DeleteString), deleteSchema)
 }
 

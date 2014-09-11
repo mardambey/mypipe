@@ -11,7 +11,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 import org.apache.avro.util.Utf8
 import mypipe.avro.GenericInMemorySchemaRepo
-import mypipe.avro.schema.GenericSchemaRepository
+import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
 import org.apache.avro.Schema
 
 class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
@@ -46,9 +46,9 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     val username = new Utf8("username")
 
     val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
-      topic     = "mypipe_user_generic",
+      topic = KafkaUtil.genericTopic("mypipe", "user"),
       zkConnect = "localhost:2181",
-      groupId   = s"mypipe_user_insert-${System.currentTimeMillis()}",
+      groupId = s"mypipe_user_insert-${System.currentTimeMillis()}",
       schemaIdSizeInBytes = 2)(
 
       insertCallback = { insertMutation ⇒
@@ -86,6 +86,8 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
       protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
       override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
       private def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
+
+      override protected def schemaTopicForMutation(byte: Byte): String = AvroSchemaUtils.genericSubject(Mutation.byteToString(byte))
     }
 
     val future = kafkaConsumer.start

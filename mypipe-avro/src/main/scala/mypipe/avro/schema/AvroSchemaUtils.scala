@@ -58,7 +58,10 @@ object AvroSchemaUtils {
   }
 
   def genericSubject(mutation: Mutation[_]): String =
-    s"generic_${Mutation.typeAsString(mutation)}"
+    genericSubject(Mutation.typeAsString(mutation))
+
+  def genericSubject(mtype: String): String =
+    s"generic_${mtype}"
 
   /** Given a mutation returns an Avro schema repository subject based
    *  specifically on the mutation's database, table, and type (insert, update, delete).
@@ -67,5 +70,8 @@ object AvroSchemaUtils {
    *  @return returns "mutationDbName_mutationTableName_mutationType" where mutationType is "insert", "update", or "delete"
    */
   def specificSubject(mutation: Mutation[_]): String =
-    s"${mutation.table.db}_${mutation.table.name}_${Mutation.typeAsString(mutation)}"
+    specificSubject(mutation.table.db, mutation.table.name, Mutation.typeAsString(mutation))
+
+  def specificSubject(db: String, table: String, mtype: String): String =
+    s"${db}_${table}_${mtype}"
 }
