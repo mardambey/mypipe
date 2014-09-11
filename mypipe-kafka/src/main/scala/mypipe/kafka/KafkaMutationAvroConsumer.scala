@@ -24,7 +24,7 @@ abstract class KafkaMutationAvroConsumer[InsertMutationType <: SpecificRecord, U
   // abstract fields and methods
   protected val schemaRepoClient: GenericSchemaRepository[SchemaId, Schema]
   protected def bytesToSchemaId(bytes: Array[Byte], offset: Int): SchemaId
-  protected def schemaTopicForMutation(byte: Byte): String
+  protected def avroSchemaSubjectForMutationByte(byte: Byte): String
 
   protected val logger = LoggerFactory.getLogger(getClass.getName)
   protected val headerLength = PROTO_HEADER_LEN_V0 + schemaIdSizeInBytes
@@ -46,17 +46,17 @@ abstract class KafkaMutationAvroConsumer[InsertMutationType <: SpecificRecord, U
 
       val continue = mutationType match {
         case Mutation.InsertByte ⇒ schemaRepoClient
-          .getSchema(schemaTopicForMutation(Mutation.InsertByte), schemaId)
+          .getSchema(avroSchemaSubjectForMutationByte(Mutation.InsertByte), schemaId)
           .map(insertDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ insertCallback(m)))
           .getOrElse(None)
 
         case Mutation.UpdateByte ⇒ schemaRepoClient
-          .getSchema(schemaTopicForMutation(Mutation.UpdateByte), schemaId)
+          .getSchema(avroSchemaSubjectForMutationByte(Mutation.UpdateByte), schemaId)
           .map(updateDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ updateCallback(m)))
           .getOrElse(None)
 
         case Mutation.DeleteByte ⇒ schemaRepoClient
-          .getSchema(schemaTopicForMutation(Mutation.DeleteByte), schemaId)
+          .getSchema(avroSchemaSubjectForMutationByte(Mutation.DeleteByte), schemaId)
           .map(deleteDeserializer.deserialize(_, bytes, headerLength).map(m ⇒ deleteCallback(m)))
           .getOrElse(None)
       }

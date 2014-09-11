@@ -86,7 +86,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
       override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
       private def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
 
-      override protected def schemaTopicForMutation(byte: Byte): String = ???
+      override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = ???
     }
 
     val future = kafkaConsumer.start
