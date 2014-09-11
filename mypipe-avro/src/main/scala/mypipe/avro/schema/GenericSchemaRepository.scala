@@ -8,29 +8,29 @@ import com.google.common.collect.{ HashBiMap, BiMap }
 
 trait SchemaRepository[ID, SCHEMA] {
 
-  /** @param topic
+  /** @param subject
    *  @param schemaId
-   *  @return Some(schema) if the topic and schemaId are valid, None otherwise
+   *  @return Some(schema) if the subject and schemaId are valid, None otherwise
    */
-  def getSchema(topic: String, schemaId: ID): Option[SCHEMA]
+  def getSchema(subject: String, schemaId: ID): Option[SCHEMA]
 
-  /** @param topic
-   *  @return Some(schema) if the topic exists, None otherwise
+  /** @param subject
+   *  @return Some(schema) if the subject exists, None otherwise
    */
-  def getLatestSchema(topic: String, flushCache: Boolean = false): Option[SCHEMA]
+  def getLatestSchema(subject: String, flushCache: Boolean = false): Option[SCHEMA]
 
-  /** @param topic
+  /** @param subject
    *  @param schema
-   *  @return Some(schemaId) if the topic and schema are valid, None otherwise
+   *  @return Some(schemaId) if the subject and schema are valid, None otherwise
    */
-  def getSchemaId(topic: String, schema: SCHEMA): Option[ID]
+  def getSchemaId(subject: String, schema: SCHEMA): Option[ID]
 
-  /** @param topic
+  /** @param subject
    *  @param schema
    *  @return schemaId, potentially an already existing one, if the schema isn't new.
    *  @throws Exception if registration is unsuccessful
    */
-  def registerSchema(topic: String, schema: SCHEMA): ID
+  def registerSchema(subject: String, schema: SCHEMA): ID
 }
 
 /** Generic implementation of a caching client for an AVRO-1124-style repo which provides strongly-typed APIs.
@@ -65,20 +65,20 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
   /** Utility function to DRY up the code.
    *
    *
-   *  @param topic to look into to get the repository's corresponding [[org.apache.avro.repo.Subject]]
+   *  @param subject to look into to get the repository's corresponding [[org.apache.avro.repo.Subject]]
    *  @param key to store in the cache, if we are able to retrieve an entity
    *  @param map to store the key and entity into, if we are able to retrieve the entity
    *            N.B.: using a java.util.Map for compatibility with Guava's [[com.google.common.collect.BiMap]]
    *  @param entityRetrievalFunction to use on the [[org.apache.avro.repo.Subject]] to get a [[org.apache.avro.repo.SchemaEntry]]
    *  @param schemaEntryToStringFunction to use on the [[org.apache.avro.repo.SchemaEntry]] in order to get our (Stringly-typed) entity
    *  @param stringToValueFunction to convert the (Stringly-typed) entity into the proper type (VALUE).
-   *  @param createMissingSubject to tell the function whether to create the topic/Subject in the remote repository, if it doesn't already exist (default = false).
+   *  @param createMissingSubject to tell the function whether to create the subject in the remote repository, if it doesn't already exist (default = false).
    *  @param throwException to tell the function whether to throw an exception instead of returning None if there's any problem (default = false).
    *  @tparam KEY the type of the key in the map we want to update
    *  @tparam VALUE the type of the value in the map we want to update
-   *  @return Some(schema) if the topic and key are valid, None otherwise
+   *  @return Some(schema) if the subject and key are valid, None otherwise
    */
-  private def retrieveUnknownEntity[KEY, VALUE](topic: String,
+  private def retrieveUnknownEntity[KEY, VALUE](subject: String,
                                                 key: KEY,
                                                 map: java.util.Map[KEY, VALUE],
                                                 entityRetrievalFunction: Subject ⇒ SchemaEntry,
@@ -86,10 +86,10 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
                                                 stringToValueFunction: String ⇒ VALUE,
                                                 createMissingSubject: Boolean = false,
                                                 throwException: Boolean = false): Option[VALUE] = {
-    val subjectOption: Option[Subject] = client.lookup(topic) match {
+    val subjectOption: Option[Subject] = client.lookup(subject) match {
       case null ⇒ {
         if (createMissingSubject) {
-          Some(client.register(topic, null))
+          Some(client.register(subject, null))
         } else {
           None
         }
@@ -130,14 +130,14 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
         }
       }
       case None ⇒ if (throwException) {
-        throw new RuntimeException("The requested topic does not exist in the remote Schema Repository.")
+        throw new RuntimeException("The requested subject does not exist in the remote Schema Repository.")
       } else {
         None
       }
     }
   }
 
-  private def retrieveEntity[KEY, VALUE](topic: String,
+  private def retrieveEntity[KEY, VALUE](subject: String,
                                          key: KEY,
                                          mainCache: mutable.Map[String, BiMap[KEY, VALUE]],
                                          inverseCache: mutable.Map[String, BiMap[VALUE, KEY]],
@@ -149,7 +149,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
                                          throwException: Boolean = false): Option[VALUE] = {
       def specificRetrieveFunction(cachedMap: java.util.Map[KEY, VALUE]): Option[VALUE] = {
         retrieveUnknownEntity[KEY, VALUE](
-          topic,
+          subject,
           key,
           cachedMap,
           entityRetrievalFunction,
@@ -159,7 +159,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
           throwException)
       }
 
-    mainCache.get(topic) match {
+    mainCache.get(subject) match {
       case Some(existingCachedMap) ⇒ Option(existingCachedMap.get(key)) match {
         case None                       ⇒ specificRetrieveFunction(existingCachedMap)
         case someSchema if (flushCache) ⇒ specificRetrieveFunction(existingCachedMap)
@@ -167,20 +167,20 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
       }
       case None ⇒ {
         val newMapToCache = HashBiMap.create[KEY, VALUE]()
-        mainCache.put(topic, newMapToCache)
-        inverseCache.put(topic, newMapToCache.inverse())
+        mainCache.put(subject, newMapToCache)
+        inverseCache.put(subject, newMapToCache.inverse())
         specificRetrieveFunction(newMapToCache)
       }
     }
   }
 
-  /** @param topic
+  /** @param subject
    *  @param schemaId
-   *  @return Some(schema) if the topic and schemaId are valid, None otherwise
+   *  @return Some(schema) if the subject and schemaId are valid, None otherwise
    */
-  def getSchema(topic: String, schemaId: ID): Option[SCHEMA] = {
+  def getSchema(subject: String, schemaId: ID): Option[SCHEMA] = {
     retrieveEntity[ID, SCHEMA](
-      topic,
+      subject,
       schemaId,
       idToSchemaCache,
       schemaToIdCache,
@@ -189,14 +189,14 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
       stringToValueFunction = stringToSchema)
   }
 
-  /** @param topic
-   *  @return Some(schema) if the topic exists, None otherwise
+  /** @param subject
+   *  @return Some(schema) if the subject exists, None otherwise
    */
-  def getLatestSchema(topic: String, flushCache: Boolean = false): Option[SCHEMA] = {
+  def getLatestSchema(subject: String, flushCache: Boolean = false): Option[SCHEMA] = {
 
       def retrieve = retrieveUnknownEntity[String, SCHEMA](
-        topic,
-        topic,
+        subject,
+        subject,
         latestSchemaCache,
         entityRetrievalFunction = _.latest,
         schemaEntryToStringFunction = _.getSchema,
@@ -205,20 +205,20 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
     if (flushCache) {
       retrieve
     } else {
-      Option(latestSchemaCache.get(topic)) match {
+      Option(latestSchemaCache.get(subject)) match {
         case None       ⇒ retrieve
         case someSchema ⇒ someSchema
       }
     }
   }
 
-  /** @param topic
+  /** @param subject
    *  @param schema
-   *  @return Some(schemaId) if the topic and schema are valid, None otherwise
+   *  @return Some(schemaId) if the subject and schema are valid, None otherwise
    */
-  def getSchemaId(topic: String, schema: SCHEMA): Option[ID] = {
+  def getSchemaId(subject: String, schema: SCHEMA): Option[ID] = {
     retrieveEntity[SCHEMA, ID](
-      topic,
+      subject,
       schema,
       schemaToIdCache,
       idToSchemaCache,
@@ -227,14 +227,14 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
       stringToValueFunction = stringToId)
   }
 
-  /** @param topic
+  /** @param subject
    *  @param schema
    *  @return schemaId, potentially an already existing one, if the schema isn't new.
    *  @throws Exception if registration is unsuccessful
    */
-  def registerSchema(topic: String, schema: SCHEMA): ID = {
+  def registerSchema(subject: String, schema: SCHEMA): ID = {
     retrieveEntity[SCHEMA, ID](
-      topic,
+      subject,
       schema,
       schemaToIdCache,
       idToSchemaCache,

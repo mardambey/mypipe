@@ -1,29 +1,28 @@
 package mypipe.kafka
 
-import scala.concurrent.duration._
 import mypipe._
-import mypipe.api._
-import mypipe.producer.KafkaMutationGenericAvroProducer
-import mypipe.mysql.BinlogFilePos
-import scala.concurrent.{ Future, Await }
-import mypipe.mysql.BinlogConsumer
-import org.scalatest.BeforeAndAfterAll
-import org.slf4j.LoggerFactory
-import org.apache.avro.util.Utf8
 import mypipe.avro.GenericInMemorySchemaRepo
 import mypipe.avro.schema.GenericSchemaRepository
+import mypipe.mysql.{BinlogConsumer, BinlogFilePos}
+import mypipe.producer.{KafkaMutationSpecificAvroProducer, KafkaMutationGenericAvroProducer}
 import org.apache.avro.Schema
+import org.apache.avro.util.Utf8
+import org.scalatest.BeforeAndAfterAll
+import org.slf4j.LoggerFactory
 
-class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+
+class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
   val log = LoggerFactory.getLogger(getClass)
   @volatile var connected = false
   @volatile var done = false
-  val kafkaProducer = new KafkaMutationGenericAvroProducer(
-    conf.getConfig("mypipe.test.kafka-generic-producer"))
+  val kafkaProducer = new KafkaMutationSpecificAvroProducer(
+    conf.getConfig("mypipe.test.kafka-specific-producer"))
 
   val binlogConsumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
-  val pipe = new Pipe("test-pipe-kafka-generic", List(binlogConsumer), kafkaProducer)
+  val pipe = new Pipe("test-pipe-kafka-specific", List(binlogConsumer), kafkaProducer)
 
   override def beforeAll() {
 
@@ -41,14 +40,14 @@ class KafkaSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     db.disconnect
   }
 
-  "A generic Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒
+  "A specific Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒
 
     val username = new Utf8("username")
 
     val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
-      "mypipe_user",
-      "localhost:2181",
-      s"mypipe_user_insert-${System.currentTimeMillis()}",
+      topic     = "mypipe_user_specific",
+      zkConnect = "localhost:2181",
+      groupId   = s"mypipe_user_insert-${System.currentTimeMillis()}",
       schemaIdSizeInBytes = 2)(
 
       insertCallback = { insertMutation ⇒
