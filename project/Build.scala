@@ -94,7 +94,7 @@ object ApplicationBuild extends Build {
     settings = Project.defaultSettings ++ Seq(
       parallelExecution in Test := false,
       libraryDependencies ++= kafkaDependencies
-    ) ++ Format.settings
+    ) ++ Format.settings ++ AvroCompiler.settings
   ) dependsOn(api % "compile->compile;test->test", myavro)
 }
 
@@ -114,6 +114,14 @@ object Dependencies {
     val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
     val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.10.3"
     val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
+}
+
+object AvroCompiler {
+  import sbtavro.SbtAvro._
+
+  lazy val settings = avroSettings ++ Seq(
+    sourceDirectory in avroConfig <<= (sourceDirectory in Test)(_ / "avro")
+  )
 }
 
 object Format {

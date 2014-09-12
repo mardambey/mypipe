@@ -78,6 +78,17 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     }
   }
 
+  /** Adds a header into the given Record based on the Mutation's
+   *  database, table, and tableId.
+   *  @param record
+   *  @param mutation
+   */
+  protected def header(record: GenericData.Record, mutation: Mutation[_]) {
+    record.put("database", mutation.table.db)
+    record.put("table", mutation.table.name)
+    record.put("tableId", mutation.table.id)
+  }
+
   /** Given a mutation, returns a magic byte that can be associated
    *  with the mutation's type (for example: insert, update, delete).
    *  @param mutation

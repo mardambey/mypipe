@@ -4,12 +4,13 @@ import mypipe.api._
 import org.apache.avro.io.{ DatumReader, BinaryDecoder, DecoderFactory }
 import org.apache.avro.Schema
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.TypeTag
 import org.apache.avro.specific.{ SpecificDatumReader, SpecificRecord }
 import java.util.logging.Logger
 
-class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord]()(implicit tag: TypeTag[InputRecord])
+class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord]()(implicit tag: ClassTag[InputRecord])
     extends Deserializer[Array[Byte], InputRecord, Schema] {
 
   protected val logger = Logger.getLogger(getClass.getName)
@@ -19,14 +20,8 @@ class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord]()(implicit 
   lazy protected val decoder: BinaryDecoder = decoderFactory.binaryDecoder(Array[Byte](), null)
   lazy protected val reader: DatumReader[InputRecord] = new SpecificDatumReader[InputRecord](readerSchema)
 
-  protected def getInstanceByReflection[InstanceType](implicit instanceTypeTag: TypeTag[InstanceType]): InstanceType = {
-
-    val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-    val inputRecordClass = universe.typeOf[InstanceType].typeSymbol.asClass
-    val inputRecordClassMirror = runtimeMirror.reflectClass(inputRecordClass)
-    val inputRecordConstructor = universe.typeOf[InstanceType].declaration(universe.nme.CONSTRUCTOR).asTerm.alternatives.head.asMethod
-    val inputRecordConstructorMirror = inputRecordClassMirror.reflectConstructor(inputRecordConstructor)
-    inputRecordConstructorMirror().asInstanceOf[InstanceType]
+  protected def getInstanceByReflection[InstanceType](implicit instanceTypeTag: ClassTag[InstanceType]): InstanceType = {
+    implicitly[ClassTag[InstanceType]].runtimeClass.newInstance.asInstanceOf[InstanceType]
   }
 
   override def deserialize(schema: Schema, bytes: Array[Byte], offset: Int = 0): Option[InputRecord] = try {

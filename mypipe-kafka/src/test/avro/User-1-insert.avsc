@@ -1,15 +1,19 @@
 {
-  "namespace": "mypipe.avro",
+  "namespace": "mypipe.kafka",
   "type": "record",
-  "name": "User",
+  "name": "UserInsert",
   "fields": [
 	    {
 			"name": "database",
-			"type": ["string", "null"]
+			"type": "string"
 		},
 		{
 			"name": "table",
-			"type": ["string", "null"]
+			"type": "string"
+		},
+		{
+			"name": "tableId",
+			"type": "int"
 		},
 		{
 			"name": "id",

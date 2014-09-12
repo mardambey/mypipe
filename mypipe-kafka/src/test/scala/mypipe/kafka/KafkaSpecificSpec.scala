@@ -2,7 +2,7 @@ package mypipe.kafka
 
 import mypipe._
 import mypipe.api.Mutation
-import mypipe.avro.{ InMemorySchemaRepo, GenericInMemorySchemaRepo }
+import mypipe.avro.{ AvroVersionedRecordDeserializer, InMemorySchemaRepo, GenericInMemorySchemaRepo }
 import mypipe.avro.schema.{ AvroSchemaUtils, ShortSchemaId, AvroSchema, GenericSchemaRepository }
 import mypipe.mysql.{ BinlogConsumer, BinlogFilePos }
 import mypipe.producer.{ KafkaMutationSpecificAvroProducer, KafkaMutationGenericAvroProducer }
@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{ Await, Future }
+
+import scala.reflect.runtime.universe._
 
 class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
@@ -43,10 +45,13 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 
   "A specific Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒
 
-    val username = new Utf8("username")
+    val DATABASE = "mypipe"
+    val TABLE = "user"
+    val USERNAME = "username"
+    val LOGIN_COUNT = 5
 
-    val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
-      topic = KafkaUtil.specificTopic("mypipe", "user"),
+    val kafkaConsumer = new KafkaMutationAvroConsumer[mypipe.kafka.UserInsert, mypipe.kafka.UserUpdate, mypipe.kafka.UserDelete, Short](
+      topic = KafkaUtil.specificTopic(DATABASE, TABLE),
       zkConnect = "localhost:2181",
       groupId = s"mypipe_user_insert-${System.currentTimeMillis()}",
       schemaIdSizeInBytes = 2)(
@@ -54,22 +59,23 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
       insertCallback = { insertMutation ⇒
         log.debug("consumed insert mutation: " + insertMutation)
         try {
-          assert(insertMutation.getDatabase.toString == "mypipe")
-          assert(insertMutation.getTable.toString == "user")
-          assert(insertMutation.getStrings().get(username).toString.equals("username"))
+          assert(insertMutation.getDatabase.toString == DATABASE)
+          assert(insertMutation.getTable.toString == TABLE)
+          assert(insertMutation.getUsername.toString == USERNAME)
+          assert(insertMutation.getLoginCount == LOGIN_COUNT)
         }
-        // FIXME: remove this
-        done = true
         true
       },
 
       updateCallback = { updateMutation ⇒
         log.debug("consumed update mutation: " + updateMutation)
         try {
-          assert(updateMutation.getDatabase.toString == "mypipe")
-          assert(updateMutation.getTable.toString == "user")
-          assert(updateMutation.getOldStrings().get(username).toString == "username")
-          assert(updateMutation.getNewStrings().get(username).toString == "username2")
+          assert(updateMutation.getDatabase.toString == DATABASE)
+          assert(updateMutation.getTable.toString == TABLE)
+          assert(updateMutation.getOldUsername.toString == USERNAME)
+          assert(updateMutation.getNewUsername.toString == USERNAME + "2")
+          assert(updateMutation.getOldLoginCount == LOGIN_COUNT)
+          assert(updateMutation.getNewLoginCount == LOGIN_COUNT + 1)
         }
         true
       },
@@ -77,27 +83,36 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
       deleteCallback = { deleteMutation ⇒
         log.debug("consumed delete mutation: " + deleteMutation)
         try {
-          assert(deleteMutation.getDatabase.toString == "mypipe")
-          assert(deleteMutation.getTable.toString == "user")
-          assert(deleteMutation.getStrings().get(username).toString == "username2")
+          assert(deleteMutation.getDatabase.toString == DATABASE)
+          assert(deleteMutation.getTable.toString == TABLE)
+          assert(deleteMutation.getUsername.toString == USERNAME + "2")
+          assert(deleteMutation.getLoginCount == LOGIN_COUNT + 1)
         }
         done = true
         true
-      }) {
+      },
+
+      implicitly[TypeTag[UserInsert]],
+      implicitly[TypeTag[UserUpdate]],
+      implicitly[TypeTag[UserDelete]]) {
 
       protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = TestSchemaRepo
 
       override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
       private def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
 
-      override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.specificSubject("mypipe", "user", Mutation.byteToString(byte))
+      override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.byteToString(byte))
+
+      override val insertDeserializer: AvroVersionedRecordDeserializer[UserInsert] = new AvroVersionedRecordDeserializer[UserInsert]()
+      override val updateDeserializer: AvroVersionedRecordDeserializer[UserUpdate] = new AvroVersionedRecordDeserializer[UserUpdate]()
+      override val deleteDeserializer: AvroVersionedRecordDeserializer[UserDelete] = new AvroVersionedRecordDeserializer[UserDelete]()
     }
 
     val future = kafkaConsumer.start
 
-    Await.result(db.connection.sendQuery(Queries.INSERT.statement), 2 seconds)
-    //Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2 seconds)
-    //Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2 seconds)
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT)), 2 seconds)
+    Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2 seconds)
+    Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2 seconds)
     Await.result(Future { while (!done) Thread.sleep(100) }, 20 seconds)
 
     try {
@@ -110,15 +125,9 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 }
 
 object TestSchemaRepo extends InMemorySchemaRepo[Short, Schema] with ShortSchemaId with AvroSchema {
-  val insertSchemaFile: String = "/User-1-insert.avsc"
-  val updateSchemaFile: String = "/User-1-update.avsc"
-  val deleteSchemaFile: String = "/User-1-delete.avsc"
-
-  val insertSchema = try { Schema.parse(getClass.getResourceAsStream(insertSchemaFile)) } catch { case e: Exception ⇒ println("Failed on insert: " + e.getMessage); null }
-  val updateSchema = try { Schema.parse(getClass.getResourceAsStream(updateSchemaFile)) } catch { case e: Exception ⇒ println("Failed on update: " + e.getMessage); null }
-  val deleteSchema = try { Schema.parse(getClass.getResourceAsStream(deleteSchemaFile)) } catch { case e: Exception ⇒ println("Failed on delete: " + e.getMessage); null }
-
-  val insertSchemaId = registerSchema(AvroSchemaUtils.specificSubject("mypipe", "user", Mutation.InsertString), insertSchema)
-  val updateSchemaId = registerSchema(AvroSchemaUtils.specificSubject("mypipe", "user", Mutation.UpdateString), updateSchema)
-  val deleteSchemaId = registerSchema(AvroSchemaUtils.specificSubject("mypipe", "user", Mutation.DeleteString), deleteSchema)
+  val DATABASE = "mypipe"
+  val TABLE = "user"
+  val insertSchemaId = registerSchema(AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.InsertString), new UserInsert().getSchema)
+  val updateSchemaId = registerSchema(AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.UpdateString), new UserUpdate().getSchema)
+  val deleteSchemaId = registerSchema(AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.DeleteString), new UserDelete().getSchema)
 }

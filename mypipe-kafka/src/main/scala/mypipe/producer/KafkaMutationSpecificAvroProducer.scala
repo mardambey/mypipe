@@ -25,9 +25,9 @@ class KafkaMutationSpecificAvroProducer(config: Config)
   override protected def avroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record = {
 
     Mutation.getMagicByte(mutation) match {
-      case Mutation.InsertByte ⇒ insertMutationToAvro(mutation.asInstanceOf[InsertMutation], schema)
+      case Mutation.InsertByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], schema)
       case Mutation.UpdateByte ⇒ updateMutationToAvro(mutation.asInstanceOf[UpdateMutation], schema)
-      case Mutation.DeleteByte ⇒ deleteMutationToAvro(mutation.asInstanceOf[DeleteMutation], schema)
+      case Mutation.DeleteByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], schema)
       case _ ⇒ {
         logger.error(s"Unexpected mutation type ${mutation.getClass} encountered; retuning empty Avro GenericData.Record(schema=$schema")
         new GenericData.Record(schema)
@@ -43,7 +43,7 @@ class KafkaMutationSpecificAvroProducer(config: Config)
    */
   override protected def avroSchemaSubject(mutation: Mutation[_]): String = AvroSchemaUtils.specificSubject(mutation)
 
-  protected def insertMutationToAvro(mutation: InsertMutation, schema: Schema): GenericData.Record = {
+  protected def insertOrDeleteMutationToAvro(mutation: SingleValuedMutation, schema: Schema): GenericData.Record = {
 
     val record = new GenericData.Record(schema)
 
@@ -53,9 +53,23 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
     })
 
+    header(record, mutation)
     record
   }
 
-  protected def updateMutationToAvro(mutation: UpdateMutation, schema: Schema): GenericData.Record = ???
-  protected def deleteMutationToAvro(mutation: DeleteMutation, schema: Schema): GenericData.Record = ???
+  protected def updateMutationToAvro(mutation: UpdateMutation, schema: Schema): GenericData.Record = {
+
+    val record = new GenericData.Record(schema)
+
+    mutation.rows.head._1.columns.foreach(col ⇒ {
+      Option(schema.getField("old_" + col._1)).map(f ⇒ record.put(f.name(), col._2.value))
+    })
+
+    mutation.rows.head._2.columns.foreach(col ⇒ {
+      Option(schema.getField("new_" + col._1)).map(f ⇒ record.put(f.name(), col._2.value))
+    })
+
+    header(record, mutation)
+    record
+  }
 }

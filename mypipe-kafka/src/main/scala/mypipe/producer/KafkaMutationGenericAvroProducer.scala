@@ -81,12 +81,6 @@ class KafkaMutationGenericAvroProducer(config: Config)
     record.put(keyOp("longs"), longs)
   }
 
-  protected def header(record: GenericData.Record, mutation: Mutation[_]) {
-    record.put("database", mutation.table.db)
-    record.put("table", mutation.table.name)
-    record.put("tableId", mutation.table.id)
-  }
-
   protected def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {
 
     val cols = columns.values.groupBy(_.metadata.colType)

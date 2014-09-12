@@ -4,7 +4,7 @@ import mypipe.api.Mutation
 import mypipe.avro.schema.AvroSchemaUtils
 
 import scala.reflect.runtime.universe._
-import mypipe.avro.{ InsertMutation, UpdateMutation, DeleteMutation }
+import mypipe.avro.{ AvroVersionedRecordDeserializer, InsertMutation, UpdateMutation, DeleteMutation }
 
 import mypipe.kafka.KafkaGenericMutationAvroConsumer._
 
@@ -28,5 +28,9 @@ abstract class KafkaGenericMutationAvroConsumer[SchemaId](
       implicitly[TypeTag[InsertMutation]],
       implicitly[TypeTag[UpdateMutation]],
       implicitly[TypeTag[DeleteMutation]]) {
+
+  override lazy val insertDeserializer = new AvroVersionedRecordDeserializer[InsertMutation]()
+  override lazy val updateDeserializer = new AvroVersionedRecordDeserializer[UpdateMutation]()
+  override lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[DeleteMutation]()
 }
 

@@ -74,7 +74,7 @@ object Queries {
   }
 
   object UPDATE {
-    val statement = """UPDATE user set username = "username2", password = "password2""""
+    val statement = """UPDATE user set username = "username2", password = "password2", login_count = login_count + 1"""
   }
 
   object TRUNCATE {
