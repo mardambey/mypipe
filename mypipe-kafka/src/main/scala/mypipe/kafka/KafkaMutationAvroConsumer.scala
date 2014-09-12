@@ -29,6 +29,7 @@ abstract class KafkaMutationAvroConsumer[InsertMutationType <: SpecificRecord, U
   protected val logger = LoggerFactory.getLogger(getClass.getName)
   protected val headerLength = PROTO_HEADER_LEN_V0 + schemaIdSizeInBytes
 
+  // FIXME: these need to use "specific" classes if the consumer is going to deserialize to those types and not generic types
   lazy val insertDeserializer = new AvroVersionedRecordDeserializer[InsertMutationType]()
   lazy val updateDeserializer = new AvroVersionedRecordDeserializer[UpdateMutationType]()
   lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[DeleteMutationType]()

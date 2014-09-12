@@ -14,8 +14,8 @@ class KafkaMutationSpecificAvroProducer(config: Config)
   private val schemaRepoClientClassName = config.getString("schema-repo-client")
 
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
-  override protected val schemaRepoClient = Class.forName(schemaRepoClientClassName)
-    .newInstance()
+  override protected val schemaRepoClient = Class.forName(schemaRepoClientClassName + "$")
+    .getField("MODULE$").get(null)
     .asInstanceOf[GenericSchemaRepository[Short, Schema]]
 
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)

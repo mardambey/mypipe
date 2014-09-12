@@ -11,8 +11,8 @@ object KafkaUtil {
     s"${db}_${table}_generic"
 
   def specificTopic(mutation: Mutation[_]): String =
-    specificTopic(mutation.table.db, mutation.table.name, Mutation.typeAsString(mutation))
+    specificTopic(mutation.table.db, mutation.table.name)
 
-  def specificTopic(db: String, table: String, mtype: String): String =
-    s"${db}_${table}_${mtype}_specific"
+  def specificTopic(db: String, table: String): String =
+    s"${db}_${table}_specific"
 }
