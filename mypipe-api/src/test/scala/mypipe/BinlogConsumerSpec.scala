@@ -41,9 +41,12 @@ trait ConfigSpec {
 
 trait DatabaseSpec extends ConfigSpec {
 
-  val name = conf.getString("mypipe.test.database.name")
-  val Array(hostname, port, username, password) = conf.getString("mypipe.test.database.host").split(":")
-  val db = Db(hostname, port.toInt, username, password, name)
+  val db = Db(
+    Queries.DATABASE.host,
+    Queries.DATABASE.port,
+    Queries.DATABASE.username,
+    Queries.DATABASE.password,
+    Queries.DATABASE.name)
 
   def withDatabase(testCode: Db ⇒ Any) {
     try {
@@ -61,6 +64,15 @@ trait ActorSystemSpec {
 object Queries {
 
   val conf = ConfigFactory.load("test.conf")
+  val Array(dbHost, dbPort, dbUsername, dbPassword, dbName) = conf.getString("mypipe.test.database.info").split(":")
+
+  object DATABASE {
+    val name = dbName
+    val host = dbHost
+    val port = dbPort.toInt
+    val username = dbUsername
+    val password = dbPassword
+  }
 
   object TABLE {
     val name = "user"
@@ -68,13 +80,19 @@ object Queries {
   }
 
   object INSERT {
+    val username = "username"
+    val password = "password"
+    val loginCount = 0;
+
     def statement: String = statement()
-    def statement(id: String = "NULL", username: String = "username", password: String = "password", loginCount: Int = 0): String =
+    def statement(id: String = "NULL", username: String = this.username, password: String = this.password, loginCount: Int = this.loginCount): String =
       s"""INSERT INTO user values ($id, "$username", "$password", $loginCount)"""
   }
 
   object UPDATE {
-    val statement = """UPDATE user set username = "username2", password = "password2", login_count = login_count + 1"""
+    val username = "username2"
+    val password = "password2"
+    lazy val statement = s"""UPDATE user set username = "$username", password = "$password", login_count = login_count + 1"""
   }
 
   object TRUNCATE {
@@ -97,7 +115,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   val queue = new LinkedBlockingQueue[Mutation[_]]()
   val queueProducer = new QueueProducer(queue)
-  val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
+  val consumer = BinlogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinlogFilePos.current)
   val pipe = new Pipe("test-pipe", List(consumer), queueProducer)
 
   override def beforeAll() {

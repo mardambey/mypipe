@@ -31,8 +31,8 @@ class MySQLMetaDataSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
     implicit val timeout = Timeout(1 second)
 
     val manager = system.actorOf(
-      MySQLMetadataManager.props(hostname, port.toInt, username, Some(password)),
-      s"TestDBMetadataActor-$hostname:$port")
+      MySQLMetadataManager.props(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Some(Queries.DATABASE.password)),
+      s"TestDBMetadataActor-${Queries.DATABASE.host}:${Queries.DATABASE.port}")
 
     val columnTypes: Array[ColumnType.EnumVal] = Array(ColumnType.INT24, ColumnType.VARCHAR, ColumnType.VARCHAR, ColumnType.INT24)
     val future = ask(manager, GetColumns("mypipe", "user", columnTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]

@@ -31,7 +31,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
   "TableCache" should "be able to add and get tables to and from the cache" in {
 
-    val consumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
+    val consumer = BinlogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinlogFilePos.current)
 
     val future = Future[Boolean] {
       val tableCache = new TableCache(db.hostname, db.port, db.username, db.password)

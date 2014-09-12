@@ -24,7 +24,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
   val kafkaProducer = new KafkaMutationSpecificAvroProducer(
     conf.getConfig("mypipe.test.kafka-specific-producer"))
 
-  val binlogConsumer = BinlogConsumer(hostname, port.toInt, username, password, BinlogFilePos.current)
+  val binlogConsumer = BinlogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinlogFilePos.current)
   val pipe = new Pipe("test-pipe-kafka-specific", List(binlogConsumer), kafkaProducer)
 
   override def beforeAll() {
@@ -45,15 +45,17 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 
   "A specific Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒
 
-    val DATABASE = "mypipe"
-    val TABLE = "user"
-    val USERNAME = "username"
+    val DATABASE = Queries.DATABASE.name
+    val TABLE = Queries.TABLE.name
+    val USERNAME = Queries.INSERT.username
+    val USERNAME2 = Queries.UPDATE.username
     val LOGIN_COUNT = 5
+    val zkConnect = conf.getString("mypipe.test.kafka-specific-producer.zk-connect")
 
     val kafkaConsumer = new KafkaMutationAvroConsumer[mypipe.kafka.UserInsert, mypipe.kafka.UserUpdate, mypipe.kafka.UserDelete, Short](
       topic = KafkaUtil.specificTopic(DATABASE, TABLE),
-      zkConnect = "localhost:2181",
-      groupId = s"mypipe_user_insert-${System.currentTimeMillis()}",
+      zkConnect = zkConnect,
+      groupId = s"${DATABASE}_${TABLE}_specific_test-${System.currentTimeMillis()}",
       schemaIdSizeInBytes = 2)(
 
       insertCallback = { insertMutation ⇒
@@ -73,7 +75,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
           assert(updateMutation.getDatabase.toString == DATABASE)
           assert(updateMutation.getTable.toString == TABLE)
           assert(updateMutation.getOldUsername.toString == USERNAME)
-          assert(updateMutation.getNewUsername.toString == USERNAME + "2")
+          assert(updateMutation.getNewUsername.toString == USERNAME2)
           assert(updateMutation.getOldLoginCount == LOGIN_COUNT)
           assert(updateMutation.getNewLoginCount == LOGIN_COUNT + 1)
         }
@@ -85,7 +87,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
         try {
           assert(deleteMutation.getDatabase.toString == DATABASE)
           assert(deleteMutation.getTable.toString == TABLE)
-          assert(deleteMutation.getUsername.toString == USERNAME + "2")
+          assert(deleteMutation.getUsername.toString == USERNAME2)
           assert(deleteMutation.getLoginCount == LOGIN_COUNT + 1)
         }
         done = true

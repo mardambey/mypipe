@@ -12,8 +12,6 @@ import java.io.ByteArrayOutputStream
 import mypipe.kafka.{ PROTO_MAGIC_V0 }
 import org.slf4j.LoggerFactory
 
-case class MutationStringAndByte(string: String, byte: Byte)
-
 /** The base class for a Mypipe producer that encodes Mutation instances
  *  as Avro records and publishes them into Kafka.
  *
