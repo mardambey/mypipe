@@ -44,19 +44,20 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
   "A generic Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒
 
     val username = new Utf8("username")
+    val zkConnect = conf.getString("mypipe.test.kafka-generic-producer.zk-connect")
 
     val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
-      topic = KafkaUtil.genericTopic("mypipe", "user"),
-      zkConnect = "localhost:2181",
-      groupId = s"mypipe_user_insert-${System.currentTimeMillis()}",
+      topic = KafkaUtil.genericTopic(Queries.DATABASE.name, Queries.TABLE.name),
+      zkConnect = zkConnect,
+      groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}",
       schemaIdSizeInBytes = 2)(
 
       insertCallback = { insertMutation ⇒
         log.debug("consumed insert mutation: " + insertMutation)
         try {
-          assert(insertMutation.getDatabase.toString == "mypipe")
-          assert(insertMutation.getTable.toString == "user")
-          assert(insertMutation.getStrings().get(username).toString.equals("username"))
+          assert(insertMutation.getDatabase.toString == Queries.DATABASE.name)
+          assert(insertMutation.getTable.toString == Queries.TABLE.name)
+          assert(insertMutation.getStrings().get(username).toString.equals(Queries.INSERT.username))
         }
         true
       },
@@ -64,10 +65,10 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
       updateCallback = { updateMutation ⇒
         log.debug("consumed update mutation: " + updateMutation)
         try {
-          assert(updateMutation.getDatabase.toString == "mypipe")
-          assert(updateMutation.getTable.toString == "user")
-          assert(updateMutation.getOldStrings().get(username).toString == "username")
-          assert(updateMutation.getNewStrings().get(username).toString == "username2")
+          assert(updateMutation.getDatabase.toString == Queries.DATABASE.name)
+          assert(updateMutation.getTable.toString == Queries.TABLE.name)
+          assert(updateMutation.getOldStrings().get(username).toString == Queries.INSERT.username)
+          assert(updateMutation.getNewStrings().get(username).toString == Queries.UPDATE.username)
         }
         true
       },
@@ -75,9 +76,9 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
       deleteCallback = { deleteMutation ⇒
         log.debug("consumed delete mutation: " + deleteMutation)
         try {
-          assert(deleteMutation.getDatabase.toString == "mypipe")
-          assert(deleteMutation.getTable.toString == "user")
-          assert(deleteMutation.getStrings().get(username).toString == "username2")
+          assert(deleteMutation.getDatabase.toString == Queries.DATABASE.name)
+          assert(deleteMutation.getTable.toString == Queries.TABLE.name)
+          assert(deleteMutation.getStrings().get(username).toString == Queries.UPDATE.username)
         }
         done = true
         true
