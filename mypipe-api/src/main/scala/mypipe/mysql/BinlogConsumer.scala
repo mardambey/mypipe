@@ -54,6 +54,7 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
         case XID       ⇒ handleXid(event)
         case e: EventType if isMutation(eventType) == true ⇒ {
           if (!handleMutation(event) && quitOnEventHandleFailure) {
+            // TODO: allow for user specified error handlers
             log.error(s"Failed to process event $event and asked to quit on event handler failure, disconnecting from $hostname:$port")
             client.disconnect()
           }
