@@ -3,7 +3,7 @@ package mypipe
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 
 import akka.util.Timeout
-import mypipe.api.Table
+import mypipe.api.{ TableMapEvent, Table }
 import mypipe.mysql._
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
@@ -31,15 +31,15 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
   "TableCache" should "be able to add and get tables to and from the cache" in {
 
-    val consumer = BinlogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinlogFilePos.current)
+    val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
 
     val future = Future[Boolean] {
       val tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
       val queue = new LinkedBlockingQueue[Table](1)
 
-      consumer.registerListener(new BinlogConsumerListener() {
-        override def onConnect(c: BinlogConsumer) { connected = true }
-        override def onTableMap(c: BinlogConsumer, table: Table) {
+      consumer.registerListener(new BinaryLogConsumerListener() {
+        override def onConnect(c: BaseBinaryLogConsumer) { connected = true }
+        override def onTableMap(c: BaseBinaryLogConsumer, table: Table) {
           // intercept the table change event
           queue.add(table)
         }
@@ -53,7 +53,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       Await.result(insertFuture, 2000 millis)
 
       val table = queue.poll(10, TimeUnit.SECONDS)
-      tableCache.addTableByEvent(Long.unbox(table.id), table.name, table.db, table.columns.map(_.colType.value.toByte).toArray)
+      tableCache.addTableByEvent(TableMapEvent(Long.unbox(table.id), table.name, table.db, table.columns.map(_.colType.value.toByte).toArray))
       val table2 = tableCache.getTable(table.id)
       assert(table2.isDefined)
       assert(table2.get.name == Queries.TABLE.name)

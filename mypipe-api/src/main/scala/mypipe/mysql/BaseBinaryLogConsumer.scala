@@ -18,22 +18,18 @@ import mypipe.api.Table
 import mypipe.api.Row
 import mypipe.api.InsertMutation
 
-case class BinlogConsumer(hostname: String, port: Int, username: String, password: String, binlogFileAndPos: BinlogFilePos) {
+abstract class BaseBinaryLogConsumer(override val hostname: String, override val port: Int, username: String, password: String, binlogFileAndPos: BinaryLogFilePosition) extends BinaryLogConsumerTrait {
 
-  protected var tableCache = new TableCache(hostname, port, username, password)
   protected var transactionInProgress = false
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
-  protected val listeners = new scala.collection.mutable.HashSet[BinlogConsumerListener]()
   protected val txQueue = new scala.collection.mutable.ListBuffer[Event]
-  protected val self = this
-  val client = new BinaryLogClient(hostname, port, username, password)
-  protected val dbMetadata = MySQLMetadataManager(hostname, port, username, Some(password))
   protected val log = LoggerFactory.getLogger(getClass)
+  val client = new BinaryLogClient(hostname, port, username, password)
 
   // FIXME: this needs to be configurable
   protected val quitOnEventHandleFailure = true
 
-  if (binlogFileAndPos != BinlogFilePos.current) {
+  if (binlogFileAndPos != BinaryLogFilePosition.current) {
     log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
     client.setBinlogFilename(binlogFileAndPos.filename)
     client.setBinlogPosition(binlogFileAndPos.pos)
@@ -45,46 +41,58 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   client.registerEventListener(new EventListener() {
     override def onEvent(event: Event) {
-
-      val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
-
-      eventType match {
-        case TABLE_MAP ⇒ handleTableMap(event)
-        case QUERY     ⇒ handleQuery(event)
-        case XID       ⇒ handleXid(event)
-        case e: EventType if isMutation(eventType) == true ⇒ {
-          if (!handleMutation(event) && quitOnEventHandleFailure) {
-            // TODO: allow for user specified error handlers
-            log.error(s"Failed to process event $event and asked to quit on event handler failure, disconnecting from $hostname:$port")
-            client.disconnect()
-          }
-        }
-        case _ ⇒ log.debug(s"Event ignored ${eventType}")
-      }
+      handleEvent(event)
     }
   })
 
   client.registerLifecycleListener(new LifecycleListener {
     override def onDisconnect(client: BinaryLogClient): Unit = {
-      listeners foreach (l ⇒ l.onDisconnect(self))
+      handleDisconnect()
     }
 
     override def onConnect(client: BinaryLogClient) {
-      listeners foreach (l ⇒ l.onConnect(self))
+      handleConnect()
     }
 
     override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
 
-  protected def handleTableMap(event: Event) {
+  protected def handleError(event: Event): Unit = {
 
+  }
+
+  protected def handleEvent(event: Event): Unit = {
+    val eventType = event.getHeader().asInstanceOf[EventHeader].getEventType()
+
+    eventType match {
+      case TABLE_MAP ⇒ handleTableMap(event)
+      case QUERY     ⇒ handleQuery(event)
+      case XID       ⇒ handleXid(event)
+
+      case e: EventType if isMutation(eventType) == true ⇒ {
+        if (!handleMutation(event)) {
+
+          log.error("Failed to process event $event.")
+
+          if (quitOnEventHandleFailure) {
+            log.error(s"Failure encountered and asked to quit on event handler failure, disconnecting from $hostname:$port")
+            client.disconnect()
+          }
+        }
+      }
+      case _ ⇒ log.debug(s"Event ignored ${eventType}")
+    }
+  }
+
+  protected def handleTableMap(event: Event) {
     val tableMapEventData: TableMapEventData = event.getData()
-    val table = tableCache.addTableByEvent(tableMapEventData.getTableId,
+    val tableMapEvent = TableMapEvent(
+      tableMapEventData.getTableId,
       tableMapEventData.getTable,
       tableMapEventData.getDatabase,
       tableMapEventData.getColumnTypes)
-    listeners.foreach(_.onTableMap(this, table))
+    val table = handleTableMap(tableMapEvent)
   }
 
   protected def handleMutation(event: Event): Boolean = {
@@ -96,17 +104,8 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
     } else {
 
-      val results = listeners.takeWhile(l ⇒ try { l.onMutation(self, createMutation(event)) }
-      catch {
-        case e: Exception ⇒
-          log.error("Listener $l failed on mutation from event: $event")
-          false
-      })
-
-      // make sure all listeners have returned true
-      if (results.size == listeners.size) true
-      // TODO: we know which listener failed, we can do something about it
-      else false
+      val mutation = createMutation(event)
+      handleMutation(mutation)
     }
   }
 
@@ -140,24 +139,16 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
 
   protected def commit() {
     val mutations = txQueue.map(createMutation(_))
-    listeners.foreach(_.onMutation(this, mutations))
+    mutations.foreach(handleMutation)
     txQueue.clear
     transactionInProgress = false
   }
 
   override def toString(): String = s"$hostname:$port"
 
-  def connect() {
-    client.connect()
-  }
+  def connect(): Unit = client.connect()
 
-  def disconnect() {
-    client.disconnect()
-  }
-
-  def registerListener(listener: BinlogConsumerListener) {
-    listeners += listener
-  }
+  def disconnect(): Unit = client.disconnect()
 
   protected def isMutation(eventType: EventType): Boolean = eventType match {
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS |
@@ -169,19 +160,19 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
   protected def createMutation(event: Event): Mutation[_] = event.getHeader().asInstanceOf[EventHeader].getEventType() match {
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒ {
       val evData = event.getData[WriteRowsEventData]()
-      val table = tableCache.getTable(evData.getTableId()).get
+      val table = getTableById(evData.getTableId)
       InsertMutation(table, createRows(table, evData.getRows()))
     }
 
     case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒ {
       val evData = event.getData[UpdateRowsEventData]()
-      val table = tableCache.getTable(evData.getTableId).get
+      val table = getTableById(evData.getTableId)
       UpdateMutation(table, createRowsUpdate(table, evData.getRows()))
     }
 
     case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
       val evData = event.getData[DeleteRowsEventData]()
-      val table = tableCache.getTable(evData.getTableId).get
+      val table = getTableById(evData.getTableId)
       DeleteMutation(table, createRows(table, evData.getRows()))
     }
   }
@@ -212,4 +203,3 @@ case class BinlogConsumer(hostname: String, port: Int, username: String, passwor
     }).toList
   }
 }
-

@@ -1,9 +1,9 @@
 package mypipe.runner
 
-import mypipe.mysql.{ BinlogConsumer, BinlogFilePos, HostPortUserPass }
+import mypipe.mysql.{ BinaryLogConsumer, BinaryLogFilePosition, HostPortUserPass }
 
 import scala.collection.JavaConverters._
-import mypipe.api.{ Mapping, Producer }
+import mypipe.api.Producer
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 import mypipe.{ Conf, Pipe }
@@ -38,15 +38,8 @@ object PipeRunnerUtil {
 
   protected val log = LoggerFactory.getLogger(getClass)
 
-  def loadProducerClasses(conf: Config, key: String): Map[String, Class[Producer]] = {
-    val PRODUCERS = conf.getObject("mypipe.producers").asScala
-    PRODUCERS.map(kv ⇒ {
-      val name = kv._1
-      val prodConf = conf.getConfig(s"mypipe.producers.$name")
-      val clazz = prodConf.getString("class")
-      (name, Class.forName(clazz).asInstanceOf[Class[Producer]])
-    }).toMap
-  }
+  def loadProducerClasses(conf: Config, key: String): Map[String, Class[Producer]] =
+    Conf.loadClassesForKey[Producer]("mypipe.producers")
 
   def loadConsumerConfigs(conf: Config, key: String): Map[String, HostPortUserPass] = {
     val CONSUMERS = conf.getObject("mypipe.consumers").asScala
@@ -98,9 +91,9 @@ object PipeRunnerUtil {
     }).filter(_ != null).toSeq
   }
 
-  protected def createConsumer(pipeName: String, params: HostPortUserPass): BinlogConsumer = {
-    val filePos = Conf.binlogFilePos(params.host, params.port, pipeName).getOrElse(BinlogFilePos.current)
-    val consumer = BinlogConsumer(params.host, params.port, params.user, params.password, filePos)
+  protected def createConsumer(pipeName: String, params: HostPortUserPass): BinaryLogConsumer = {
+    val filePos = Conf.binlogLoadFilePosition(params.host, params.port, pipeName).getOrElse(BinaryLogFilePosition.current)
+    val consumer = BinaryLogConsumer(params.host, params.port, params.user, params.password, filePos)
     consumer
   }
 

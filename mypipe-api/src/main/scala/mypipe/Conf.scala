@@ -1,8 +1,10 @@
 package mypipe
 
 import com.typesafe.config.ConfigFactory
+import scala.collection.JavaConverters._
+
 import java.io.{ PrintWriter, File }
-import mypipe.mysql.BinlogFilePos
+import mypipe.mysql.BinaryLogFilePosition
 import org.slf4j.LoggerFactory
 
 object Conf {
@@ -19,7 +21,7 @@ object Conf {
 
   val MYSQL_SERVER_ID_PREFIX = Conf.conf.getInt("mypipe.mysql-server-id-prefix")
 
-  private val lastBinlogFilePos = scala.collection.mutable.HashMap[String, BinlogFilePos]()
+  private val lastBinlogFilePos = scala.collection.concurrent.TrieMap[String, BinaryLogFilePosition]()
 
   try {
     new File(DATADIR).mkdirs()
@@ -28,29 +30,29 @@ object Conf {
     case e: Exception ⇒ println(s"Error while creating data and log dir ${DATADIR}, ${LOGDIR}: ${e.getMessage}")
   }
 
-  def binlogStatusFile(hostname: String, port: Int, pipe: String): String = {
+  def binlogGetStatusFilename(hostname: String, port: Int, pipe: String): String = {
     s"$DATADIR/$pipe-$hostname-$port.pos"
   }
 
-  def binlogFilePos(hostname: String, port: Int, pipe: String): Option[BinlogFilePos] = {
+  def binlogLoadFilePosition(hostname: String, port: Int, pipe: String): Option[BinaryLogFilePosition] = {
     try {
 
-      val statusFile = binlogStatusFile(hostname, port, pipe)
+      val statusFile = binlogGetStatusFilename(hostname, port, pipe)
       val filePos = scala.io.Source.fromFile(statusFile).getLines().mkString.split(":")
-      Some(BinlogFilePos(filePos(0), filePos(1).toLong))
+      Some(BinaryLogFilePosition(filePos(0), filePos(1).toLong))
 
     } catch {
       case e: Exception ⇒ None
     }
   }
 
-  def binlogFilePosSave(hostname: String, port: Int, filePos: BinlogFilePos, pipe: String) {
+  def binlogSaveFilePosition(hostname: String, port: Int, filePos: BinaryLogFilePosition, pipe: String) {
 
-    val key = binlogStatusFile(hostname, port, pipe)
+    val key = binlogGetStatusFilename(hostname, port, pipe)
 
     if (!lastBinlogFilePos.getOrElse(key, "").equals(filePos)) {
 
-      val fileName = binlogStatusFile(hostname, port, pipe)
+      val fileName = binlogGetStatusFilename(hostname, port, pipe)
       val file = new File(fileName)
       val writer = new PrintWriter(file)
 
@@ -60,5 +62,15 @@ object Conf {
 
       lastBinlogFilePos(key) = filePos
     }
+  }
+
+  def loadClassesForKey[T](key: String): Map[String, Class[T]] = {
+    val classes = Conf.conf.getObject(key).asScala
+    classes.map(kv ⇒ {
+      val subKey = kv._1
+      val classConf = conf.getConfig(s"$key.$subKey")
+      val clazz = classConf.getString("class")
+      (subKey, Class.forName(clazz).asInstanceOf[Class[T]])
+    }).toMap
   }
 }

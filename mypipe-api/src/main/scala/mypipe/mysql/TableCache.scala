@@ -19,20 +19,20 @@ class TableCache(hostname: String, port: Int, username: String, password: String
     tablesById.get(tableId)
   }
 
-  def addTableByEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]): Table = {
+  def addTableByEvent(ev: TableMapEvent): Table = {
 
-    tablesById.getOrElseUpdate(tableId, {
+    tablesById.getOrElseUpdate(ev.tableId, {
 
       // TODO: make this configurable
       implicit val timeout = Timeout(2 second)
 
-      val colTypes = columnTypes.map(
+      val colTypes = ev.columnTypes.map(
         colType ⇒ ColumnType.typeByCode(colType.toInt).getOrElse(ColumnType.UNKNOWN)).toArray
 
-      val future = ask(dbMetadata, GetColumns(database, tableName, colTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
+      val future = ask(dbMetadata, GetColumns(ev.database, ev.tableName, colTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
       val columns = Await.result(future, 2 seconds)
 
-      Table(tableId, tableName, database, columns._1, columns._2)
+      Table(ev.tableId, ev.tableName, ev.database, columns._1, columns._2)
     })
   }
 }

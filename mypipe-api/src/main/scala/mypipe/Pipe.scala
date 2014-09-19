@@ -2,11 +2,11 @@ package mypipe
 
 import scala.concurrent.duration._
 import org.slf4j.LoggerFactory
-import mypipe.mysql.{ BinlogFilePos, BinlogConsumerListener, BinlogConsumer }
+import mypipe.mysql.{ BaseBinaryLogConsumer, BinaryLogFilePosition, BinaryLogConsumerListener, BinaryLogConsumer }
 import mypipe.api.{ Table, Mutation, Producer }
 import akka.actor.{ Cancellable, ActorSystem }
 
-class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
+class Pipe(id: String, consumers: List[BinaryLogConsumer], producer: Producer) {
 
   protected val log = LoggerFactory.getLogger(getClass)
   protected var CONSUMER_DISCONNECT_WAIT_SECS = 2
@@ -17,40 +17,40 @@ class Pipe(id: String, consumers: List[BinlogConsumer], producer: Producer) {
   protected var threads = List.empty[Thread]
   protected var flusher: Option[Cancellable] = None
 
-  protected val listener = new BinlogConsumerListener() {
+  protected val listener = new BinaryLogConsumerListener() {
 
-    override def onConnect(consumer: BinlogConsumer) {
+    override def onConnect(consumer: BaseBinaryLogConsumer) {
       log.info(s"Pipe $id connected!")
 
       _connected = true
 
       flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS seconds,
         Conf.FLUSH_INTERVAL_SECS seconds) {
-          Conf.binlogFilePosSave(consumer.hostname, consumer.port,
-            BinlogFilePos(consumer.client.getBinlogFilename, consumer.client.getBinlogPosition),
+          Conf.binlogSaveFilePosition(consumer.hostname, consumer.port,
+            BinaryLogFilePosition(consumer.client.getBinlogFilename, consumer.client.getBinlogPosition),
             id)
           // TODO: if flush fails, stop and disconnect
           producer.flush
         })
     }
 
-    override def onDisconnect(consumer: BinlogConsumer) {
+    override def onDisconnect(consumer: BaseBinaryLogConsumer) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
-      Conf.binlogFilePosSave(
+      Conf.binlogSaveFilePosition(
         consumer.hostname,
         consumer.port,
-        BinlogFilePos(consumer.client.getBinlogFilename, consumer.client.getBinlogPosition),
+        BinaryLogFilePosition(consumer.client.getBinlogFilename, consumer.client.getBinlogPosition),
         id)
       producer.flush
     }
 
-    override def onMutation(consumer: BinlogConsumer, mutation: Mutation[_]): Boolean = {
+    override def onMutation(consumer: BaseBinaryLogConsumer, mutation: Mutation[_]): Boolean = {
       producer.queue(mutation)
     }
 
-    override def onMutation(consumer: BinlogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
+    override def onMutation(consumer: BaseBinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
       producer.queueList(mutations.toList)
     }
   }
