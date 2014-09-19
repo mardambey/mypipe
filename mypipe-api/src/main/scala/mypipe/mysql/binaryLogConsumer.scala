@@ -4,6 +4,10 @@ import com.github.shyiko.mysql.binlog.event.Event
 
 import mypipe.api.{ TableMapEvent, Mutation, Table }
 
+trait BinaryLogRawConsumerTrait {
+  protected def handleEvent(event: Event)
+}
+
 trait BinaryLogConsumerTrait {
 
   val hostname: String
@@ -11,7 +15,6 @@ trait BinaryLogConsumerTrait {
   val username: String
   val password: String
 
-  protected def handleEvent(event: Event)
   protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation[_])
   protected def handleTableMap(event: TableMapEvent): Table
   protected def handleMutation(mutation: Mutation[_]): Boolean

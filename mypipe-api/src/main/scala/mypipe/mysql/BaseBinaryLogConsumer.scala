@@ -18,16 +18,25 @@ import mypipe.api.Table
 import mypipe.api.Row
 import mypipe.api.InsertMutation
 
-abstract class BaseBinaryLogConsumer(override val hostname: String, override val port: Int, username: String, password: String, binlogFileAndPos: BinaryLogFilePosition) extends BinaryLogConsumerTrait {
+abstract class BaseBinaryLogConsumer(
+  override val hostname: String,
+  override val port: Int,
+  username: String,
+  password: String,
+  binlogFileAndPos: BinaryLogFilePosition)
+    extends BinaryLogRawConsumerTrait
+    with BinaryLogConsumerTrait {
+
+  // FIXME: this is public because tests access it directly
+  val client = new BinaryLogClient(hostname, port, username, password)
+
+  // FIXME: this needs to be configurable
+  protected val quitOnEventHandleFailure = true
 
   protected var transactionInProgress = false
   protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   protected val txQueue = new scala.collection.mutable.ListBuffer[Event]
   protected val log = LoggerFactory.getLogger(getClass)
-  val client = new BinaryLogClient(hostname, port, username, password)
-
-  // FIXME: this needs to be configurable
-  protected val quitOnEventHandleFailure = true
 
   if (binlogFileAndPos != BinaryLogFilePosition.current) {
     log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
