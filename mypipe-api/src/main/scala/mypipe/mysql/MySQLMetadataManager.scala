@@ -10,7 +10,7 @@ import akka.actor.SupervisorStrategy.Restart
 import akka.actor._
 import com.github.mauricio.async.db.mysql.MySQLConnection
 
-case class GetColumns(database: String, table: String, columnTypes: Array[ColumnType.EnumVal], flushCache: Boolean = false)
+case class GetColumns(database: String, table: String, flushCache: Boolean = false)
 
 object MySQLMetadataManager {
   protected val system = ActorSystem("mypipe")
@@ -34,10 +34,10 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
   protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
 
   def receive = {
-    case GetColumns(db, table, colTypes, flushCache) ⇒ sender ! getTableColumns(db, table, colTypes, flushCache)
+    case GetColumns(db, table, flushCache) ⇒ sender ! getTableColumns(db, table, flushCache)
   }
 
-  protected def getTableColumns(db: String, table: String, columnTypes: Array[ColumnType.EnumVal], flushCache: Boolean): (List[ColumnMetadata], Option[PrimaryKey]) = {
+  protected def getTableColumns(db: String, table: String, flushCache: Boolean): (List[ColumnMetadata], Option[PrimaryKey]) = {
 
     if (flushCache) dbTableCols.remove(s"$db.$table")
 
@@ -57,7 +57,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
       val results1 = results(0)
       val results2 = results(1)
 
-      val cols = createColumns(results1.asInstanceOf[List[(String, Boolean)]], columnTypes)
+      val cols = createColumns(results1.asInstanceOf[List[(String, String, Boolean)]])
       val primaryKey: Option[PrimaryKey] = try {
         val primaryKeys: List[ColumnMetadata] = results2.asInstanceOf[List[String]].map(colName ⇒ cols.find(_.name.equals(colName)).get)
         Some(PrimaryKey(primaryKeys))
@@ -71,19 +71,19 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     cols
   }
 
-  protected def getTableColumns(db: String, table: String, dbConn: Connection): Future[List[(String, Boolean)]] = {
+  protected def getTableColumns(db: String, table: String, dbConn: Connection): Future[List[(String, String, Boolean)]] = {
     val futureCols: Future[QueryResult] = dbConn.sendQuery(
-      s"""select COLUMN_NAME, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
+      s"""select COLUMN_NAME, DATA_TYPE, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
 
-    val mapCols: Future[List[(String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
+    val mapCols: Future[List[(String, String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
       case Some(resultSet) ⇒ {
         resultSet.map(row ⇒ {
-          (row(0).asInstanceOf[String], row(1).equals("PRI"))
+          (row(0).asInstanceOf[String], row(1).asInstanceOf[String], row(2).equals("PRI"))
         }).toList
       }
 
       case None ⇒ {
-        List.empty[(String, Boolean)]
+        List.empty[(String, String, Boolean)]
       }
     })
     mapCols
@@ -109,15 +109,16 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     pKey
   }
 
-  protected def createColumns(columns: List[(String, Boolean)], columnTypes: Array[ColumnType.EnumVal]): List[ColumnMetadata] = {
+  protected def createColumns(columns: List[(String, String, Boolean)]): List[ColumnMetadata] = {
     try {
       // TODO: if the table definition changes we'll overflow due to the following being larger than colTypes
       var cur = 0
 
       val cols = columns.map(c ⇒ {
         val colName = c._1
-        val isPrimaryKey = c._2
-        val colType = columnTypes(cur)
+        val colTypeStr = c._2
+        val isPrimaryKey = c._3
+        val colType = ColumnType.typeByString(colTypeStr).getOrElse(ColumnType.UNKNOWN)
         cur += 1
         ColumnMetadata(colName, colType, isPrimaryKey)
       })

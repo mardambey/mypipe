@@ -34,8 +34,7 @@ class MySQLMetaDataSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
       MySQLMetadataManager.props(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Some(Queries.DATABASE.password)),
       s"TestDBMetadataActor-${Queries.DATABASE.host}:${Queries.DATABASE.port}")
 
-    val columnTypes: Array[ColumnType.EnumVal] = Array(ColumnType.INT24, ColumnType.VARCHAR, ColumnType.VARCHAR, ColumnType.INT24)
-    val future = ask(manager, GetColumns("mypipe", "user", columnTypes)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
+    val future = ask(manager, GetColumns("mypipe", "user")).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
     val c = Await.result(future, 2 seconds)
     val columns = c._1
     val pKey = c._2

@@ -27,6 +27,7 @@ object ApplicationBuild extends Build {
     mysqlAsync,
     mysqlBinlogConnectorJava,
     scalaTest,
+    scalaReflect,
     typesafeConfig,
     logback
   )
