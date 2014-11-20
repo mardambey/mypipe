@@ -9,7 +9,7 @@ import scala.annotation.tailrec
 
 /** Abstract class that consumes messages for the given topic from
  *  the Kafka cluster running on the provided zkConnect settings. The
- *  groupId is used to controll if the consumer resumes from it's saved
+ *  groupId is used to control if the consumer resumes from it's saved
  *  offset or not.
  *
  *  @param topic to read messages from
