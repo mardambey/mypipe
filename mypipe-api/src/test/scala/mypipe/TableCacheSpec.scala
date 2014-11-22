@@ -29,23 +29,22 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
   implicit val timeout = Timeout(1 second)
 
+  val queue = new LinkedBlockingQueue[Table](1)
+
+  val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+  consumer.registerListener(new BinaryLogConsumerListener() {
+    override def onConnect(c: BinaryLogConsumerTrait): Unit = connected = true
+    override def onTableMap(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
+    override def onTableAlter(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
+  })
+
+  val tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
+
   "TableCache" should "be able to add and get tables to and from the cache" in {
 
-    val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
-
     val future = Future[Boolean] {
-      val tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
-      val queue = new LinkedBlockingQueue[Table](1)
 
-      consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onConnect(c: BaseBinaryLogConsumer) { connected = true }
-        override def onTableMap(c: BaseBinaryLogConsumer, table: Table) {
-          // intercept the table change event
-          queue.add(table)
-        }
-      })
-
-      val f = Future { consumer.connect() }
+      Future { consumer.connect() }
       while (!connected) Thread.sleep(1)
 
       // make an insert
@@ -64,14 +63,25 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
     try {
       val ret = Await.result(future, 10 seconds)
-      consumer.disconnect()
       assert(ret)
     } catch {
       case e: Exception ⇒ {
-        consumer.disconnect()
         log.error(s"Caught exception: ${e.getMessage} at ${e.getStackTraceString}")
         assert(false)
       }
     }
   }
+
+  it should "be able to refresh metadata" in {
+
+    db.connection.sendQuery(Queries.ALTER.statementAdd)
+    val table = queue.poll(10, TimeUnit.SECONDS)
+    assert(table.columns.find(column => column.name == "email").isDefined)
+
+    db.connection.sendQuery(Queries.ALTER.statementDrop)
+    val table = queue.poll(10, TimeUnit.SECONDS)
+    assert(table.columns.find(column => column.name == "email").isEmpty)
+  }
+
+  consumer.disconnect()
 }

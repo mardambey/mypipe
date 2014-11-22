@@ -132,13 +132,9 @@ abstract class BaseBinaryLogConsumer(
       case "BEGIN" if groupEventsByTx    ⇒ transactionInProgress = true
       case "COMMIT" if groupEventsByTx   ⇒ commit()
       case "ROLLBACK" if groupEventsByTx ⇒ rollback()
-      case q if q.indexOf("ALTER") == 0  ⇒ handleAlter(event)
+      case q if q.indexOf("ALTER") == 0  ⇒ handleAlter(queryEventData)
       case _                             ⇒
     }
-  }
-
-  protected def handleAlter(event: Event) {
-
   }
 
   protected def rollback() {

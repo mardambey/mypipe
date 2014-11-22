@@ -106,6 +106,11 @@ object Queries {
   object CREATE {
     val statement = conf.getString("mypipe.test.database.create")
   }
+
+  object ALTER {
+    val statementAdd  = conf.getString("mypipe.test.database.alter.add")
+    val statementDrop = conf.getString("mypipe.test.database.alter.drop")
+  }
 }
 
 class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {

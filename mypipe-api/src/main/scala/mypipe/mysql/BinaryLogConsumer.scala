@@ -12,8 +12,6 @@ case class BinaryLogConsumer(
     with ConfigBasedErrorHandling
     with CacheableTableMap {
 
-  protected val listeners = new scala.collection.mutable.HashSet[BinaryLogConsumerListener]()
-
   override protected def handleMutation(mutation: Mutation[_]): Boolean = {
     val results = listeners.takeWhile(l ⇒
       try {
