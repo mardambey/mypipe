@@ -13,7 +13,6 @@ import scala.concurrent.{ Await, Future }
 
 class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
-  @volatile var connected = false
   val log = LoggerFactory.getLogger(getClass)
 
   override def beforeAll() {
@@ -29,20 +28,19 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
   implicit val timeout = Timeout(1 second)
 
-  val queue = new LinkedBlockingQueue[Table](1)
-
-  val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
-  consumer.registerListener(new BinaryLogConsumerListener() {
-    override def onConnect(c: BinaryLogConsumerTrait): Unit = connected = true
-    override def onTableMap(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
-    override def onTableAlter(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
-  })
-
-  val tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
-
   "TableCache" should "be able to add and get tables to and from the cache" in {
 
+    @volatile var connected = false
+    val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+    val tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
+
     val future = Future[Boolean] {
+
+      val queue = new LinkedBlockingQueue[Table](1)
+      consumer.registerListener(new BinaryLogConsumerListener() {
+        override def onConnect(c: BinaryLogConsumerTrait): Unit = connected = true
+        override def onTableMap(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
+      })
 
       Future { consumer.connect() }
       while (!connected) Thread.sleep(1)
@@ -70,18 +68,54 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
         assert(false)
       }
     }
+
+    consumer.disconnect
   }
 
   it should "be able to refresh metadata" in {
 
-    db.connection.sendQuery(Queries.ALTER.statementAdd)
-    val table = queue.poll(10, TimeUnit.SECONDS)
-    assert(table.columns.find(column => column.name == "email").isDefined)
+    @volatile var connected = false
+    val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
 
-    db.connection.sendQuery(Queries.ALTER.statementDrop)
-    val table = queue.poll(10, TimeUnit.SECONDS)
-    assert(table.columns.find(column => column.name == "email").isEmpty)
+    val future = Future[Boolean] {
+
+      val queue = new LinkedBlockingQueue[Table](1)
+      consumer.registerListener(new BinaryLogConsumerListener() {
+        override def onConnect(c: BinaryLogConsumerTrait): Unit = connected = true
+        override def onTableAlter(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
+      })
+
+      Future { consumer.connect() }
+      while (!connected) Thread.sleep(1)
+
+      val insertFuture = db.connection.sendQuery(Queries.INSERT.statement(id = "124"))
+      Await.result(insertFuture, 2000 millis)
+
+      val alterAddFuture = db.connection.sendQuery(Queries.ALTER.statementAdd)
+      Await.result(alterAddFuture, 2000 millis)
+
+      val table = queue.poll(10, TimeUnit.SECONDS)
+      assert(table.columns.find(column ⇒ column.name == "email").isDefined)
+
+      val alterDropFuture = db.connection.sendQuery(Queries.ALTER.statementDrop)
+      Await.result(alterDropFuture, 2000 millis)
+
+      val table2 = queue.poll(10, TimeUnit.SECONDS)
+      assert(table2.columns.find(column ⇒ column.name == "email").isEmpty)
+
+      true
+    }
+
+    try {
+      val ret = Await.result(future, 10 seconds)
+      assert(ret)
+    } catch {
+      case e: Exception ⇒ {
+        log.error(s"Caught exception: ${e.getMessage} at ${e.getStackTraceString}")
+        assert(false)
+      }
+    } finally {
+      consumer.disconnect()
+    }
   }
-
-  consumer.disconnect()
 }

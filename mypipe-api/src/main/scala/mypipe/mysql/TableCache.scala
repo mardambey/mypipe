@@ -69,7 +69,7 @@ class TableCache(hostname: String, port: Int, username: String, password: String
     // TODO: make this configurable
     implicit val timeout = Timeout(2 second)
 
-    val future = ask(dbMetadata, GetColumns(database, tableName)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
+    val future = ask(dbMetadata, GetColumns(database, tableName, flushCache = true)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
     val columns = Await.result(future, 2 seconds)
 
     Table(tableId, tableName, database, columns._1, columns._2)

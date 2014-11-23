@@ -54,7 +54,6 @@ trait CacheableTableMap extends BinaryLogConsumerTrait {
     // FIXME: this sucks and needs to be done properly
     val tableName = query.split(" ")(2)
     val table = tableCache.refreshTable(event.getDatabase, tableName)
-
-    listeners foreach (l ⇒ l.onTableAlter(this, table.get))
+    table.map(t ⇒ listeners foreach (l ⇒ l.onTableAlter(this, t)))
   }
 }

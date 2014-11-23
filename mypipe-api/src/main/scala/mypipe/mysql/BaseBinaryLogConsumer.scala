@@ -129,11 +129,11 @@ abstract class BaseBinaryLogConsumer(
     val query = queryEventData.getSql()
 
     query match {
-      case "BEGIN" if groupEventsByTx    ⇒ transactionInProgress = true
-      case "COMMIT" if groupEventsByTx   ⇒ commit()
-      case "ROLLBACK" if groupEventsByTx ⇒ rollback()
-      case q if q.indexOf("ALTER") == 0  ⇒ handleAlter(queryEventData)
-      case _                             ⇒
+      case "BEGIN" if groupEventsByTx               ⇒ transactionInProgress = true
+      case "COMMIT" if groupEventsByTx              ⇒ commit()
+      case "ROLLBACK" if groupEventsByTx            ⇒ rollback()
+      case q if q.toLowerCase.indexOf("alter") == 0 ⇒ handleAlter(queryEventData)
+      case _                                        ⇒
     }
   }
 

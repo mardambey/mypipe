@@ -86,7 +86,7 @@ object Queries {
 
     def statement: String = statement()
     def statement(id: String = "NULL", username: String = this.username, password: String = this.password, loginCount: Int = this.loginCount): String =
-      s"""INSERT INTO user values ($id, "$username", "$password", $loginCount)"""
+      s"""INSERT INTO user (id, username, password, login_count) values ($id, "$username", "$password", $loginCount)"""
   }
 
   object UPDATE {
@@ -108,7 +108,7 @@ object Queries {
   }
 
   object ALTER {
-    val statementAdd  = conf.getString("mypipe.test.database.alter.add")
+    val statementAdd = conf.getString("mypipe.test.database.alter.add")
     val statementDrop = conf.getString("mypipe.test.database.alter.drop")
   }
 }
