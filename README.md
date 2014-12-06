@@ -92,7 +92,7 @@ following structure in the case of an insert (`InsertMutation.avsc`):
     }
 
 Updates will contain both the old row values and the new ones (see 
-`UpdateMutation.avsc`) and deletes are similar to inserts (`DeleteMutation.avro`). 
+`UpdateMutation.avsc`) and deletes are similar to inserts (`DeleteMutation.avsc`). 
 Once transformed into Avro data the mutations are pushed into Kafka topics 
 based on the following convention:
 
@@ -101,8 +101,32 @@ based on the following convention:
 This ensures that all mutations destined to a specific database / table tuple are
 all added to a single topic with mutation ordering guarantees.
 
-# tests
+# Consuming from "generic" Kafka topics
+In order to consume from generic Kafka topics the `KafkaGenericMutationAvroConsumer` 
+can be used. This consumer will allow you react to insert, update, and delete mutations. 
+The consumer needs an Avro schema repository as well as some helpers to be defined. A quick 
+(and incomplete) example follows:
 
+    val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
+      topic = KafkaUtil.genericTopic("databaseName", "tableName"),
+      zkConnect = "localhost:2181",
+      groupId = "someGroupId",
+      schemaIdSizeInBytes = 2)(
+      
+      insertCallback = { insertMutation ⇒ ??? }
+      updateCallback = { updateMutation ⇒ ??? }
+      deleteCallback = { deleteMutation ⇒ ??? } 
+    ) {
+      protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
+    }
+
+For a more complete example take a look at `KafkaGenericSpec.scala`.
+
+Alternatively you can implement your own Kafka consumer given the binary structure 
+of the messages as shown above if the `KafkaGenericMutationAvroConsumer` does not 
+satisfy your needs.
+
+# Tests
 In order to run the tests you need to configure `test.conf` with proper MySQL
 values. You should also make sure there you have a database called `mypipe` with
 the following credentials:
@@ -112,7 +136,7 @@ the following credentials:
 
 The database must also have binary logging enabled in `row` format.
 
-# sample application.conf
+# Sample application.conf
 
     mypipe {
     
@@ -152,8 +176,8 @@ The database must also have binary logging enabled in `row` format.
         }
     
         # push events into kafka topics
-    		# where each database-table tuple
-    		# get their own topic
+        # where each database-table tuple
+        # get their own topic
         kafka-generic {
           enabled = true
           consumers = ["database1"]
