@@ -1,18 +1,9 @@
 # mypipe
-
 mypipe latches onto a MySQL server with binary log replication enabled and
 allows for the creation of pipes that can consume the replication stream and
 act on the data.
 
-# kafka integration
-mypipe's main goal is to replicate a MySQL binlog stream into Apache Kafka.
-mypipe supports Avro encoding and can use a schema repository to figure out
-how to encode data. Data can either be encoded generically and stored in
-Avro maps by type (integers, strings, longs, etc.) or it can encode data
-more specifically if the schema repository can return specific schemas. The
-latter will allow the table's structure to be reflected in the Avro beans.
-
-# api
+# API
 mypipe tries to provide enough information that usually is not part of the
 MySQL binary log stream so that the data is meaningful. mypipe requires a
 row based binary log format and provides `Insert`, `Update`, and `Delete`
@@ -20,20 +11,97 @@ mutations representing changed rows. Each change is related back to it's
 table and the API provides metadata like column types, primary key
 information (composite, key order), and other such useful information.
 
-## producers
+# Producers
 
 Producers receive MySQL binary log events and act on them. They can funnel
 down to another data store, send them to some service, or just print them
 out to the screen in the case of the stdout producer.
 
-## pipes
-
+# Pipes
 Pipes tie one or more MySQL binary log consumers to a producer. Pipes can be
 used to create a system of fan-in data flow from several MySQL servers to
 other data sources such as Hadoop, Cassandra, Kafka, or other MySQL servers.
 They can also be used to update or flush caches.
 
-## tests
+# Kafka integration
+mypipe's main goal is to replicate a MySQL binlog stream into Apache Kafka.
+mypipe supports Avro encoding and can use a schema repository to figure out
+how to encode data. Data can either be encoded generically and stored in
+Avro maps by type (integers, strings, longs, etc.) or it can encode data
+more specifically if the schema repository can return specific schemas. The
+latter will allow the table's structure to be reflected in the Avro beans.
+
+# Kafka message format
+Binary log events, specifically mutation events (insert, update, delete) are
+pushed into Kafka and are binary encoded. Every message has the following 
+format:
+
+     -----------------
+    | MAGIC | 1 byte  |
+    |-----------------|
+    | MTYPE | 1 byte  |
+    |-----------------|
+    | SCMID | N bytes |
+    |-----------------|
+    | DATA  | N bytes |
+     -----------------
+
+The above fields are:
+
+* `MAGIC`: magic byte, used to figure out protocol version
+* `MTYPE`: mutation type, a single byte indicating insert, update, or delete
+* `SCMID`: Avro schema ID, variable number of bytes
+* `DATA`: the actual mutation data as bytes, variable size
+
+# Mysql to "generic" Kafka topics
+If you do not have an Avro schema repository running that contains schemas 
+for each of your tables you can use generic Avro encoding. This will take 
+binary log mutations (insert, update, or delete) and encode them into the 
+following structure in the case of an insert (`InsertMutation.avsc`):
+
+    {
+      "namespace": "mypipe.avro",
+      "type": "record",
+      "name": "InsertMutation",
+      "fields": [
+    	    {
+    			"name": "database",
+    			"type": "string"
+    		},
+    		{
+    			"name": "table",
+    			"type": "string"
+    		},
+    		{
+    			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    			"name": "integers",
+    			"type": {"type": "map", "values": "int"}
+    		},
+    		{
+    			"name": "strings",
+    			"type": {"type": "map", "values": "string"}
+    		},
+    		{
+    			"name": "longs",
+    			"type": {"type": "map", "values": "long"}
+    		}
+    	]
+    }
+
+Updates will contain both the old row values and the new ones (see 
+`UpdateMutation.avsc`) and deletes are similar to inserts (`DeleteMutation.avro`). 
+Once transformed into Avro data the mutations are pushed into Kafka topics 
+based on the following convention:
+
+    topicName = s"$db_$table_generic"
+
+This ensures that all mutations destined to a specific database / table tuple are
+all added to a single topic with mutation ordering guarantees.
+
+# tests
 
 In order to run the tests you need to configure `test.conf` with proper MySQL
 values. You should also make sure there you have a database called `mypipe` with
@@ -44,18 +112,20 @@ the following credentials:
 
 The database must also have binary logging enabled in `row` format.
 
-## sample application.conf
+# sample application.conf
 
     mypipe {
+    
+      # Avro schema repository client class name
+      schema-repo-client = "mypipe.avro.schema.SchemaRepo"
     
       # consumers represent sources for mysql binary logs
       consumers {
     
-        consumer1 {
+      database1  {
           # database "host:port:user:pass" array
-          source = "localhost:3306:root:root"
+          source = "localhost:3306:mypipe:mypipe"
         }
-    
       }
     
       # data producers export data out (stdout, other stores, external services, etc.)
@@ -73,23 +143,27 @@ The database must also have binary logging enabled in `row` format.
       # pipes join consumers and producers
       pipes {
     
+        # prints queries to standard out
         stdout {
-          consumers = ["consumer1"]
+          consumers = ["database1"]
           producer {
             stdout {}
           }
         }
     
-      	kafka-generic {
-      		enabled = true
-      	  consumers = ["consumer1"]
-      	  producer {
-      	    kafka-generic {
-      	      metadata-brokers = "localhost:9092"
-      	    }
-      	  }
-      	 }
+        # push events into kafka topics
+    		# where each database-table tuple
+    		# get their own topic
+        kafka-generic {
+          enabled = true
+          consumers = ["database1"]
+          producer {
+            kafka-generic {
+              metadata-brokers = "localhost:9092"
+            }
+          }
+        }
       }
     }
-    
+
 
