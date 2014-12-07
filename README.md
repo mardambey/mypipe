@@ -11,6 +11,8 @@ mutations representing changed rows. Each change is related back to it's
 table and the API provides metadata like column types, primary key
 information (composite, key order), and other such useful information.
 
+Look at `ColumnType.scala` and `Mutation.scala` for more details.
+
 # Producers
 
 Producers receive MySQL binary log events and act on them. They can funnel
@@ -49,11 +51,11 @@ format:
 The above fields are:
 
 * `MAGIC`: magic byte, used to figure out protocol version
-* `MTYPE`: mutation type, a single byte indicating insert, update, or delete
+* `MTYPE`: mutation type, a single byte indicating insert (0x1), update (0x2), or delete (0x3)
 * `SCMID`: Avro schema ID, variable number of bytes
 * `DATA`: the actual mutation data as bytes, variable size
 
-# Mysql to "generic" Kafka topics
+# MySQL to "generic" Kafka topics
 If you do not have an Avro schema repository running that contains schemas 
 for each of your tables you can use generic Avro encoding. This will take 
 binary log mutations (insert, update, or delete) and encode them into the 
@@ -190,4 +192,33 @@ The database must also have binary logging enabled in `row` format.
       }
     }
 
+# MySQL Event Processing Internals
+mypipe uses the [mysql-binlog-connector-java](https://github.com/shyiko/mysql-binlog-connector-java) to tap 
+into the MySQL server's binary log stream. We currently handle the following events:
+
+## `TABLE_MAP`
+This event causes mypipe to look up a table's metadata (primary key, column names and types, etc.).
+This is done by issuing the following query to the MySQL server to determine column information:
+
+    select COLUMN_NAME, DATA_TYPE, COLUMN_KEY 
+    from COLUMNS 
+    where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" 
+    order by ORDINAL_POSITION
+
+The following query is issued to the server also to determine the primary key:
+
+    select COLUMN_NAME
+    from KEY_COLUMN_USAGE 
+    where TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' and CONSTRAINT_NAME='PRIMARY' 
+    order by ORDINAL_POSITION
+
+While a `TABLE_MAP` event is being handled no other events will be handled concurrently.
+
+## `QUERY`
+We handle a few different types of raw queries (besides mutations) like:
+
+* `BEGIN`
+* `COMMIT`
+* `ROLLBACK`
+* `ALTER`
 
