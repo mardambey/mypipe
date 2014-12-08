@@ -51,7 +51,7 @@ format:
 The above fields are:
 
 * `MAGIC`: magic byte, used to figure out protocol version
-* `MTYPE`: mutation type, a single byte indicating insert (0x1), update (0x2), or delete (0x3)
+* `MTYPE`: mutation type, a single byte indicating insert (`0x1`), update (`0x2`), or delete (`0x3`)
 * `SCMID`: Avro schema ID, variable number of bytes
 * `DATA`: the actual mutation data as bytes, variable size
 
@@ -102,6 +102,14 @@ based on the following convention:
 
 This ensures that all mutations destined to a specific database / table tuple are
 all added to a single topic with mutation ordering guarantees.
+
+## `ALTER` queries and "generic" Kafka topics
+mypipe handles `ALTER` table queries (as described below) allowing it to add 
+new columns or stop including removed ones into "generic" Avro records published 
+into Kafka. Since the "generic" Avro beans consist of typed maps (ints, strings, etc.) 
+mypipe can easily include or remove columns based on `ALTER` queries. Once a table's 
+metadata is refreshed (blocking operation) all subsequent mutations to the 
+table will use the new structure and publish that into Kafka.
 
 # Consuming from "generic" Kafka topics
 In order to consume from generic Kafka topics the `KafkaGenericMutationAvroConsumer` 
@@ -215,10 +223,26 @@ The following query is issued to the server also to determine the primary key:
 While a `TABLE_MAP` event is being handled no other events will be handled concurrently.
 
 ## `QUERY`
-We handle a few different types of raw queries (besides mutations) like:
+mypipe handles a few different types of raw queries (besides mutations) like:
 
-* `BEGIN`
-* `COMMIT`
-* `ROLLBACK`
-* `ALTER`
+### `BEGIN`
+If transaction event grouping is enabled mypipe will queue up all events that
+arrive after a `BEGIN` query has been encountered. While queuing is occuring 
+mypipe will not save it's binary log position as it receives events and will 
+only do so once the transaction is committed.
+
+### `COMMIT`
+If transaction event grouping is enabled mypipe will hold wait for a `COMMIT` 
+query to arrive before "flushing" all queued events (mutations) at and then 
+saves it's binary log position to mark the processing of the entire transaction.
+
+### `ROLLBACK`
+If transaction event grouping is enabled mypipe will clear and not flush the 
+queued up events (mutations) upon receiving a `ROLBACK`.
+
+### `ALTER`
+Upon receiving an `ALTER` query mypipe will attempt to reload the affected table's 
+metadata. This allows mypipe to detect dropped / added columns, changed keys, or 
+anything else that could affect the table. mypipe will perform a look up similar 
+to the one done when handling a `TABLE_MAP` event.
 
