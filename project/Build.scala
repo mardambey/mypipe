@@ -24,12 +24,13 @@ object ApplicationBuild extends Build {
     akkaActor,
     akkaAgent,
     commonsLang,
+    jsqlParser,
+    logback,
     mysqlAsync,
     mysqlBinlogConnectorJava,
-    scalaTest,
     scalaReflect,
-    typesafeConfig,
-    logback
+    scalaTest,
+    typesafeConfig
   )
 
   val runnerDependencies = Seq(
@@ -43,7 +44,7 @@ object ApplicationBuild extends Build {
 
   val avroDependencies = Seq(
     avro,
-		guava,
+    guava,
     xinject,
     jsr305,
     scalaTest,
@@ -101,20 +102,21 @@ object ApplicationBuild extends Build {
 
 object Dependencies {
 
-    val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
-    val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.5"
-    val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.3.5"
-    val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
-    val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0"
-    val commonsLang = "commons-lang" % "commons-lang" % "2.6"
-    val mysqlAsync = "com.github.mauricio" %% "mysql-async" % "0.2.12"
-    val avro = "org.apache.avro" % "avro" % "1.7.5"
-    val kafka = "org.apache.kafka" %% "kafka" % "0.8.1" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
-		val guava = "com.google.guava" % "guava" % "14.0.1"
-    val xinject = "javax.inject" % "javax.inject" % "1"
-    val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
-    val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.10.3"
-    val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
+  val guava = "com.google.guava" % "guava" % "14.0.1"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.5"
+  val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.3.5"
+  val avro = "org.apache.avro" % "avro" % "1.7.5"
+  val commonsLang = "commons-lang" % "commons-lang" % "2.6"
+  val jsqlParser = "com.github.jsqlparser" % "jsqlparser" % "0.9"
+  val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
+  val kafka = "org.apache.kafka" %% "kafka" % "0.8.1" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
+  val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
+  val mysqlAsync = "com.github.mauricio" %% "mysql-async" % "0.2.12"
+  val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0"
+  val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.10.3"
+  val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
+  val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
+  val xinject = "javax.inject" % "javax.inject" % "1"
 }
 
 object AvroCompiler {
@@ -150,4 +152,3 @@ object Format {
       setPreference(SpacesWithinPatternBinders, true)
   }
 }
-

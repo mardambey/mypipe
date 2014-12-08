@@ -31,15 +31,15 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
   "TableCache" should "be able to add and get tables to and from the cache" in {
 
     @volatile var connected = false
-    val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+    val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
     val tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
 
     val future = Future[Boolean] {
 
       val queue = new LinkedBlockingQueue[Table](1)
       consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onConnect(c: BinaryLogConsumerTrait): Unit = connected = true
-        override def onTableMap(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
+        override def onConnect(c: AbstractBinaryLogConsumer): Unit = connected = true
+        override def onTableMap(c: AbstractBinaryLogConsumer, table: Table): Unit = queue.add(table)
       })
 
       Future { consumer.connect() }
@@ -75,30 +75,32 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
   it should "be able to refresh metadata" in {
 
     @volatile var connected = false
-    val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+    val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
 
     val future = Future[Boolean] {
 
       val queue = new LinkedBlockingQueue[Table](1)
       consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onConnect(c: BinaryLogConsumerTrait): Unit = connected = true
-        override def onTableAlter(c: BinaryLogConsumerTrait, table: Table): Unit = queue.add(table)
+        override def onConnect(c: AbstractBinaryLogConsumer): Unit = connected = true
+        override def onTableAlter(c: AbstractBinaryLogConsumer, table: Table): Unit = {
+          queue.add(table)
+        }
       })
 
       Future { consumer.connect() }
       while (!connected) Thread.sleep(1)
 
       val insertFuture = db.connection.sendQuery(Queries.INSERT.statement(id = "124"))
-      Await.result(insertFuture, 2000 millis)
+      Await.result(insertFuture, 5 seconds)
 
       val alterAddFuture = db.connection.sendQuery(Queries.ALTER.statementAdd)
-      Await.result(alterAddFuture, 2000 millis)
+      Await.result(alterAddFuture, 5 seconds)
 
       val table = queue.poll(10, TimeUnit.SECONDS)
       assert(table.columns.find(column ⇒ column.name == "email").isDefined)
 
       val alterDropFuture = db.connection.sendQuery(Queries.ALTER.statementDrop)
-      Await.result(alterDropFuture, 2000 millis)
+      Await.result(alterDropFuture, 5 seconds)
 
       val table2 = queue.poll(10, TimeUnit.SECONDS)
       assert(table2.columns.find(column ⇒ column.name == "email").isEmpty)
@@ -107,7 +109,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     }
 
     try {
-      val ret = Await.result(future, 10 seconds)
+      val ret = Await.result(future, 35 seconds)
       assert(ret)
     } catch {
       case e: Exception ⇒ {

@@ -33,7 +33,7 @@ Avro maps by type (integers, strings, longs, etc.) or it can encode data
 more specifically if the schema repository can return specific schemas. The
 latter will allow the table's structure to be reflected in the Avro beans.
 
-# Kafka message format
+## Kafka message format
 Binary log events, specifically mutation events (insert, update, delete) are
 pushed into Kafka and are binary encoded. Every message has the following 
 format:
@@ -55,7 +55,7 @@ The above fields are:
 * `SCMID`: Avro schema ID, variable number of bytes
 * `DATA`: the actual mutation data as bytes, variable size
 
-# MySQL to "generic" Kafka topics
+## MySQL to "generic" Kafka topics
 If you do not have an Avro schema repository running that contains schemas 
 for each of your tables you can use generic Avro encoding. This will take 
 binary log mutations (insert, update, or delete) and encode them into the 
@@ -111,7 +111,7 @@ mypipe can easily include or remove columns based on `ALTER` queries. Once a tab
 metadata is refreshed (blocking operation) all subsequent mutations to the 
 table will use the new structure and publish that into Kafka.
 
-# Consuming from "generic" Kafka topics
+## Consuming from "generic" Kafka topics
 In order to consume from generic Kafka topics the `KafkaGenericMutationAvroConsumer` 
 can be used. This consumer will allow you react to insert, update, and delete mutations. 
 The consumer needs an Avro schema repository as well as some helpers to be defined. A quick 
@@ -202,7 +202,7 @@ The database must also have binary logging enabled in `row` format.
 
 # MySQL Event Processing Internals
 mypipe uses the [mysql-binlog-connector-java](https://github.com/shyiko/mysql-binlog-connector-java) to tap 
-into the MySQL server's binary log stream. We currently handle the following events:
+into the MySQL server's binary log stream and handles several types of events.
 
 ## `TABLE_MAP`
 This event causes mypipe to look up a table's metadata (primary key, column names and types, etc.).
@@ -245,4 +245,6 @@ Upon receiving an `ALTER` query mypipe will attempt to reload the affected table
 metadata. This allows mypipe to detect dropped / added columns, changed keys, or 
 anything else that could affect the table. mypipe will perform a look up similar 
 to the one done when handling a `TABLE_MAP` event.
+
+## Binary log offset handling
 

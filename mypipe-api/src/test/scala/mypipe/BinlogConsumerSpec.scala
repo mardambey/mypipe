@@ -1,6 +1,6 @@
 package mypipe
 
-import mypipe.mysql.{ BinaryLogFilePosition, BinaryLogConsumer }
+import mypipe.mysql.{ BinaryLogFilePosition, MySQLBinaryLogConsumer }
 import com.github.mauricio.async.db.{ Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import scala.concurrent.Await
@@ -120,7 +120,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
 
   val queue = new LinkedBlockingQueue[Mutation[_]]()
   val queueProducer = new QueueProducer(queue)
-  val consumer = BinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+  val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
   val pipe = new Pipe("test-pipe", List(consumer), queueProducer)
 
   override def beforeAll() {

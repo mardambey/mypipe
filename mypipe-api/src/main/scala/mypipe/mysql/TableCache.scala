@@ -1,5 +1,7 @@
 package mypipe.mysql
 
+import org.slf4j.LoggerFactory
+
 import scala.concurrent.duration._
 import mypipe.api._
 import scala.concurrent.{ Future, Await }
@@ -23,6 +25,7 @@ class TableCache(hostname: String, port: Int, username: String, password: String
   protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
   protected val tableNameToId = scala.collection.mutable.HashMap[String, Long]()
   protected val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
+  protected val log = LoggerFactory.getLogger(getClass)
 
   def getTable(tableId: Long): Option[Table] = {
     tablesById.get(tableId)

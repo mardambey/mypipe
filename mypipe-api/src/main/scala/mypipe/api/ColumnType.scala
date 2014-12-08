@@ -40,7 +40,7 @@ object ColumnType extends Enum {
   val BLOB = new EnumVal { val value = 252; val str = "blob" }
   val VAR_STRING = new EnumVal { val value = 253; val str = "text" }
   val STRING = new EnumVal { val value = 254; val str = "text" }
-  val GEOMETRY = new EnumVal { val value = 255; val str = "geomrtry" }
+  val GEOMETRY = new EnumVal { val value = 255; val str = "geometry" }
 
   val UNKNOWN = new EnumVal { val value = -9999; val str = "unknown" }
 

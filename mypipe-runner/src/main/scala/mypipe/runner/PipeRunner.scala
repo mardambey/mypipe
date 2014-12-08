@@ -1,6 +1,6 @@
 package mypipe.runner
 
-import mypipe.mysql.{ BinaryLogConsumer, BinaryLogFilePosition, HostPortUserPass }
+import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition, HostPortUserPass }
 
 import scala.collection.JavaConverters._
 import mypipe.api.Producer
@@ -91,9 +91,9 @@ object PipeRunnerUtil {
     }).filter(_ != null).toSeq
   }
 
-  protected def createConsumer(pipeName: String, params: HostPortUserPass): BinaryLogConsumer = {
+  protected def createConsumer(pipeName: String, params: HostPortUserPass): MySQLBinaryLogConsumer = {
     val filePos = Conf.binlogLoadFilePosition(params.host, params.port, pipeName).getOrElse(BinaryLogFilePosition.current)
-    val consumer = BinaryLogConsumer(params.host, params.port, params.user, params.password, filePos)
+    val consumer = MySQLBinaryLogConsumer(params.host, params.port, params.user, params.password, filePos)
     consumer
   }
 

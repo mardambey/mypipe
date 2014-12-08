@@ -91,7 +91,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
 
   protected def getPrimaryKey(db: String, table: String, dbConn: Connection): Future[List[String]] = {
     val futurePkey: Future[QueryResult] = dbConn.sendQuery(
-      s"""SELECT COLUMN_NAME FROM KEY_COLUMN_USAGE WHERE TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' AND CONSTRAINT_NAME='PRIMARY' ORDER BY ORDINAL_POSITION""")
+      s"""select COLUMN_NAME from KEY_COLUMN_USAGE where TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' and CONSTRAINT_NAME='PRIMARY' order by ORDINAL_POSITION""")
 
     val pKey: Future[List[String]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
       case Some(resultSet) ⇒ {
