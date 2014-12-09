@@ -3,7 +3,9 @@ package mypipe
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 
 import akka.util.Timeout
-import mypipe.api.{ TableMapEvent, Table }
+import mypipe.api.consumer.{ BinaryLogConsumerListener, AbstractBinaryLogConsumer }
+import mypipe.api.data.Table
+import mypipe.api.event.TableMapEvent
 import mypipe.mysql._
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory

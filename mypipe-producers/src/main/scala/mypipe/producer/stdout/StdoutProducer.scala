@@ -1,9 +1,9 @@
 package mypipe.producer.stdout
 
 import mypipe.api._
+import mypipe.api.event.{ DeleteMutation, Mutation, UpdateMutation, InsertMutation }
+import mypipe.api.producer.Producer
 import org.slf4j.LoggerFactory
-import mypipe.api.UpdateMutation
-import mypipe.api.InsertMutation
 import com.typesafe.config.Config
 
 class StdoutProducer(config: Config) extends Producer(config) {

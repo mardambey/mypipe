@@ -1,6 +1,6 @@
 package mypipe.kafka
 
-import mypipe.api.Mutation
+import mypipe.api.event.Mutation
 
 import scala.reflect.runtime.universe._
 import org.slf4j.LoggerFactory

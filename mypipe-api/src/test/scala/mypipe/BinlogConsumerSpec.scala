@@ -1,8 +1,10 @@
 package mypipe
 
+import mypipe.api.event.{ DeleteMutation, Mutation, UpdateMutation, InsertMutation }
 import mypipe.mysql.{ BinaryLogFilePosition, MySQLBinaryLogConsumer }
 import com.github.mauricio.async.db.{ Connection, Configuration }
 import com.github.mauricio.async.db.mysql.MySQLConnection
+import mypipe.pipe.Pipe
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import mypipe.api._
@@ -10,9 +12,7 @@ import mypipe.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import akka.actor.ActorSystem
 import org.scalatest.BeforeAndAfterAll
-import mypipe.api.UpdateMutation
 import scala.Some
-import mypipe.api.InsertMutation
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 

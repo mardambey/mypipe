@@ -1,10 +1,14 @@
-package mypipe
+package mypipe.pipe
+
+import akka.actor.{ ActorSystem, Cancellable }
+import mypipe.api.consumer.{ AbstractBinaryLogConsumer, BinaryLogConsumerListener }
+import mypipe.api.event.Mutation
+import mypipe.api.Conf
+import mypipe.api.producer.Producer
+import mypipe.mysql._
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import org.slf4j.LoggerFactory
-import mypipe.mysql._
-import mypipe.api.{ Mutation, Producer }
-import akka.actor.{ Cancellable, ActorSystem }
 
 class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Producer) {
 

@@ -1,6 +1,6 @@
 package mypipe.kafka
 
-import mypipe.api.Mutation
+import mypipe.api.event.Mutation
 import mypipe.avro.schema.AvroSchemaUtils
 
 import scala.reflect.runtime.universe._

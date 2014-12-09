@@ -1,6 +1,7 @@
 package mypipe.avro
 
 import mypipe.api._
+import mypipe.api.event.Deserializer
 import org.apache.avro.io.{ DatumReader, BinaryDecoder, DecoderFactory }
 import org.apache.avro.Schema
 

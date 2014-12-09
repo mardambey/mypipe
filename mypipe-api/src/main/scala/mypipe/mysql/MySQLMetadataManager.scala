@@ -1,6 +1,6 @@
 package mypipe.mysql
 
-import mypipe.api.{ ColumnType, PrimaryKey, ColumnMetadata }
+import mypipe.api.data.{ ColumnMetadata, PrimaryKey, ColumnType }
 
 import org.slf4j.LoggerFactory
 import scala.concurrent.{ Await, Future }

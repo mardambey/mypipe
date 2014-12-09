@@ -1,12 +1,15 @@
-package mypipe.api
+package mypipe.api.event
+
+import mypipe.api.data.Table
+import mypipe.api.data.Row
 
 /** General purpose Mutation helpers.
  */
 object Mutation {
 
-  val InsertClass = classOf[mypipe.api.InsertMutation]
-  val UpdateClass = classOf[mypipe.api.UpdateMutation]
-  val DeleteClass = classOf[mypipe.api.DeleteMutation]
+  val InsertClass = classOf[InsertMutation]
+  val UpdateClass = classOf[UpdateMutation]
+  val DeleteClass = classOf[DeleteMutation]
 
   val UnknownByte = 0x0.toByte
   val InsertByte = 0x1.toByte

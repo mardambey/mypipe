@@ -1,6 +1,9 @@
 package mypipe.mysql
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient.{ LifecycleListener, EventListener }
+import mypipe.api.consumer.AbstractBinaryLogConsumer
+import mypipe.api.data.{ Column, Table, Row }
+import mypipe.api.event._
 import org.slf4j.LoggerFactory
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient
@@ -8,14 +11,7 @@ import com.github.shyiko.mysql.binlog.event.EventType._
 import com.github.shyiko.mysql.binlog.event._
 
 import scala.collection.JavaConverters._
-import mypipe.api._
 import scala.collection.immutable.ListMap
-import mypipe.api.UpdateMutation
-import mypipe.api.Column
-import mypipe.api.DeleteMutation
-import mypipe.api.Table
-import mypipe.api.Row
-import mypipe.api.InsertMutation
 
 abstract class AbstractMySQLBinaryLogConsumer(
   override val hostname: String,

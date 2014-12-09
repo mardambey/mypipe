@@ -1,4 +1,4 @@
-package mypipe.mysql
+package mypipe.api
 
 class HostPortUserPass(val host: String, val port: Int, val user: String, val password: String)
 

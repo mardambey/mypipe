@@ -1,5 +1,8 @@
 package mypipe.kafka
 
+import mypipe.api.event.Mutation
+import mypipe.pipe.Pipe
+
 import scala.concurrent.duration._
 import mypipe._
 import mypipe.api._

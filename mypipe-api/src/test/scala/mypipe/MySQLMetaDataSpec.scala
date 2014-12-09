@@ -1,5 +1,6 @@
 package mypipe
 
+import mypipe.api.data.{ ColumnType, ColumnMetadata, PrimaryKey }
 import mypipe.mysql._
 import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration._
@@ -7,8 +8,6 @@ import mypipe.api._
 import akka.pattern.ask
 import org.scalatest.BeforeAndAfterAll
 import akka.util.Timeout
-import mypipe.api.PrimaryKey
-import mypipe.api.ColumnMetadata
 
 class MySQLMetaDataSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 

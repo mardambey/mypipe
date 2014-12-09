@@ -1,5 +1,7 @@
 package mypipe.mysql
 
+import mypipe.api.data.{ ColumnMetadata, Table, PrimaryKey }
+import mypipe.api.event.TableMapEvent
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
@@ -8,8 +10,6 @@ import scala.concurrent.{ Future, Await }
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-import mypipe.api.PrimaryKey
-import mypipe.api.Table
 
 /** A cache for tables who's metadata needs to be looked up against
  *  the database in order to determine column and key structure.

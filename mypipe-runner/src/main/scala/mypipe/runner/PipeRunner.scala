@@ -1,12 +1,13 @@
 package mypipe.runner
 
-import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition, HostPortUserPass }
+import mypipe.api.producer.Producer
+import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition }
+import mypipe.pipe.Pipe
 
 import scala.collection.JavaConverters._
-import mypipe.api.Producer
+import mypipe.api.{ Conf, HostPortUserPass }
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
-import mypipe.{ Conf, Pipe }
 import org.slf4j.LoggerFactory
 
 object PipeRunner extends App {

@@ -1,11 +1,12 @@
-package mypipe
+package mypipe.api
+
+import java.io.{ File, PrintWriter }
 
 import com.typesafe.config.ConfigFactory
-import scala.collection.JavaConverters._
-
-import java.io.{ PrintWriter, File }
 import mypipe.mysql.BinaryLogFilePosition
 import org.slf4j.LoggerFactory
+
+import scala.collection.JavaConverters._
 
 object Conf {
 

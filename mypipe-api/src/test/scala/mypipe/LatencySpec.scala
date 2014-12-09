@@ -1,5 +1,7 @@
 package mypipe
 
+import mypipe.api.consumer.{ BinaryLogConsumerListener, AbstractBinaryLogConsumer }
+import mypipe.api.event.{ Mutation, InsertMutation }
 import mypipe.mysql._
 import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration._
@@ -9,7 +11,6 @@ import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import akka.actor.ActorDSL._
 import akka.pattern.ask
 import org.scalatest.BeforeAndAfterAll
-import mypipe.api.InsertMutation
 import akka.util.Timeout
 import akka.agent.Agent
 import scala.collection.mutable.ListBuffer

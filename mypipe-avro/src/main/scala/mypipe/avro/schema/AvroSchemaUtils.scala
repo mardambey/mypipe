@@ -1,6 +1,6 @@
 package mypipe.avro.schema
 
-import mypipe.api.Mutation
+import mypipe.api.event.Mutation
 import org.apache.avro.Schema
 import org.apache.avro.specific.SpecificRecord
 

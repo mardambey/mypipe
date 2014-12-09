@@ -1,4 +1,4 @@
-package mypipe.api
+package mypipe.api.event
 
 trait QueryEvent {
   val database: String

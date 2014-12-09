@@ -4,7 +4,7 @@ import akka.util.Timeout
 import akka.actor._
 import akka.actor.ActorDSL._
 import akka.pattern.ask
-import mypipe.Conf
+import mypipe.api.Conf
 import scala.concurrent.Await
 import scala.concurrent.duration._
 

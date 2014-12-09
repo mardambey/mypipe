@@ -1,10 +1,11 @@
 package mypipe.kafka
 
 import mypipe._
-import mypipe.api.Mutation
+import mypipe.api.event.Mutation
 import mypipe.avro.{ AvroVersionedRecordDeserializer, InMemorySchemaRepo, GenericInMemorySchemaRepo }
 import mypipe.avro.schema.{ AvroSchemaUtils, ShortSchemaId, AvroSchema, GenericSchemaRepository }
 import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition }
+import mypipe.pipe.Pipe
 import mypipe.producer.{ KafkaMutationSpecificAvroProducer, KafkaMutationGenericAvroProducer }
 import org.apache.avro.Schema
 import org.apache.avro.util.Utf8

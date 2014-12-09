@@ -1,6 +1,6 @@
 package mypipe.avro
 
-import mypipe.api.Mutation
+import mypipe.api.event.Mutation
 import org.apache.avro.Schema
 import mypipe.avro.schema.{ AvroSchemaUtils, AvroSchema, ShortSchemaId }
 

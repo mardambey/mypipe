@@ -1,6 +1,7 @@
-package mypipe.mysql
+package mypipe.api.consumer
 
-import mypipe.api.{ Table, Mutation }
+import mypipe.api.data.Table
+import mypipe.api.event.Mutation
 
 trait BinaryLogConsumerListener {
   def onConnect(consumer: AbstractBinaryLogConsumer) {}

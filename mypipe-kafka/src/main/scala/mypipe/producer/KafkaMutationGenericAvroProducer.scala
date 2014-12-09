@@ -2,6 +2,8 @@ package mypipe.producer
 
 import mypipe.api._
 import com.typesafe.config.Config
+import mypipe.api.data.{ Column, ColumnType }
+import mypipe.api.event.{ DeleteMutation, UpdateMutation, InsertMutation, Mutation }
 import mypipe.avro.schema.AvroSchemaUtils
 import mypipe.avro.{ AvroVersionedRecordSerializer, GenericInMemorySchemaRepo }
 import mypipe.kafka.KafkaUtil

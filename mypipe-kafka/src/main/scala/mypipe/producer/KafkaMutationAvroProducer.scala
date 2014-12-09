@@ -1,6 +1,8 @@
 package mypipe.producer
 
 import mypipe.api._
+import mypipe.api.event.{ Serializer, Mutation }
+import mypipe.api.producer.Producer
 import mypipe.kafka.KafkaProducer
 import com.typesafe.config.Config
 import mypipe.avro.schema.{ GenericSchemaRepository }
