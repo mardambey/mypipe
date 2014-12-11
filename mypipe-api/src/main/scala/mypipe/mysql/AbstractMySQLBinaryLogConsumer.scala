@@ -1,14 +1,14 @@
 package mypipe.mysql
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient.{ LifecycleListener, EventListener }
+import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
 import mypipe.api.consumer.AbstractBinaryLogConsumer
 import mypipe.api.data.{ Column, Table, Row }
+import mypipe.api.event.Event
 import mypipe.api.event._
-import org.slf4j.LoggerFactory
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient
 import com.github.shyiko.mysql.binlog.event.EventType._
-import com.github.shyiko.mysql.binlog.event._
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
@@ -19,14 +19,10 @@ abstract class AbstractMySQLBinaryLogConsumer(
   username: String,
   password: String,
   binlogFileAndPos: BinaryLogFilePosition)
-    extends AbstractBinaryLogConsumer {
+    extends AbstractBinaryLogConsumer[MEvent] {
 
   // FIXME: this is public because tests access it directly
   val client = new BinaryLogClient(hostname, port, username, password)
-
-  // FIXME: this needs to be configurable
-  protected val quitOnEventHandleFailure = true
-  protected val log = LoggerFactory.getLogger(getClass)
 
   if (binlogFileAndPos != BinaryLogFilePosition.current) {
     log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
@@ -39,7 +35,7 @@ abstract class AbstractMySQLBinaryLogConsumer(
   client.setServerId(MySQLServerId.next)
 
   client.registerEventListener(new EventListener() {
-    override def onEvent(event: Event) {
+    override def onEvent(event: MEvent) {
       handleEvent(event)
     }
   })
@@ -57,71 +53,56 @@ abstract class AbstractMySQLBinaryLogConsumer(
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
 
-  protected def handleError(event: Event): Unit = {
-
+  protected def handleError(event: MEvent): Unit = {
+    // FIXME: we need better error handling
+    client.disconnect()
   }
 
-  protected def handleEvent(event: Event): Unit = {
-    val eventType = event.getHeader[EventHeader].getEventType
-
-    eventType match {
-      case TABLE_MAP ⇒ handleTableMap(event)
-      case QUERY     ⇒ handleQuery(event)
-      case XID       ⇒ handleXid(event)
-
-      case e: EventType if isMutation(eventType) ⇒ {
-        if (!handleMutation(event)) {
-
-          log.error("Failed to process event $event.")
-
-          if (quitOnEventHandleFailure) {
-            log.error("Failure encountered and asked to quit on event handler failure, disconnecting from {}:{}", hostname, port)
-            client.disconnect()
-          }
-        }
-      }
-      case _ ⇒ log.trace("Event ignored {}", eventType)
+  protected def decodeEvent(event: MEvent): Option[Event] = {
+    event.getHeader[EventHeader].getEventType match {
+      case TABLE_MAP                     ⇒ decodeTableMapEvent(event)
+      case QUERY                         ⇒ decodeQueryEvent(event)
+      case XID                           ⇒ decodeXidEvent(event)
+      case e: EventType if isMutation(e) ⇒ decodeMutationEvent(event)
+      case _                             ⇒ Some(UnknownEvent())
     }
   }
 
-  protected def handleTableMap(event: Event) {
+  protected def decodeTableMapEvent(event: MEvent): Option[TableMapEvent] = {
     val tableMapEventData = event.getData[TableMapEventData]
-    val tableMapEvent = TableMapEvent(
+    Some(TableMapEvent(
       tableMapEventData.getTableId,
       tableMapEventData.getTable,
       tableMapEventData.getDatabase,
-      tableMapEventData.getColumnTypes)
-
-    handleTableMap(tableMapEvent)
+      tableMapEventData.getColumnTypes))
   }
 
-  protected def handleMutation(event: Event): Boolean = {
-    val mutation = createMutation(event)
-    handleMutation(mutation)
-  }
-
-  protected def handleXid(event: Event) {
-    val eventData = event.getData[XidEventData]
-    handleXid(XidEvent(eventData.getXid))
-  }
-
-  protected def handleQuery(event: Event) {
+  protected def decodeQueryEvent(event: MEvent): Option[QueryEvent] = {
     val queryEventData = event.getData[QueryEventData]
     val query = queryEventData.getSql
 
-    log.trace("query={}", query)
-
     query.toLowerCase match {
-      case q if q.indexOf("begin") == 0 && groupEventsByTx ⇒
-        handleBegin(BeginEvent(queryEventData.getDatabase, queryEventData.getSql))
-      case q if q.indexOf("commit") == 0 && groupEventsByTx ⇒
-        handleCommit(CommitEvent(queryEventData.getDatabase, queryEventData.getSql))
-      case q if q.indexOf("rollback") == 0 && groupEventsByTx ⇒
-        handleRollback(RollbackEvent(queryEventData.getDatabase, queryEventData.getSql))
+      case q if q.indexOf("begin") == 0 ⇒
+        Some(BeginEvent(queryEventData.getDatabase, queryEventData.getSql))
+      case q if q.indexOf("commit") == 0 ⇒
+        Some(CommitEvent(queryEventData.getDatabase, queryEventData.getSql))
+      case q if q.indexOf("rollback") == 0 ⇒
+        Some(RollbackEvent(queryEventData.getDatabase, queryEventData.getSql))
       case q if q.indexOf("alter") == 0 ⇒
-        handleAlter(AlterEvent(queryEventData.getDatabase, queryEventData.getSql))
-      case q ⇒ log.trace("ignoring query={}", q)
+        Some(AlterEvent(queryEventData.getDatabase, queryEventData.getSql))
+      case q ⇒
+        log.trace("ignoring query={}", q)
+        Some(UnknownEvent(queryEventData.getDatabase, queryEventData.getSql))
     }
+  }
+
+  protected def decodeXidEvent(event: MEvent): Option[XidEvent] = {
+    val eventData = event.getData[XidEventData]
+    Some(XidEvent(eventData.getXid))
+  }
+
+  protected def decodeMutationEvent(event: MEvent): Option[Mutation[_]] = {
+    Some(createMutation(event))
   }
 
   override def toString: String = s"$hostname:$port"
@@ -137,7 +118,7 @@ abstract class AbstractMySQLBinaryLogConsumer(
     case _ ⇒ false
   }
 
-  protected def createMutation(event: Event): Mutation[_] = event.getHeader[EventHeader].getEventType match {
+  protected def createMutation(event: MEvent): Mutation[_] = event.getHeader[EventHeader].getEventType match {
     case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒ {
       val evData = event.getData[WriteRowsEventData]()
       val table = getTableById(evData.getTableId)

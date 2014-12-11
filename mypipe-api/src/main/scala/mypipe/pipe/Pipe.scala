@@ -1,7 +1,7 @@
 package mypipe.pipe
 
 import akka.actor.{ ActorSystem, Cancellable }
-import mypipe.api.consumer.{ AbstractBinaryLogConsumer, BinaryLogConsumerListener }
+import mypipe.api.consumer.{ BinaryLogConsumer, AbstractBinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.event.Mutation
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
@@ -23,7 +23,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
 
   protected val listener = new BinaryLogConsumerListener() {
 
-    override def onConnect(consumer: AbstractBinaryLogConsumer) {
+    override def onConnect(consumer: BinaryLogConsumer) {
       log.info(s"Pipe $id connected!")
 
       _connected = true
@@ -42,7 +42,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
         })
     }
 
-    override def onDisconnect(consumer: AbstractBinaryLogConsumer) {
+    override def onDisconnect(consumer: BinaryLogConsumer) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
@@ -58,11 +58,11 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       producer.flush
     }
 
-    override def onMutation(consumer: AbstractBinaryLogConsumer, mutation: Mutation[_]): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer, mutation: Mutation[_]): Boolean = {
       producer.queue(mutation)
     }
 
-    override def onMutation(consumer: AbstractBinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
       producer.queueList(mutations.toList)
     }
   }

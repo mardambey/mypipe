@@ -1,11 +1,10 @@
 package mypipe
 
-import mypipe.api.consumer.{ BinaryLogConsumerListener, AbstractBinaryLogConsumer }
+import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.event.{ Mutation, InsertMutation }
 import mypipe.mysql._
 import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration._
-import mypipe.api._
 import mypipe.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import akka.actor.ActorDSL._
@@ -82,17 +81,17 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
       val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
 
       consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onMutation(c: AbstractBinaryLogConsumer, mutation: Mutation[_]): Boolean = {
+        override def onMutation(c: BinaryLogConsumer, mutation: Mutation[_]): Boolean = {
           queueProducer.queue(mutation)
           true
         }
 
-        override def onMutation(c: AbstractBinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
+        override def onMutation(c: BinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
           queueProducer.queueList(mutations.toList)
           true
         }
 
-        override def onConnect(c: AbstractBinaryLogConsumer) { connected = true }
+        override def onConnect(c: BinaryLogConsumer) { connected = true }
       })
 
       val f = Future { consumer.connect() }

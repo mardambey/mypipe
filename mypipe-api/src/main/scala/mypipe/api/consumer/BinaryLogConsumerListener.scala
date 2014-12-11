@@ -4,11 +4,11 @@ import mypipe.api.data.Table
 import mypipe.api.event.Mutation
 
 trait BinaryLogConsumerListener {
-  def onConnect(consumer: AbstractBinaryLogConsumer) {}
-  def onDisconnect(consumer: AbstractBinaryLogConsumer) {}
-  def onMutation(consumer: AbstractBinaryLogConsumer, mutation: Mutation[_]): Boolean = true
-  def onMutation(consumer: AbstractBinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = true
-  def onTableMap(consumer: AbstractBinaryLogConsumer, table: Table) {}
-  def onTableAlter(consumer: AbstractBinaryLogConsumer, table: Table) {}
+  def onConnect(consumer: BinaryLogConsumer) {}
+  def onDisconnect(consumer: BinaryLogConsumer) {}
+  def onMutation(consumer: BinaryLogConsumer, mutation: Mutation[_]): Boolean = true
+  def onMutation(consumer: BinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = true
+  def onTableMap(consumer: BinaryLogConsumer, table: Table) {}
+  def onTableAlter(consumer: BinaryLogConsumer, table: Table) {}
 }
 

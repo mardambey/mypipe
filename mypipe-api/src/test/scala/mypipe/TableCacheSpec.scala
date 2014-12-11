@@ -3,7 +3,7 @@ package mypipe
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 
 import akka.util.Timeout
-import mypipe.api.consumer.{ BinaryLogConsumerListener, AbstractBinaryLogConsumer }
+import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event.TableMapEvent
 import mypipe.mysql._
@@ -40,8 +40,8 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
       val queue = new LinkedBlockingQueue[Table](1)
       consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onConnect(c: AbstractBinaryLogConsumer): Unit = connected = true
-        override def onTableMap(c: AbstractBinaryLogConsumer, table: Table): Unit = queue.add(table)
+        override def onConnect(c: BinaryLogConsumer): Unit = connected = true
+        override def onTableMap(c: BinaryLogConsumer, table: Table): Unit = queue.add(table)
       })
 
       Future { consumer.connect() }
@@ -83,8 +83,8 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
       val queue = new LinkedBlockingQueue[Table](1)
       consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onConnect(c: AbstractBinaryLogConsumer): Unit = connected = true
-        override def onTableAlter(c: AbstractBinaryLogConsumer, table: Table): Unit = {
+        override def onConnect(c: BinaryLogConsumer): Unit = connected = true
+        override def onTableAlter(c: BinaryLogConsumer, table: Table): Unit = {
           queue.add(table)
         }
       })

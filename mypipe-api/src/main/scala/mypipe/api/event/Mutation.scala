@@ -61,7 +61,7 @@ object Mutation {
  *  @param rows changes rows
  *  @tparam T type of the rows
  */
-sealed abstract class Mutation[T](val table: Table, val rows: T)
+sealed abstract class Mutation[T](val table: Table, val rows: T) extends Event
 
 /** Represents a Mutation that holds a single set of values for each row (Insert or Delete, not Update)
  *
