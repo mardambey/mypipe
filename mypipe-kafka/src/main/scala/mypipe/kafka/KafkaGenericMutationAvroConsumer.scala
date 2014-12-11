@@ -1,8 +1,5 @@
 package mypipe.kafka
 
-import mypipe.api.event.Mutation
-import mypipe.avro.schema.AvroSchemaUtils
-
 import scala.reflect.runtime.universe._
 import mypipe.avro.{ AvroVersionedRecordDeserializer, InsertMutation, UpdateMutation, DeleteMutation }
 
