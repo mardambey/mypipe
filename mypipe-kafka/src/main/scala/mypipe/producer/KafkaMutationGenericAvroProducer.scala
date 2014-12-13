@@ -34,42 +34,39 @@ class KafkaMutationGenericAvroProducer(config: Config)
 
   override protected def getKafkaTopic(mutation: Mutation[_]): String = KafkaUtil.genericTopic(mutation)
 
-  override protected def avroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record = {
+  override protected def avroRecord(mutation: Mutation[_], schema: Schema): List[GenericData.Record] = {
 
     Mutation.getMagicByte(mutation) match {
 
-      case Mutation.InsertByte ⇒ {
-        val (integers, strings, longs) = columnsToMaps(mutation.asInstanceOf[InsertMutation].rows.head.columns)
+      case Mutation.InsertByte ⇒ mutation.asInstanceOf[InsertMutation].rows.map(row ⇒ {
+        val (integers, strings, longs) = columnsToMaps(row.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
         body(record, mutation, integers, strings, longs)
         record
-      }
+      })
 
-      case Mutation.DeleteByte ⇒ {
-        val (integers, strings, longs) = columnsToMaps(mutation.asInstanceOf[DeleteMutation].rows.head.columns)
+      case Mutation.DeleteByte ⇒ mutation.asInstanceOf[DeleteMutation].rows.map(row ⇒ {
+        val (integers, strings, longs) = columnsToMaps(row.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
         body(record, mutation, integers, strings, longs)
-
         record
-      }
+      })
 
-      case Mutation.UpdateByte ⇒ {
-        val (integersOld, stringsOld, longsOld) = columnsToMaps(mutation.asInstanceOf[UpdateMutation].rows.head._1.columns)
-        val (integersNew, stringsNew, longsNew) = columnsToMaps(mutation.asInstanceOf[UpdateMutation].rows.head._2.columns)
+      case Mutation.UpdateByte ⇒ mutation.asInstanceOf[UpdateMutation].rows.map(row ⇒ {
+        val (integersOld, stringsOld, longsOld) = columnsToMaps(row._1.columns)
+        val (integersNew, stringsNew, longsNew) = columnsToMaps(row._2.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
         body(record, mutation, integersOld, stringsOld, longsOld) { s ⇒ "old_" + s }
         body(record, mutation, integersNew, stringsNew, longsNew) { s ⇒ "new_" + s }
-
         record
-      }
+      })
 
-      case _ ⇒ {
+      case _ ⇒
         logger.error(s"Unexpected mutation type ${mutation.getClass} encountered; retuning empty Avro GenericData.Record(schema=$schema")
-        new GenericData.Record(schema)
-      }
+        List(new GenericData.Record(schema))
     }
   }
 

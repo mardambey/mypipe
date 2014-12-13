@@ -57,14 +57,14 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    */
   protected def schemaIdToByteArray(schemaId: SchemaId): Array[Byte]
 
-  /** Given a Mutation, this method must convert it into an Avro record
+  /** Given a Mutation, this method must convert it into a(n) Avro record(s)
    *  for the given Avro schema.
    *
    *  @param mutation
    *  @param schema
-   *  @return the Avro generic record
+   *  @return the Avro generic record(s)
    */
-  protected def avroRecord(mutation: Mutation[_], schema: Schema): GenericData.Record
+  protected def avroRecord(mutation: Mutation[_], schema: Schema): List[GenericData.Record]
 
   override def flush(): Boolean = {
     try {
@@ -123,9 +123,12 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
       val mutationType = magicByte(input)
       val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
       val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
-      val record = avroRecord(input, schema)
-      val bytes = serialize(record, schema, schemaId.get, mutationType)
-      producer.send(getKafkaTopic(input), bytes)
+      val records = avroRecord(input, schema)
+
+      records foreach (record ⇒ {
+        val bytes = serialize(record, schema, schemaId.get, mutationType)
+        producer.send(getKafkaTopic(input), bytes)
+      })
     })
 
     true
@@ -136,10 +139,13 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     val mutationType = magicByte(input)
     val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
     val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
-    val record = avroRecord(input, schema)
-    val bytes = serialize(record, schema, schemaId.get, mutationType)
+    val records = avroRecord(input, schema)
 
-    producer.send(getKafkaTopic(input), bytes)
+    records foreach (record ⇒ {
+      val bytes = serialize(record, schema, schemaId.get, mutationType)
+      producer.send(getKafkaTopic(input), bytes)
+    })
+
     true
   }
 

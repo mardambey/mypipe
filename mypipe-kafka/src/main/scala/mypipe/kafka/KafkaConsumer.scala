@@ -47,7 +47,7 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
 
       if (next && loop) consume
     } else {
-      Unit
+      // do nothing
     }
   }
 
