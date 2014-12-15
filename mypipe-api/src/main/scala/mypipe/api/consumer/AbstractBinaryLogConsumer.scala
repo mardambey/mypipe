@@ -7,6 +7,9 @@ import mypipe.api.event._
 import org.slf4j.LoggerFactory
 
 trait BinaryLogConsumer {
+  type BinLogPos
+  type BinLogEvent
+
   val hostname: String
   val port: Int
   val username: String
@@ -16,12 +19,16 @@ trait BinaryLogConsumer {
   protected def findTable(event: AlterEvent): Option[Table]
   protected def findTable(event: TableMapEvent): Table
   protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation[_])
+  protected def decodeEvent(binaryLogEvent: BinLogEvent): Option[Event]
+  protected def handleError(binaryLogEvent: BinLogEvent)
+
+  def binaryLogPosition: BinLogPos
 }
 
-abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsumer {
+abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumer {
 
-  protected def decodeEvent(binaryLogEvent: BinaryLogEvent): Option[Event]
-  protected def handleError(binaryLogEvent: BinaryLogEvent)
+  type BinLogPos = BinaryLogPosition
+  type BinLogEvent = BinaryLogEvent
 
   // TODO: make this configurable
   protected val quitOnEventHandleFailure = true

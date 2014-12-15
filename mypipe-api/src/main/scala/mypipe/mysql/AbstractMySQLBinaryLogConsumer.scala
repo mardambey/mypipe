@@ -19,10 +19,9 @@ abstract class AbstractMySQLBinaryLogConsumer(
   username: String,
   password: String,
   binlogFileAndPos: BinaryLogFilePosition)
-    extends AbstractBinaryLogConsumer[MEvent] {
+    extends AbstractBinaryLogConsumer[MEvent, BinaryLogFilePosition] {
 
-  // FIXME: this is public because tests access it directly
-  val client = new BinaryLogClient(hostname, port, username, password)
+  protected val client = new BinaryLogClient(hostname, port, username, password)
 
   if (binlogFileAndPos != BinaryLogFilePosition.current) {
     log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
@@ -53,12 +52,16 @@ abstract class AbstractMySQLBinaryLogConsumer(
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
 
-  protected def handleError(event: MEvent): Unit = {
+  override def binaryLogPosition: BinaryLogFilePosition = {
+    BinaryLogFilePosition(client.getBinlogFilename, client.getBinlogPosition)
+  }
+
+  override protected def handleError(event: MEvent): Unit = {
     // FIXME: we need better error handling
     client.disconnect()
   }
 
-  protected def decodeEvent(event: MEvent): Option[Event] = {
+  override protected def decodeEvent(event: MEvent): Option[Event] = {
     event.getHeader[EventHeader].getEventType match {
       case TABLE_MAP                     ⇒ decodeTableMapEvent(event)
       case QUERY                         ⇒ decodeQueryEvent(event)

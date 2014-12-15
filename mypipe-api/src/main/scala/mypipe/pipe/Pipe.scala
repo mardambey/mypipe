@@ -35,7 +35,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
             // we'll fail to recover from the correct position if the process stops before reaching the commit.
             // (saving an offset in the middle of the transaction and picking up from the middle not knowing
             //  that we're in the middle of the transaction; then we'll encounter a "dangling" commit or rollback).
-            BinaryLogFilePosition(consumer.asInstanceOf[AbstractMySQLBinaryLogConsumer].client.getBinlogFilename, consumer.asInstanceOf[AbstractMySQLBinaryLogConsumer].client.getBinlogPosition),
+            consumer.binaryLogPosition.asInstanceOf[BinaryLogFilePosition],
             id)
           // TODO: if flush fails, stop and disconnect
           producer.flush
@@ -53,7 +53,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
         // we'll fail to recover from the correct position if the process stops before reaching the commit.
         // (saving an offset in the middle of the transaction and picking up from the middle not knowing
         //  that we're in the middle of the transaction; then we'll encounter a "dangling" commit or rollback).
-        BinaryLogFilePosition(consumer.asInstanceOf[AbstractMySQLBinaryLogConsumer].client.getBinlogFilename, consumer.asInstanceOf[AbstractMySQLBinaryLogConsumer].client.getBinlogPosition),
+        consumer.binaryLogPosition.asInstanceOf[BinaryLogFilePosition],
         id)
       producer.flush
     }
