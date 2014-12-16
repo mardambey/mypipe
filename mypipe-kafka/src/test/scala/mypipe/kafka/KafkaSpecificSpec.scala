@@ -2,13 +2,12 @@ package mypipe.kafka
 
 import mypipe._
 import mypipe.api.event.Mutation
-import mypipe.avro.{ AvroVersionedRecordDeserializer, InMemorySchemaRepo, GenericInMemorySchemaRepo }
+import mypipe.avro.{ AvroVersionedRecordDeserializer, InMemorySchemaRepo }
 import mypipe.avro.schema.{ AvroSchemaUtils, ShortSchemaId, AvroSchema, GenericSchemaRepository }
 import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition }
 import mypipe.pipe.Pipe
-import mypipe.producer.{ KafkaMutationSpecificAvroProducer, KafkaMutationGenericAvroProducer }
+import mypipe.producer.KafkaMutationSpecificAvroProducer
 import org.apache.avro.Schema
-import org.apache.avro.util.Utf8
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 
@@ -30,18 +29,18 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 
   override def beforeAll() {
 
-    db.connect
+    db.connect()
     pipe.connect()
 
     while (!db.connection.isConnected || !pipe.isConnected) { Thread.sleep(10) }
 
-    Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1 second)
-    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1 second)
+    Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
+    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1.second)
   }
 
   override def afterAll() {
     pipe.disconnect()
-    db.disconnect
+    db.disconnect()
   }
 
   "A specific Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒
@@ -102,7 +101,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
       protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = TestSchemaRepo
 
       override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
-      private def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
+      private def byteArray2Short(data: Array[Byte], offset: Int) = ((data(offset) << 8) | (data(offset + 1) & 0xff)).toShort
 
       override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.byteToString(byte))
 
@@ -113,14 +112,14 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 
     val future = kafkaConsumer.start
 
-    Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT)), 2 seconds)
-    Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2 seconds)
-    Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2 seconds)
-    Await.result(Future { while (!done) Thread.sleep(100) }, 20 seconds)
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT)), 2.seconds)
+    Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2.seconds)
+    Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2.seconds)
+    Await.result(Future { while (!done) Thread.sleep(100) }, 20.seconds)
 
     try {
       kafkaConsumer.stop
-      Await.result(future, 5 seconds)
+      Await.result(future, 5.seconds)
     }
 
     if (!done) assert(false)
