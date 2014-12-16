@@ -2,9 +2,9 @@ package mypipe.mysql
 
 case class MySQLBinaryLogConsumer(
   override val hostname: String, override val port: Int,
-  username: String, password: String, binlogFileAndPos: BinaryLogFilePosition)
+  username: String, password: String, initialBinlogFileAndPos: BinaryLogFilePosition)
 
-    extends AbstractMySQLBinaryLogConsumer(hostname, port, username, password, binlogFileAndPos)
+    extends AbstractMySQLBinaryLogConsumer(hostname, port, username, password, initialBinlogFileAndPos)
 
     with ConfigBasedErrorHandlingBehaviour
     with CacheableTableMapBehaviour

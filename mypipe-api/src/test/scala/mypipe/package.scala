@@ -65,6 +65,12 @@ package object mypipe {
       val password = dbPassword
     }
 
+    object TX {
+      val BEGIN = "begin"
+      val COMMIT = "commit"
+      val ROLLBACK = "rollback"
+    }
+
     object TABLE {
       val name = "user"
       val fields = List("id", "username", "password", "login_count")

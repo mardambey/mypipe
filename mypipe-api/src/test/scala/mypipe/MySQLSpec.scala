@@ -65,10 +65,60 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
     db.connection.sendQuery(Queries.DELETE.statement)
 
     log.info("Waiting for binary log event to arrive.")
-    val mutation = queue.poll(30, TimeUnit.SECONDS)
+    val mutation = queue.poll(10, TimeUnit.SECONDS)
 
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[DeleteMutation])
+  }
+
+  "A binlog consumer" should "not advance it's binlog position until a transaction is committed" in withDatabase { db ⇒
+
+    queue.clear()
+
+    val position1 = consumer.binaryLogPosition.get
+
+    Await.result(db.connection.sendQuery(Queries.TX.BEGIN), 1.second)
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
+
+    queue.poll(10, TimeUnit.SECONDS)
+
+    val position2 = consumer.binaryLogPosition.get
+
+    Await.result(db.connection.sendQuery(Queries.TX.COMMIT), 1.second)
+
+    // used to block
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
+    queue.poll(10, TimeUnit.SECONDS)
+
+    val position3 = consumer.binaryLogPosition.get
+
+    assert(position1.pos == position2.pos)
+    assert(position2.pos < position3.pos)
+  }
+
+  "A binlog consumer" should "not advance it's binlog position until a transaction is rolled back" in withDatabase { db ⇒
+
+    queue.clear()
+
+    val position1 = consumer.binaryLogPosition.get
+
+    Await.result(db.connection.sendQuery(Queries.TX.BEGIN), 1.second)
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
+
+    queue.poll(10, TimeUnit.SECONDS)
+
+    val position2 = consumer.binaryLogPosition.get
+
+    Await.result(db.connection.sendQuery(Queries.TX.ROLLBACK), 1.second)
+
+    // used to block
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
+    queue.poll(10, TimeUnit.SECONDS)
+
+    val position3 = consumer.binaryLogPosition.get
+
+    assert(position1.pos == position2.pos)
+    assert(position2.pos < position3.pos)
   }
 }

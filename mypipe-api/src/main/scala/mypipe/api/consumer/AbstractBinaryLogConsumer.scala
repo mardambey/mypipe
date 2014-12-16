@@ -151,6 +151,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   }
 
   protected def handleConnect() {
+    updateBinaryLogPosition()
     listeners foreach (l ⇒ l.onConnect(this))
   }
 

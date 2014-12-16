@@ -94,7 +94,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
         c.disconnect()
         t.join(CONSUMER_DISCONNECT_WAIT_SECS * 1000)
       } catch {
-        case e: Exception ⇒ log.error(s"Caught exception while trying to disconnect from ${c.hostname}:${c.port} at binlog position ${c.binlogFileAndPos}.")
+        case e: Exception ⇒ log.error(s"Caught exception while trying to disconnect from ${c.hostname}:${c.port} at binlog position ${c.initialBinlogFileAndPos}.")
       }
     }
   }
