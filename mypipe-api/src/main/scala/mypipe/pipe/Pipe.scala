@@ -1,7 +1,7 @@
 package mypipe.pipe
 
 import akka.actor.{ ActorSystem, Cancellable }
-import mypipe.api.consumer.{ BinaryLogConsumer, AbstractBinaryLogConsumer, BinaryLogConsumerListener }
+import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.event.Mutation
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
@@ -28,17 +28,13 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
 
       _connected = true
 
-      flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS seconds,
-        Conf.FLUSH_INTERVAL_SECS seconds) {
+      flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS.seconds,
+        Conf.FLUSH_INTERVAL_SECS.seconds) {
           Conf.binlogSaveFilePosition(consumer.hostname, consumer.port,
-            // FIXME: if we blindly save the binlog position here and we're in the middle of a transaction then
-            // we'll fail to recover from the correct position if the process stops before reaching the commit.
-            // (saving an offset in the middle of the transaction and picking up from the middle not knowing
-            //  that we're in the middle of the transaction; then we'll encounter a "dangling" commit or rollback).
-            consumer.binaryLogPosition.asInstanceOf[BinaryLogFilePosition],
+            consumer.binaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
             id)
           // TODO: if flush fails, stop and disconnect
-          producer.flush
+          producer.flush()
         })
     }
 
@@ -49,13 +45,9 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       Conf.binlogSaveFilePosition(
         consumer.hostname,
         consumer.port,
-        // FIXME: if we blindly save the binlog position here and we're in the middle of a transaction then
-        // we'll fail to recover from the correct position if the process stops before reaching the commit.
-        // (saving an offset in the middle of the transaction and picking up from the middle not knowing
-        //  that we're in the middle of the transaction; then we'll encounter a "dangling" commit or rollback).
-        consumer.binaryLogPosition.asInstanceOf[BinaryLogFilePosition],
+        consumer.binaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
         id)
-      producer.flush
+      producer.flush()
     }
 
     override def onMutation(consumer: BinaryLogConsumer, mutation: Mutation[_]): Boolean = {
@@ -98,7 +90,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       t ← threads
     ) {
       try {
-        log.info(s"Disconnecting pipe between ${c} -> ${producer}")
+        log.info(s"Disconnecting pipe between $c -> $producer")
         c.disconnect()
         t.join(CONSUMER_DISCONNECT_WAIT_SECS * 1000)
       } catch {
@@ -107,6 +99,6 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
     }
   }
 
-  override def toString(): String = id
+  override def toString: String = id
 }
 

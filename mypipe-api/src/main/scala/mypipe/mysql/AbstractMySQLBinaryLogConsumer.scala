@@ -52,8 +52,8 @@ abstract class AbstractMySQLBinaryLogConsumer(
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
 
-  override def binaryLogPosition: BinaryLogFilePosition = {
-    BinaryLogFilePosition(client.getBinlogFilename, client.getBinlogPosition)
+  override def getBinaryLogPosition: Option[BinaryLogFilePosition] = {
+    Some(BinaryLogFilePosition(client.getBinlogFilename, client.getBinlogPosition))
   }
 
   override protected def handleError(event: MEvent): Unit = {
@@ -71,7 +71,7 @@ abstract class AbstractMySQLBinaryLogConsumer(
     }
   }
 
-  protected def decodeTableMapEvent(event: MEvent): Option[TableMapEvent] = {
+  private def decodeTableMapEvent(event: MEvent): Option[TableMapEvent] = {
     val tableMapEventData = event.getData[TableMapEventData]
     Some(TableMapEvent(
       tableMapEventData.getTableId,
@@ -122,23 +122,20 @@ abstract class AbstractMySQLBinaryLogConsumer(
   }
 
   protected def createMutation(event: MEvent): Mutation[_] = event.getHeader[EventHeader].getEventType match {
-    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒ {
+    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒
       val evData = event.getData[WriteRowsEventData]()
       val table = getTableById(evData.getTableId)
       InsertMutation(table, createRows(table, evData.getRows))
-    }
 
-    case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒ {
+    case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒
       val evData = event.getData[UpdateRowsEventData]()
       val table = getTableById(evData.getTableId)
       UpdateMutation(table, createRowsUpdate(table, evData.getRows))
-    }
 
-    case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ {
+    case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒
       val evData = event.getData[DeleteRowsEventData]()
       val table = getTableById(evData.getTableId)
       DeleteMutation(table, createRows(table, evData.getRows))
-    }
   }
 
   protected def createRows(table: Table, evRows: java.util.List[Array[java.io.Serializable]]): List[Row] = {

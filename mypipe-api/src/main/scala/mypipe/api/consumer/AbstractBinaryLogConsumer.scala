@@ -15,14 +15,15 @@ trait BinaryLogConsumer {
   val username: String
   val password: String
 
-  protected def getTableById(tableId: java.lang.Long): Table
+  protected def decodeEvent(binaryLogEvent: BinLogEvent): Option[Event]
   protected def findTable(event: AlterEvent): Option[Table]
   protected def findTable(event: TableMapEvent): Table
-  protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation[_])
-  protected def decodeEvent(binaryLogEvent: BinLogEvent): Option[Event]
+  protected def getBinaryLogPosition: Option[BinLogPos]
+  protected def getTableById(tableId: java.lang.Long): Table
   protected def handleError(binaryLogEvent: BinLogEvent)
+  protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation[_])
 
-  def binaryLogPosition: BinLogPos
+  def binaryLogPosition: Option[BinLogPos]
 }
 
 abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumer {
@@ -31,13 +32,14 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   type BinLogEvent = BinaryLogEvent
 
   // TODO: make this configurable
-  protected val quitOnEventHandleFailure = true
+  private val quitOnEventHandleFailure = true
 
-  protected val listeners = collection.mutable.Set[BinaryLogConsumerListener]()
-  protected val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
-  protected val txQueue = new scala.collection.mutable.ListBuffer[Mutation[_]]
+  private val listeners = collection.mutable.Set[BinaryLogConsumerListener]()
+  private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
+  private val txQueue = new scala.collection.mutable.ListBuffer[Mutation[_]]
 
-  protected var transactionInProgress = false
+  private var transactionInProgress = false
+  private var binLogPos: Option[BinaryLogPosition] = None
 
   protected val log = LoggerFactory.getLogger(getClass)
 
@@ -46,12 +48,15 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
     val success = event match {
 
-      case Some(e: TableMapEvent) ⇒ handleTableMap(e)
-      case Some(e: QueryEvent)    ⇒ handleQueryEvent(e)
-      case Some(e: XidEvent)      ⇒ handleXid(e)
-      case Some(e: Mutation[_])   ⇒ handleMutation(e)
-      case Some(e: UnknownEvent)  ⇒ true // we move on if the event is unknown to us
-      case _                      ⇒ handleEventDecodeError(binaryLogEvent)
+      case Some(e: BeginEvent) if groupEventsByTx    ⇒ handleBegin(e)
+      case Some(e: CommitEvent) if groupEventsByTx   ⇒ handleCommit(e)
+      case Some(e: RollbackEvent) if groupEventsByTx ⇒ handleRollback(e)
+      case Some(e: AlterEvent)                       ⇒ handleAlter(e)
+      case Some(e: TableMapEvent)                    ⇒ handleTableMap(e)
+      case Some(e: XidEvent)                         ⇒ handleXid(e)
+      case Some(e: Mutation[_])                      ⇒ handleMutation(e)
+      case Some(e: UnknownEvent)                     ⇒ true // we move on if the event is unknown to us
+      case _                                         ⇒ handleEventDecodeError(binaryLogEvent)
     }
 
     if (!success) {
@@ -65,27 +70,17 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     }
   }
 
-  protected def handleQueryEvent(queryEvent: QueryEvent): Boolean = {
-    queryEvent match {
-      case e: BeginEvent if groupEventsByTx    ⇒ handleBegin(e)
-      case e: CommitEvent if groupEventsByTx   ⇒ handleCommit(e)
-      case e: RollbackEvent if groupEventsByTx ⇒ handleRollback(e)
-      case e: AlterEvent                       ⇒ handleAlter(e)
-      case q                                   ⇒ log.trace("Ignoring query event {}", queryEvent); true
-    }
-  }
-
-  protected def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean = {
+  private def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean = {
     log.trace("Event ignored {}", binaryLogEvent)
     false
   }
 
-  protected def handleMutation(mutation: Mutation[_]): Boolean = {
+  private def handleMutation(mutation: Mutation[_]): Boolean = {
     if (transactionInProgress) {
       txQueue += mutation
       true
     } else {
-      _handleMutation(mutation)
+      _handleMutation(mutation) && updateBinaryLogPosition()
     }
   }
 
@@ -103,49 +98,52 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     else false
   }
 
-  protected def handleTableMap(event: TableMapEvent): Boolean = {
+  private def handleTableMap(event: TableMapEvent): Boolean = {
     val table = findTable(event)
     listeners.foreach(_.onTableMap(this, table))
-    true
+    updateBinaryLogPosition()
   }
 
-  protected def handleAlter(event: AlterEvent): Boolean = {
+  private def handleAlter(event: AlterEvent): Boolean = {
     val table = findTable(event)
     table.map(t ⇒ listeners foreach (l ⇒ l.onTableAlter(this, t)))
-    // FIXME: return proper value
-    true
+    updateBinaryLogPosition()
   }
 
-  protected def handleBegin(event: BeginEvent): Boolean = {
+  private def handleBegin(event: BeginEvent): Boolean = {
     transactionInProgress = true
-    // FIXME: return proper value
     true
   }
 
-  protected def handleRollback(event: RollbackEvent): Boolean = {
+  private def handleRollback(event: RollbackEvent): Boolean = {
     txQueue.clear()
     transactionInProgress = false
-    // FIXME: return proper value
-    true
+    updateBinaryLogPosition()
   }
 
-  protected def handleCommit(event: CommitEvent): Boolean = {
-    commit()
-    // FIXME: return proper value
-    true
+  private def handleCommit(event: CommitEvent): Boolean = {
+    commit() && updateBinaryLogPosition()
   }
 
-  protected def handleXid(event: XidEvent): Boolean = {
-    commit()
-    // FIXME: return proper value
-    true
+  private def handleXid(event: XidEvent): Boolean = {
+    commit() && updateBinaryLogPosition()
   }
 
-  private def commit(): Unit = {
+  private def commit(): Boolean = {
     // TODO: take care of _handleMutation's listeners returning false
-    txQueue.foreach(_handleMutation)
-    txQueue.clear()
-    transactionInProgress = false
+
+    if (txQueue.nonEmpty) {
+      txQueue.foreach(_handleMutation)
+      txQueue.clear()
+      transactionInProgress = false
+    }
+
+    true
+  }
+
+  private def updateBinaryLogPosition(): Boolean = {
+    binLogPos = getBinaryLogPosition
+    binLogPos != None
   }
 
   protected def handleDisconnect() {
@@ -159,4 +157,6 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   def registerListener(listener: BinaryLogConsumerListener) {
     listeners += listener
   }
+
+  def binaryLogPosition: Option[BinaryLogPosition] = binLogPos
 }
