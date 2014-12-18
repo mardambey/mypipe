@@ -136,70 +136,6 @@ Alternatively you can implement your own Kafka consumer given the binary structu
 of the messages as shown above if the `KafkaGenericMutationAvroConsumer` does not 
 satisfy your needs.
 
-# Tests
-In order to run the tests you need to configure `test.conf` with proper MySQL
-values. You should also make sure there you have a database called `mypipe` with
-the following credentials:
-
-    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'mypipe'@'%' IDENTIFIED BY 'mypipe'
-    GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
-
-The database must also have binary logging enabled in `row` format.
-
-# Sample application.conf
-
-    mypipe {
-    
-      # Avro schema repository client class name
-      schema-repo-client = "mypipe.avro.schema.SchemaRepo"
-    
-      # consumers represent sources for mysql binary logs
-      consumers {
-    
-      database1  {
-          # database "host:port:user:pass" array
-          source = "localhost:3306:mypipe:mypipe"
-        }
-      }
-    
-      # data producers export data out (stdout, other stores, external services, etc.)
-      producers {
-    
-        stdout {
-           class = "mypipe.producer.stdout.StdoutProducer"
-        }
-    
-    	  kafka-generic {
-    	    class = "mypipe.producer.KafkaMutationGenericAvroProducer"
-    	  }
-      }
-    
-      # pipes join consumers and producers
-      pipes {
-    
-        # prints queries to standard out
-        stdout {
-          consumers = ["database1"]
-          producer {
-            stdout {}
-          }
-        }
-    
-        # push events into kafka topics
-        # where each database-table tuple
-        # get their own topic
-        kafka-generic {
-          enabled = true
-          consumers = ["database1"]
-          producer {
-            kafka-generic {
-              metadata-brokers = "localhost:9092"
-            }
-          }
-        }
-      }
-    }
-
 # MySQL Event Processing Internals
 mypipe uses the [mysql-binlog-connector-java](https://github.com/shyiko/mysql-binlog-connector-java) to tap 
 into the MySQL server's binary log stream and handles several types of events.
@@ -246,5 +182,166 @@ metadata. This allows mypipe to detect dropped / added columns, changed keys, or
 anything else that could affect the table. mypipe will perform a look up similar 
 to the one done when handling a `TABLE_MAP` event.
 
-## Binary log offset handling
+# Getting Started
+This section aims to guide you through setting up MySQL so that it can be used
+with mypipe. It then goes into setting up mypipe itself to push binary log events
+into Kafka. Finally, it explains how to consume these events from Kafka.
+
+## Enabling MySQL binary logging
+
+The following snippet of configuration will enable MySQL to generate binary logs 
+the mypipe will be able to understand. Taken from `my.cnf`:
+
+    server-id         = 112233
+    log_bin           = mysql-bin
+    expire_logs_days  = 1
+    binlog_format     = row
+
+The binary log format is required to be set to `row` for mypipe to work since 
+we need to track individual changes to rows (insert, update, delete).
+
+## Configuring mypipe to injest MySQL binary logs
+
+Currently, mypipe does not offset a binary distribution that can be installed.
+In order use mypipe, start by cloning the git repository:
+
+    git clone https://github.com/mardambey/mypipe.git
+
+Compile and package the code:
+
+    ./sbt package
+
+mypipe needs some configuration in order to point it to a MySQL server.
+The following configuration goes into `application.conf` in the `mypipe-runner`
+sub-project. Some other configuration entries can be added to other files
+as well; when indicated.
+
+A MySQL server can be defined in the configuration under the `consumers` 
+section. For example:
+
+    # consumers represent sources for mysql binary logs
+    consumers {
+  
+    database1  {
+        # database "host:port:user:pass" 
+        source = "localhost:3306:mypipe:mypipe"
+      }
+    }
+
+Multiple consumers (or sources of data) can be defined. Once mypipe
+latches onto a MySQL server, it will attempt to pick up where it last
+left of if an offset was previously saved for the given database host
+and database name combination. mypipe saves it's offsets in files for
+now. These files are stored in the location indicated by the config
+entry `data-dir` in the `mypipe-api` project's `application.conf`.
+
+    data-dir = "/tmp/mypipe"
+
+The simplest way to observe the replication stream that mypipe is 
+injesting is to configure the `stdout` producer. This producer will
+simply print to standard out the mutation events that mypipe is 
+consuming.
+
+The following snippet goes into the configuration file in order to
+do so:
+
+    producers {
+      stdout {
+         class = "mypipe.producer.stdout.StdoutProducer"
+      }
+    }
+
+In order to instruct mypipe to connect the consumer called `database1`
+and the `stdout` producer they must be joined by a `pipe`.
+
+The following configuration entry creates such a pipe:
+
+    pipes {
+  
+      # prints queries to standard out
+      stdout {
+        consumers = ["database1"]
+        producer {
+          stdout {}
+        }
+      }
+    }
+
+At this point, this configuration can be tested out. The
+`mypipe-runner` project can run mypipe and use these configuration
+entries.
+
+    ./sbt "project runner" "runMain mypipe.runner.PipeRunner"
+
+As soon as mypipe starts, it will latch onto the binary log
+stream and the `stdout` producer will print out mutations to the
+console.
+
+For a more complete configuration file, take a look at the sample
+configuration shown later in this document.
+
+# Tests
+In order to run the tests you need to configure `test.conf` with proper MySQL
+values. You should also make sure there you have a database called `mypipe` with
+the following credentials:
+
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'mypipe'@'%' IDENTIFIED BY 'mypipe'
+    GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
+
+The database must also have binary logging enabled in `row` format.
+
+# Sample application.conf
+
+    mypipe {
+
+      # Avro schema repository client class name
+      schema-repo-client = "mypipe.avro.schema.SchemaRepo"
+
+      # consumers represent sources for mysql binary logs
+      consumers {
+
+      database1  {
+          # database "host:port:user:pass" array
+          source = "localhost:3306:mypipe:mypipe"
+        }
+      }
+
+      # data producers export data out (stdout, other stores, external services, etc.)
+      producers {
+
+        stdout {
+           class = "mypipe.producer.stdout.StdoutProducer"
+        }
+
+    	  kafka-generic {
+    	    class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+    	  }
+      }
+
+      # pipes join consumers and producers
+      pipes {
+
+        # prints queries to standard out
+        stdout {
+          consumers = ["database1"]
+          producer {
+            stdout {}
+          }
+        }
+
+        # push events into kafka topics
+        # where each database-table tuple
+        # get their own topic
+        kafka-generic {
+          enabled = true
+          consumers = ["database1"]
+          producer {
+            kafka-generic {
+              metadata-brokers = "localhost:9092"
+            }
+          }
+        }
+      }
+    }
+
 
