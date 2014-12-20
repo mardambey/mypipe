@@ -31,7 +31,7 @@ mypipe supports Avro encoding and can use a schema repository to figure out
 how to encode data. Data can either be encoded generically and stored in
 Avro maps by type (integers, strings, longs, etc.) or it can encode data
 more specifically if the schema repository can return specific schemas. The
-latter will allow the table's structure to be reflected in the Avro beans.
+latter will allow the table's structure to be reflected in the Avro structure.
 
 ## Kafka message format
 Binary log events, specifically mutation events (insert, update, delete) are
@@ -200,7 +200,7 @@ the mypipe will be able to understand. Taken from `my.cnf`:
 The binary log format is required to be set to `row` for mypipe to work since 
 we need to track individual changes to rows (insert, update, delete).
 
-## Configuring mypipe to injest MySQL binary logs
+## Configuring mypipe to ingest MySQL binary logs
 
 Currently, mypipe does not offset a binary distribution that can be installed.
 In order use mypipe, start by cloning the git repository:
@@ -238,7 +238,7 @@ entry `data-dir` in the `mypipe-api` project's `application.conf`.
     data-dir = "/tmp/mypipe"
 
 The simplest way to observe the replication stream that mypipe is 
-injesting is to configure the `stdout` producer. This producer will
+ingesting is to configure the `stdout` producer. This producer will
 simply print to standard out the mutation events that mypipe is 
 consuming.
 
@@ -277,8 +277,63 @@ As soon as mypipe starts, it will latch onto the binary log
 stream and the `stdout` producer will print out mutations to the
 console.
 
+## Configuring mypipe to produce events into Kafka
+mypipe can produce mutations into Kafka either generically or more
+specifically. See the above sections for more explanation on what
+this means.
+
+### Generic Kafka topics
+In order to set up mypipe to produce events to Kafka generically, a
+producer must be added to the `producers` section of the configuration.
+This is similar to the `stdout` producer added earlier.
+
+    producers {
+        kafka-generic {
+            class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+        }
+    }
+
+This producer must then be joined with a data consumer using a pipe.
+The configuration of the Kafka brokers will also be passed to the
+producer.
+
+    pipes {
+        kafka-generic {
+            enabled = true
+            consumers = ["database1"]
+            producer {
+              kafka-generic {
+                 metadata-brokers = "localhost:9092"
+              }
+            }
+        }
+    }
+
+This pipe connects `database1` with the Kafka cluster defined by
+the values in the `meta-brokers` key, brokers must be comma separated.
+As mentioned before, once this pipe is active it will produce events
+into Kafka topics based on the database and table the mutations are
+coming from. Topics are named as such:
+
+    $database_$table_generic
+
+Each of these topics contain ordered mutations for the database / table
+tuple.
+
 For a more complete configuration file, take a look at the sample
 configuration shown later in this document.
+
+### Consuming mutations pushed into Kafka via console (generically)
+In order to generically consume and display the mutations pushed into
+Kafka, the provided generic console consumer will help. It can be
+used by invoking the following command:
+
+    ./sbt "project runner" \
+    "runMain mypipe.runner.KafkaGenericConsoleConsumer $database_$table_generic zkHost:2181 groupId"
+
+This will consume messages for the given `$database` / `$table` tuple from
+the Kafka cluster specified by the given ZooKeeper ensemble connection
+string and the consumer group ID to use.
 
 # Tests
 In order to run the tests you need to configure `test.conf` with proper MySQL
