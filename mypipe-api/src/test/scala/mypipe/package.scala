@@ -2,6 +2,7 @@ import akka.actor.ActorSystem
 import com.github.mauricio.async.db.{ Configuration, Connection }
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import com.typesafe.config.ConfigFactory
+import org.scalatest.BeforeAndAfterAll
 import scala.concurrent.duration._
 import scala.concurrent.Await
 
@@ -30,7 +31,20 @@ package object mypipe {
     val conf = ConfigFactory.load("test.conf")
   }
 
-  trait DatabaseSpec extends ConfigSpec {
+  trait DatabaseSpec extends UnitSpec with ConfigSpec with BeforeAndAfterAll {
+
+    override def beforeAll(): Unit = {
+      db.connect()
+
+      while (!db.connection.isConnected) { Thread.sleep(10) }
+
+      Await.result(db.connection.sendQuery(Queries.DROP.statement), 1.second)
+      Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
+    }
+
+    override def afterAll() : Unit = {
+      db.disconnect()
+    }
 
     val db = Db(
       Queries.DATABASE.host,
@@ -102,6 +116,10 @@ package object mypipe {
 
     object CREATE {
       val statement = conf.getString("mypipe.test.database.create")
+    }
+
+    object DROP {
+      val statement = conf.getString("mypipe.test.database.drop")
     }
 
     object ALTER {

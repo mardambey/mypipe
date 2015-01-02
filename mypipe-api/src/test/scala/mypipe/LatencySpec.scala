@@ -9,30 +9,18 @@ import mypipe.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import akka.actor.ActorDSL._
 import akka.pattern.ask
-import org.scalatest.BeforeAndAfterAll
 import akka.util.Timeout
 import akka.agent.Agent
 import scala.collection.mutable.ListBuffer
 import org.slf4j.LoggerFactory
 
-class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
+class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   @volatile var connected = false
 
   val log = LoggerFactory.getLogger(getClass)
   val maxLatency = conf.getLong("mypipe.test.max-latency")
   val latencies = ListBuffer[Long]()
-
-  override def beforeAll() {
-    db.connect
-    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1 second)
-  }
-
-  override def afterAll() {
-    try {
-      db.disconnect
-    } catch { case t: Throwable ⇒ }
-  }
 
   implicit val timeout = Timeout(1 second)
 
@@ -148,13 +136,13 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with B
 
     binlogConsumer ! Consume
 
-    while (!connected) Thread.sleep(1)
+    while (!connected) Thread.sleep(10)
 
     insertConsumer ! Consume
     insertProducer ! Insert
 
     while (maxId.get() < 100) {
-      Thread.sleep(1)
+      Thread.sleep(10)
     }
 
     val future = Future.sequence(List(ask(insertProducer, Quit), ask(binlogConsumer, Quit), ask(insertConsumer, Quit)))

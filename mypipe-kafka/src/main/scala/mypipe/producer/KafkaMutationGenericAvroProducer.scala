@@ -1,6 +1,5 @@
 package mypipe.producer
 
-import mypipe.api._
 import com.typesafe.config.Config
 import mypipe.api.data.{ Column, ColumnType }
 import mypipe.api.event.{ DeleteMutation, UpdateMutation, InsertMutation, Mutation }
@@ -10,7 +9,11 @@ import mypipe.kafka.KafkaUtil
 import org.apache.avro.Schema
 import java.lang.{ Long ⇒ JLong }
 import java.util.{ HashMap ⇒ JMap }
-import org.apache.avro.generic.{ GenericData }
+import org.apache.avro.generic.GenericData
+
+object KafkaMutationGenericAvroProducer {
+  def apply(config: Config) = new KafkaMutationGenericAvroProducer(config)
+}
 
 /** An implementation of the base KafkaMutationAvroProducer class that uses a
  *  GenericInMemorySchemaRepo in order to encode mutations as Avro beans.

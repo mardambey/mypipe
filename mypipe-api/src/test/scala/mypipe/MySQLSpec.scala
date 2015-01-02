@@ -10,10 +10,9 @@ import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 
-class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
+class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   val log = LoggerFactory.getLogger(getClass)
-  @volatile var connected = false
 
   val queue = new LinkedBlockingQueue[Mutation[_]]()
   val queueProducer = new QueueProducer(queue)
@@ -21,19 +20,14 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with Bef
   val pipe = new Pipe("test-pipe", List(consumer), queueProducer)
 
   override def beforeAll() {
-
-    db.connect()
+    super.beforeAll()
     pipe.connect()
-
-    while (!db.connection.isConnected || !pipe.isConnected) { Thread.sleep(1) }
-
-    Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
-    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1.second)
+    while (!pipe.isConnected) { Thread.sleep(10) }
   }
 
   override def afterAll() {
     pipe.disconnect()
-    db.disconnect()
+    super.afterAll()
   }
 
   "A binlog consumer" should "properly consume insert events" in withDatabase { db ⇒

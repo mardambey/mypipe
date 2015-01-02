@@ -20,28 +20,23 @@ import org.apache.avro.Schema
 class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
   val log = LoggerFactory.getLogger(getClass)
-  @volatile var connected = false
+
   @volatile var done = false
-  val kafkaProducer = new KafkaMutationGenericAvroProducer(
-    conf.getConfig("mypipe.test.kafka-generic-producer"))
+
+  val kafkaProducer = new KafkaMutationGenericAvroProducer(conf.getConfig("mypipe.test.kafka-generic-producer"))
 
   val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
   val pipe = new Pipe("test-pipe-kafka-generic", List(binlogConsumer), kafkaProducer)
 
   override def beforeAll() {
-
-    db.connect()
     pipe.connect()
-
-    while (!db.connection.isConnected || !pipe.isConnected) { Thread.sleep(10) }
-
-    Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
-    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1.second)
+    super.beforeAll()
+    while (!pipe.isConnected) { Thread.sleep(10) }
   }
 
   override def afterAll() {
     pipe.disconnect()
-    db.disconnect()
+    super.afterAll()
   }
 
   "A generic Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒

@@ -9,19 +9,7 @@ import akka.pattern.ask
 import org.scalatest.BeforeAndAfterAll
 import akka.util.Timeout
 
-class MySQLMetaDataSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
-
-  @volatile var connected = false
-
-  override def beforeAll() {
-    db.connect
-  }
-
-  override def afterAll() {
-    try {
-      db.disconnect
-    } catch { case t: Throwable ⇒ }
-  }
+class MySQLMetaDataSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   implicit val timeout = Timeout(1 second)
 

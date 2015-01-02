@@ -19,8 +19,9 @@ import scala.reflect.runtime.universe._
 class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
   val log = LoggerFactory.getLogger(getClass)
-  @volatile var connected = false
+
   @volatile var done = false
+
   val kafkaProducer = new KafkaMutationSpecificAvroProducer(
     conf.getConfig("mypipe.test.kafka-specific-producer"))
 
@@ -28,19 +29,14 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
   val pipe = new Pipe("test-pipe-kafka-specific", List(binlogConsumer), kafkaProducer)
 
   override def beforeAll() {
-
-    db.connect()
     pipe.connect()
-
-    while (!db.connection.isConnected || !pipe.isConnected) { Thread.sleep(10) }
-
-    Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
-    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1.second)
+    super.beforeAll()
+    while (!pipe.isConnected) { Thread.sleep(10) }
   }
 
   override def afterAll() {
     pipe.disconnect()
-    db.disconnect()
+    super.afterAll()
   }
 
   "A specific Kafka Avro producer and consumer" should "properly produce and consume insert, update, and delete events" in withDatabase { db ⇒

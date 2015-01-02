@@ -13,20 +13,9 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.duration._
 import scala.concurrent.{ Await, Future }
 
-class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
+class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   val log = LoggerFactory.getLogger(getClass)
-
-  override def beforeAll() {
-    db.connect
-    Await.result(db.connection.sendQuery(Queries.TRUNCATE.statement), 1 second)
-  }
-
-  override def afterAll() {
-    try {
-      db.disconnect
-    } catch { case t: Throwable ⇒ }
-  }
 
   implicit val timeout = Timeout(1 second)
 
@@ -49,7 +38,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
       // make an insert
       val insertFuture = db.connection.sendQuery(Queries.INSERT.statement(id = "123"))
-      Await.result(insertFuture, 2000 millis)
+      Await.result(insertFuture, 2000.millis)
 
       val table = queue.poll(10, TimeUnit.SECONDS)
       tableCache.addTableByEvent(TableMapEvent(Long.unbox(table.id), table.name, table.db, table.columns.map(_.colType.value.toByte).toArray))
@@ -62,7 +51,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     }
 
     try {
-      val ret = Await.result(future, 10 seconds)
+      val ret = Await.result(future, 10.seconds)
       assert(ret)
     } catch {
       case e: Exception ⇒ {
@@ -71,7 +60,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       }
     }
 
-    consumer.disconnect
+    consumer.disconnect()
   }
 
   it should "be able to refresh metadata" in {
