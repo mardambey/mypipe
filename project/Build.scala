@@ -8,7 +8,9 @@ object ApplicationBuild extends Build {
       name := "mypipe",
       version := "0.0.1",
       organization := "mypipe",
-      scalaVersion := "2.10.3",
+      scalaVersion := "2.11.2",
+      exportJars := true,
+
       parallelExecution in ThisBuild := false,
       resolvers ++= Seq(Resolver.mavenLocal,
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
@@ -109,10 +111,10 @@ object Dependencies {
   val commonsLang = "commons-lang" % "commons-lang" % "2.6"
   val jsqlParser = "com.github.jsqlparser" % "jsqlparser" % "0.9"
   val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
-  val kafka = "org.apache.kafka" %% "kafka" % "0.8.1" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
+  val kafka = "org.apache.kafka" % "kafka_2.11" % "0.8.2-beta" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
   val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
-  val mysqlAsync = "com.github.mauricio" %% "mysql-async" % "0.2.12"
-  val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.0"
+  val mysqlAsync =  "com.github.mauricio" % "mysql-async_2.11" % "0.2.15"
+  val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.1"
   val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.10.3"
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
