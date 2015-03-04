@@ -18,9 +18,9 @@ object Conf {
 
   val SHUTDOWN_FLUSH_WAIT_SECS = conf.getInt("mypipe.shutdown-wait-time-seconds")
   val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
-  val FLUSH_INTERVAL_SECS = Conf.conf.getInt("mypipe.flush-interval-seconds")
+  val FLUSH_INTERVAL_SECS = conf.getInt("mypipe.flush-interval-seconds")
 
-  val MYSQL_SERVER_ID_PREFIX = Conf.conf.getInt("mypipe.mysql-server-id-prefix")
+  val MYSQL_SERVER_ID_PREFIX = conf.getInt("mypipe.mysql-server-id-prefix")
 
   private val lastBinlogFilePos = scala.collection.concurrent.TrieMap[String, BinaryLogFilePosition]()
 

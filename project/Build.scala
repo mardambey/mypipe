@@ -30,6 +30,7 @@ object ApplicationBuild extends Build {
     logback,
     mysqlAsync,
     mysqlBinlogConnectorJava,
+    scalaCompiler,
     scalaReflect,
     scalaTest,
     typesafeConfig
@@ -55,7 +56,6 @@ object ApplicationBuild extends Build {
 
   val kafkaDependencies = Seq(
     kafka,
-    scalaCompiler,
     scalaTest
   )
 
@@ -118,6 +118,7 @@ object Dependencies {
   val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.1"
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % "2.11.2"
   val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.11.2"
+
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
   val xinject = "javax.inject" % "javax.inject" % "1"
