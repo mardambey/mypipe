@@ -42,7 +42,7 @@ package object mypipe {
       Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
     }
 
-    override def afterAll() : Unit = {
+    override def afterAll(): Unit = {
       db.disconnect()
     }
 
