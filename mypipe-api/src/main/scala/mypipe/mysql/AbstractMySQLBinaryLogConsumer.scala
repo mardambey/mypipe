@@ -114,25 +114,24 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
   def disconnect(): Unit = client.disconnect()
 
-  protected def isMutation(eventType: EventType): Boolean = eventType match {
-    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS |
-      PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS |
-      PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒ true
-    case _ ⇒ false
+  protected def isMutation(eventType: EventType): Boolean = {
+    EventType.isDelete(eventType) ||
+      EventType.isUpdate(eventType) ||
+      EventType.isWrite(eventType)
   }
 
   protected def createMutation(event: MEvent): Mutation[_] = event.getHeader[EventHeader].getEventType match {
-    case PRE_GA_WRITE_ROWS | WRITE_ROWS | EXT_WRITE_ROWS ⇒
+    case eventType if EventType.isWrite(eventType) ⇒
       val evData = event.getData[WriteRowsEventData]()
       val table = getTableById(evData.getTableId)
       InsertMutation(table, createRows(table, evData.getRows))
 
-    case PRE_GA_UPDATE_ROWS | UPDATE_ROWS | EXT_UPDATE_ROWS ⇒
+    case eventType if EventType.isUpdate(eventType) ⇒
       val evData = event.getData[UpdateRowsEventData]()
       val table = getTableById(evData.getTableId)
       UpdateMutation(table, createRowsUpdate(table, evData.getRows))
 
-    case PRE_GA_DELETE_ROWS | DELETE_ROWS | EXT_DELETE_ROWS ⇒
+    case eventType if EventType.isDelete(eventType) ⇒
       val evData = event.getData[DeleteRowsEventData]()
       val table = getTableById(evData.getTableId)
       DeleteMutation(table, createRows(table, evData.getRows))
