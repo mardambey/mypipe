@@ -1,6 +1,9 @@
 package mypipe.api.consumer
 
+import java.util.UUID
+
 import mypipe.api._
+import com.fasterxml.uuid.{ EthernetAddress, Generators }
 
 import mypipe.api.data.Table
 import mypipe.api.event._
@@ -21,7 +24,7 @@ trait BinaryLogConsumer {
   protected def getBinaryLogPosition: Option[BinLogPos]
   protected def getTableById(tableId: java.lang.Long): Table
   protected def handleError(binaryLogEvent: BinLogEvent)
-  protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation[_])
+  protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation)
 
   def binaryLogPosition: Option[BinLogPos]
 }
@@ -36,7 +39,9 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private val listeners = collection.mutable.Set[BinaryLogConsumerListener]()
   private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
-  private val txQueue = new scala.collection.mutable.ListBuffer[Mutation[_]]
+  private val txQueue = new scala.collection.mutable.ListBuffer[Mutation]
+  private val uuidGen = Generators.timeBasedGenerator(EthernetAddress.fromInterface())
+  private var curTxid: Option[UUID] = None
 
   private var transactionInProgress = false
   private var binLogPos: Option[BinaryLogPosition] = None
@@ -54,7 +59,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       case Some(e: AlterEvent)                       ⇒ handleAlter(e)
       case Some(e: TableMapEvent)                    ⇒ handleTableMap(e)
       case Some(e: XidEvent)                         ⇒ handleXid(e)
-      case Some(e: Mutation[_])                      ⇒ handleMutation(e)
+      case Some(e: Mutation)                         ⇒ handleMutation(e)
       case Some(e: UnknownEvent)                     ⇒ true // we move on if the event is unknown to us
       case _                                         ⇒ handleEventDecodeError(binaryLogEvent)
     }
@@ -75,16 +80,17 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     false
   }
 
-  private def handleMutation(mutation: Mutation[_]): Boolean = {
+  private def handleMutation(mutation: Mutation): Boolean = {
     if (transactionInProgress) {
-      txQueue += mutation
+      val i = (curTxid.get)
+      txQueue += mutation.txAware(txid = i)
       true
     } else {
       _handleMutation(mutation) && updateBinaryLogPosition()
     }
   }
 
-  private def _handleMutation(mutation: Mutation[_]): Boolean = {
+  private def _handleMutation(mutation: Mutation): Boolean = {
     val results = listeners.takeWhile(l ⇒
       try {
         l.onMutation(this, mutation)
@@ -112,12 +118,14 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def handleBegin(event: BeginEvent): Boolean = {
     transactionInProgress = true
+    curTxid = Some(uuidGen.generate())
     true
   }
 
   private def handleRollback(event: RollbackEvent): Boolean = {
     txQueue.clear()
     transactionInProgress = false
+    curTxid = None
     updateBinaryLogPosition()
   }
 
@@ -136,6 +144,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       txQueue.foreach(_handleMutation)
       txQueue.clear()
       transactionInProgress = false
+      curTxid = None
     }
 
     true

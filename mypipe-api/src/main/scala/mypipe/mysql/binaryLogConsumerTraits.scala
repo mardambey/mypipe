@@ -6,7 +6,7 @@ import mypipe.api.event.{ Mutation, AlterEvent, TableMapEvent }
 
 trait ConfigBasedErrorHandlingBehaviour extends BinaryLogConsumer {
 
-  protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation[_]) {
+  protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation) {
     // TODO: implement config based error handling
     //  val handlers = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler]("mypipe.")
   }

@@ -104,7 +104,7 @@ abstract class AbstractMySQLBinaryLogConsumer(
     Some(XidEvent(eventData.getXid))
   }
 
-  protected def decodeMutationEvent(event: MEvent): Option[Mutation[_]] = {
+  protected def decodeMutationEvent(event: MEvent): Option[Mutation] = {
     Some(createMutation(event))
   }
 
@@ -120,7 +120,7 @@ abstract class AbstractMySQLBinaryLogConsumer(
       EventType.isWrite(eventType)
   }
 
-  protected def createMutation(event: MEvent): Mutation[_] = event.getHeader[EventHeader].getEventType match {
+  protected def createMutation(event: MEvent): Mutation = event.getHeader[EventHeader].getEventType match {
     case eventType if EventType.isWrite(eventType) ⇒
       val evData = event.getData[WriteRowsEventData]()
       val table = getTableById(evData.getTableId)

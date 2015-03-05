@@ -21,9 +21,9 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
-  override protected def getKafkaTopic(mutation: Mutation[_]): String = KafkaUtil.specificTopic(mutation)
+  override protected def getKafkaTopic(mutation: Mutation): String = KafkaUtil.specificTopic(mutation)
 
-  override protected def avroRecord(mutation: Mutation[_], schema: Schema): List[GenericData.Record] = {
+  override protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record] = {
 
     Mutation.getMagicByte(mutation) match {
       case Mutation.InsertByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], schema)
@@ -41,7 +41,7 @@ class KafkaMutationSpecificAvroProducer(config: Config)
    *  @param mutation
    *  @return returns "mutationDbName_mutationTableName_mutationType" where mutationType is "insert", "update", or "delete"
    */
-  override protected def avroSchemaSubject(mutation: Mutation[_]): String = AvroSchemaUtils.specificSubject(mutation)
+  override protected def avroSchemaSubject(mutation: Mutation): String = AvroSchemaUtils.specificSubject(mutation)
 
   protected def insertOrDeleteMutationToAvro(mutation: SingleValuedMutation, schema: Schema): List[GenericData.Record] = {
 

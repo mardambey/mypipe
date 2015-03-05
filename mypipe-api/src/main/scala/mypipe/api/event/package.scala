@@ -1,5 +1,7 @@
 package mypipe.api
 
+import java.util.UUID
+
 import mypipe.api.data.{ Row, Table }
 
 package object event {
@@ -22,20 +24,21 @@ package object event {
   /** Represents a row change event (Insert, Update, or Delete).
    *
    *  @param table that the row belongs to
-   *  @param rows changes rows
-   *  @tparam T type of the rows
    */
-  sealed abstract class Mutation[T](val table: Table, val rows: T) extends Event
+  sealed abstract class Mutation(val table: Table, val txid: UUID) extends Event {
+    def txAware(txid: UUID): Mutation
+  }
 
   /** Represents a Mutation that holds a single set of values for each row (Insert or Delete, not Update)
    *
    *  @param table which the mutation affects
    *  @param rows which are changed by the mutation
    */
-  class SingleValuedMutation(
+  abstract class SingleValuedMutation(
     override val table: Table,
-    override val rows: List[Row])
-      extends Mutation[List[Row]](table, rows)
+    val rows: List[Row],
+    override val txid: UUID = null)
+      extends Mutation(table, txid)
 
   /** Represents an inserted row.
    *
@@ -44,8 +47,14 @@ package object event {
    */
   case class InsertMutation(
     override val table: Table,
-    override val rows: List[Row])
-      extends SingleValuedMutation(table, rows)
+    override val rows: List[Row],
+    override val txid: UUID = null)
+      extends SingleValuedMutation(table, rows, txid) {
+
+    override def txAware(txid: UUID = null): Mutation = {
+      InsertMutation(table, rows, txid)
+    }
+  }
 
   /** Represents an updated row.
    *  @param table that the row belongs to
@@ -53,8 +62,14 @@ package object event {
    */
   case class UpdateMutation(
     override val table: Table,
-    override val rows: List[(Row, Row)])
-      extends Mutation[List[(Row, Row)]](table, rows)
+    val rows: List[(Row, Row)],
+    override val txid: UUID = null)
+      extends Mutation(table, txid) {
+
+    override def txAware(txid: UUID = null): Mutation = {
+      UpdateMutation(table, rows, txid)
+    }
+  }
 
   /** Represents a deleted row.
    *
@@ -63,8 +78,14 @@ package object event {
    */
   case class DeleteMutation(
     override val table: Table,
-    override val rows: List[Row])
-      extends SingleValuedMutation(table, rows)
+    override val rows: List[Row],
+    override val txid: UUID = null)
+      extends SingleValuedMutation(table, rows, txid) {
+
+    override def txAware(txid: UUID = null): Mutation = {
+      DeleteMutation(table, rows, txid)
+    }
+  }
 
   /** General purpose Mutation helpers.
    */
@@ -88,7 +109,7 @@ package object event {
      *  @param mutation mutation who's type to stringify
      *  @return string representing the mutation's type
      */
-    def typeAsString(mutation: Mutation[_]): String = mutation.getClass match {
+    def typeAsString(mutation: Mutation): String = mutation.getClass match {
       case InsertClass ⇒ InsertString
       case UpdateClass ⇒ UpdateString
       case DeleteClass ⇒ DeleteString
@@ -99,7 +120,7 @@ package object event {
      *  @param mutation mutation who's magic byte we want
      *  @return a magic byte
      */
-    def getMagicByte(mutation: Mutation[_]): Byte = mutation.getClass match {
+    def getMagicByte(mutation: Mutation): Byte = mutation.getClass match {
       case InsertClass ⇒ InsertByte
       case UpdateClass ⇒ UpdateByte
       case DeleteClass ⇒ DeleteByte

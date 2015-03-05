@@ -4,8 +4,8 @@ import com.typesafe.config.Config
 import mypipe.api.event.Mutation
 
 abstract class Producer(config: Config) {
-  def queue(mutation: Mutation[_]): Boolean
-  def queueList(mutation: List[Mutation[_]]): Boolean
+  def queue(mutation: Mutation): Boolean
+  def queueList(mutation: List[Mutation]): Boolean
   def flush(): Boolean
 }
 

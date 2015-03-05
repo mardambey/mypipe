@@ -14,7 +14,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   val log = LoggerFactory.getLogger(getClass)
 
-  val queue = new LinkedBlockingQueue[Mutation[_]]()
+  val queue = new LinkedBlockingQueue[Mutation]()
   val queueProducer = new QueueProducer(queue)
   val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
   val pipe = new Pipe("test-pipe", List(consumer), queueProducer)

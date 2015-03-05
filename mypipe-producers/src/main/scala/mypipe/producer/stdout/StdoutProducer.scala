@@ -20,12 +20,12 @@ class StdoutProducer(config: Config) extends Producer(config) {
     true
   }
 
-  override def queueList(mutationz: List[Mutation[_]]): Boolean = {
+  override def queueList(mutationz: List[Mutation]): Boolean = {
     mutationz.foreach(queue)
     true
   }
 
-  override def queue(mutation: Mutation[_]): Boolean = {
+  override def queue(mutation: Mutation): Boolean = {
     mutation match {
 
       case i: InsertMutation ⇒ {

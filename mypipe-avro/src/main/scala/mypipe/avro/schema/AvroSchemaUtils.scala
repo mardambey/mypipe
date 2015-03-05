@@ -57,7 +57,7 @@ object AvroSchemaUtils {
     }
   }
 
-  def genericSubject(mutation: Mutation[_]): String =
+  def genericSubject(mutation: Mutation): String =
     genericSubject(Mutation.typeAsString(mutation))
 
   def genericSubject(mtype: String): String =
@@ -69,7 +69,7 @@ object AvroSchemaUtils {
    *  @param mutation
    *  @return returns "mutationDbName_mutationTableName_mutationType" where mutationType is "insert", "update", or "delete"
    */
-  def specificSubject(mutation: Mutation[_]): String =
+  def specificSubject(mutation: Mutation): String =
     specificSubject(mutation.table.db, mutation.table.name, Mutation.typeAsString(mutation))
 
   def specificSubject(db: String, table: String, mtype: String): String =

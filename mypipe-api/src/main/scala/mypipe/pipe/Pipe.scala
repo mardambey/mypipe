@@ -50,11 +50,11 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       producer.flush()
     }
 
-    override def onMutation(consumer: BinaryLogConsumer, mutation: Mutation[_]): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer, mutation: Mutation): Boolean = {
       producer.queue(mutation)
     }
 
-    override def onMutation(consumer: BinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer, mutations: Seq[Mutation]): Boolean = {
       producer.queueList(mutations.toList)
     }
   }

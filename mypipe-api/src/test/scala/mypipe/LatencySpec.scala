@@ -26,7 +26,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   val maxId = Agent(0)
   val insertQueue = new LinkedBlockingQueue[(Int, Long)]()
-  val binlogQueue = new LinkedBlockingQueue[Mutation[_]]()
+  val binlogQueue = new LinkedBlockingQueue[Mutation]()
 
   case object Insert
   case object Consume
@@ -69,12 +69,12 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
       val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
 
       consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onMutation(c: BinaryLogConsumer, mutation: Mutation[_]): Boolean = {
+        override def onMutation(c: BinaryLogConsumer, mutation: Mutation): Boolean = {
           queueProducer.queue(mutation)
           true
         }
 
-        override def onMutation(c: BinaryLogConsumer, mutations: Seq[Mutation[_]]): Boolean = {
+        override def onMutation(c: BinaryLogConsumer, mutations: Seq[Mutation]): Boolean = {
           queueProducer.queueList(mutations.toList)
           true
         }

@@ -35,9 +35,9 @@ class KafkaMutationGenericAvroProducer(config: Config)
    */
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
-  override protected def getKafkaTopic(mutation: Mutation[_]): String = KafkaUtil.genericTopic(mutation)
+  override protected def getKafkaTopic(mutation: Mutation): String = KafkaUtil.genericTopic(mutation)
 
-  override protected def avroRecord(mutation: Mutation[_], schema: Schema): List[GenericData.Record] = {
+  override protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record] = {
 
     Mutation.getMagicByte(mutation) match {
 
@@ -74,7 +74,7 @@ class KafkaMutationGenericAvroProducer(config: Config)
   }
 
   protected def body(record: GenericData.Record,
-                     mutation: Mutation[_],
+                     mutation: Mutation,
                      integers: JMap[CharSequence, Integer],
                      strings: JMap[CharSequence, CharSequence],
                      longs: JMap[CharSequence, JLong])(implicit keyOp: String ⇒ String = s ⇒ s) {
@@ -129,5 +129,5 @@ class KafkaMutationGenericAvroProducer(config: Config)
    *  @param mutation
    *  @return
    */
-  override protected def avroSchemaSubject(mutation: Mutation[_]): String = AvroSchemaUtils.genericSubject(mutation)
+  override protected def avroSchemaSubject(mutation: Mutation): String = AvroSchemaUtils.genericSubject(mutation)
 }

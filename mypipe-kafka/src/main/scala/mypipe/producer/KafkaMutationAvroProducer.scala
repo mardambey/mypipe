@@ -41,14 +41,14 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    *  @param mutation
    *  @return the topic name
    */
-  protected def getKafkaTopic(mutation: Mutation[_]): String
+  protected def getKafkaTopic(mutation: Mutation): String
 
   /** Given a mutation, returns the "subject" that this mutation's
    *  Schema is registered under in the Avro schema repository.
    *  @param mutation
    *  @return
    */
-  protected def avroSchemaSubject(mutation: Mutation[_]): String
+  protected def avroSchemaSubject(mutation: Mutation): String
 
   /** Given a schema ID of type SchemaId, converts it to a byte array.
    *
@@ -64,7 +64,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    *  @param schema
    *  @return the Avro generic record(s)
    */
-  protected def avroRecord(mutation: Mutation[_], schema: Schema): List[GenericData.Record]
+  protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record]
 
   override def flush(): Boolean = {
     try {
@@ -83,7 +83,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    *  @param record
    *  @param mutation
    */
-  protected def header(record: GenericData.Record, mutation: Mutation[_]) {
+  protected def header(record: GenericData.Record, mutation: Mutation) {
     record.put("database", mutation.table.db)
     record.put("table", mutation.table.name)
     record.put("tableId", mutation.table.id)
@@ -94,7 +94,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    *  @param mutation
    *  @return
    */
-  protected def magicByte(mutation: Mutation[_]): Byte = Mutation.getMagicByte(mutation)
+  protected def magicByte(mutation: Mutation): Byte = Mutation.getMagicByte(mutation)
 
   /** Given an Avro generic record, schema, and schemaId, serialized
    *  them into an array of bytes.
@@ -117,7 +117,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     out.toByteArray
   }
 
-  override def queueList(inputList: List[Mutation[_]]): Boolean = {
+  override def queueList(inputList: List[Mutation]): Boolean = {
     inputList.foreach(input ⇒ {
       val schemaTopic = avroSchemaSubject(input)
       val mutationType = magicByte(input)
@@ -134,7 +134,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     true
   }
 
-  override def queue(input: Mutation[_]): Boolean = {
+  override def queue(input: Mutation): Boolean = {
     val schemaTopic = avroSchemaSubject(input)
     val mutationType = magicByte(input)
     val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
