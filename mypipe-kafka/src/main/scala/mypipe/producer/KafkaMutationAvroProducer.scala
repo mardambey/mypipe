@@ -1,5 +1,7 @@
 package mypipe.producer
 
+import java.nio.ByteBuffer
+
 import mypipe.api._
 import mypipe.api.event.{ Serializer, Mutation }
 import mypipe.api.producer.Producer
@@ -87,6 +89,14 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     record.put("database", mutation.table.db)
     record.put("table", mutation.table.name)
     record.put("tableId", mutation.table.id)
+
+    // TODO: avoid null check
+    if (mutation.txid != null) {
+      val uuidBytes = ByteBuffer.wrap(new Array[Byte](16))
+      uuidBytes.putLong(mutation.txid.getMostSignificantBits)
+      uuidBytes.putLong(mutation.txid.getLeastSignificantBits)
+      record.put("txid", uuidBytes)
+    }
   }
 
   /** Given a mutation, returns a magic byte that can be associated

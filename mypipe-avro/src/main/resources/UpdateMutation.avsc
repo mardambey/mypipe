@@ -16,6 +16,12 @@
 			"type": "long"
 		},
 		{
+		    "name": "txid",
+		    "type": ["null, "fixed"],
+		    "default": null,
+		    "size": 16
+		},
+		{
 			"name": "old_integers",
 			"type": {"type": "map", "values": "int"}
 		},
