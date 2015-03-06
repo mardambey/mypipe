@@ -10,7 +10,6 @@ object ApplicationBuild extends Build {
       organization := "mypipe",
       scalaVersion := "2.11.2",
       exportJars := true,
-
       parallelExecution in ThisBuild := false,
       resolvers ++= Seq(Resolver.mavenLocal,
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
@@ -92,7 +91,7 @@ object ApplicationBuild extends Build {
     settings = Project.defaultSettings ++ Seq(
       parallelExecution in Test := false,
       libraryDependencies ++= avroDependencies
-    ) ++ Format.settings
+    ) ++ Format.settings ++ AvroCompiler.settingsCompile
   ) dependsOn(api % "compile->compile;test->test")
 
   lazy val mykafka = Project(id = "mykafka",
@@ -100,7 +99,7 @@ object ApplicationBuild extends Build {
     settings = Project.defaultSettings ++ Seq(
       parallelExecution in Test := false,
       libraryDependencies ++= kafkaDependencies
-    ) ++ Format.settings ++ AvroCompiler.settings
+    ) ++ Format.settings ++ AvroCompiler.settingsTest
   ) dependsOn(api % "compile->compile;test->test", myavro)
 }
 
@@ -120,7 +119,6 @@ object Dependencies {
   val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.1.1"
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % "2.11.2"
   val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.11.2"
-
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
   val xinject = "javax.inject" % "javax.inject" % "1"
@@ -129,8 +127,13 @@ object Dependencies {
 object AvroCompiler {
   import sbtavro.SbtAvro._
 
-  lazy val settings = avroSettings ++ Seq(
-    sourceDirectory in avroConfig <<= (sourceDirectory in Test)(_ / "avro")
+  lazy val settingsTest = avroSettings ++ Seq(
+    sourceDirectory in avroConfig <<= (sourceDirectory in Test)(_ / "avro"),
+    version in avroConfig := "1.7.5"
+  )
+
+  lazy val settingsCompile = avroSettings ++ Seq(
+    version in avroConfig := "1.7.5"
   )
 }
 

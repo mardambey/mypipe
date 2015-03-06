@@ -1,0 +1,131 @@
+[
+    {
+      "namespace": "mypipe.avro",
+      "name":"Guid",
+      "type":"fixed",
+      "size":16
+    },
+
+    {
+      "namespace": "mypipe.avro",
+      "type": "record",
+      "name": "InsertMutation",
+      "imports": ["Guid3.avsc"],
+      "fields": [
+    	    {
+    			"name": "database",
+    			"type": "string"
+    		},
+    		{
+    			"name": "table",
+    			"type": "string"
+    		},
+    		{
+    			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    		    "name": "guid",
+    		    "type": "Guid"
+    		},
+    		{
+    			"name": "integers",
+    			"type": {"type": "map", "values": "int"}
+    		},
+    		{
+    			"name": "strings",
+    			"type": {"type": "map", "values": "string"}
+    		},
+    		{
+    			"name": "longs",
+    			"type": {"type": "map", "values": "long"}
+    		}
+    	]
+    },
+
+    {
+      "namespace": "mypipe.avro",
+      "type": "record",
+      "name": "UpdateMutation",
+      "fields": [
+    	    {
+    			"name": "database",
+    			"type": "string"
+    		},
+    		{
+    			"name": "table",
+    			"type": "string"
+    		},
+    		{
+    			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    		    "name": "guid",
+    		    "type": "Guid"
+    		},
+    		{
+    			"name": "old_integers",
+    			"type": {"type": "map", "values": "int"}
+    		},
+    		{
+    			"name": "old_strings",
+    			"type": {"type": "map", "values": "string"}
+    		},
+    		{
+
+    			"name": "old_longs",
+    			"type": {"type": "map", "values": "long"}
+    		},
+    		{
+    			"name": "new_integers",
+    			"type": {"type": "map", "values": "int"}
+    		},
+    		{
+    			"name": "new_strings",
+    			"type": {"type": "map", "values": "string"}
+    		},
+    		{
+
+    			"name": "new_longs",
+    			"type": {"type": "map", "values": "long"}
+    		}
+    	]
+    },
+
+    {
+      "namespace": "mypipe.avro",
+      "type": "record",
+      "name": "DeleteMutation",
+      "fields": [
+    	    {
+    			"name": "database",
+    			"type": "string"
+    		},
+    		{
+    			"name": "table",
+    			"type": "string"
+    		},
+    		{
+    			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    		    "name": "guid",
+    		    "type": "Guid"
+    		},
+    		{
+    			"name": "integers",
+    			"type": {"type": "map", "values": "int"}
+    		},
+    		{
+    			"name": "strings",
+    			"type": {"type": "map", "values": "string"}
+    		},
+    		{
+    			"name": "longs",
+    			"type": {"type": "map", "values": "long"}
+    		}
+    	]
+    }
+]
