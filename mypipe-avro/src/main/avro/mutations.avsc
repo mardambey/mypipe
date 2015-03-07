@@ -10,7 +10,6 @@
       "namespace": "mypipe.avro",
       "type": "record",
       "name": "InsertMutation",
-      "imports": ["Guid3.avsc"],
       "fields": [
     	    {
     			"name": "database",
@@ -25,8 +24,9 @@
     			"type": "long"
     		},
     		{
-    		    "name": "guid",
-    		    "type": "Guid"
+    		    "name": "txid",
+    		    "type": ["null", "Guid"],
+    		    "default": "null"
     		},
     		{
     			"name": "integers",
@@ -61,8 +61,9 @@
     			"type": "long"
     		},
     		{
-    		    "name": "guid",
-    		    "type": "Guid"
+    		    "name": "txid",
+    		    "type": ["null", "Guid"],
+    		    "default": "null"
     		},
     		{
     			"name": "old_integers",
@@ -111,8 +112,9 @@
     			"type": "long"
     		},
     		{
-    		    "name": "guid",
-    		    "type": "Guid"
+    		    "name": "txid",
+    		    "type": ["null", "Guid"],
+    		    "default": "null"
     		},
     		{
     			"name": "integers",

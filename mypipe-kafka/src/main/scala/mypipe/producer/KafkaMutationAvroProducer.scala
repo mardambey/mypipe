@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import mypipe.api._
 import mypipe.api.event.{ Serializer, Mutation }
 import mypipe.api.producer.Producer
+import mypipe.avro.Guid
 import mypipe.kafka.KafkaProducer
 import com.typesafe.config.Config
 import mypipe.avro.schema.{ GenericSchemaRepository }
@@ -91,11 +92,11 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     record.put("tableId", mutation.table.id)
 
     // TODO: avoid null check
-    if (mutation.txid != null) {
+    if (mutation.txid != null && record.getSchema().getField("txid") != null) {
       val uuidBytes = ByteBuffer.wrap(new Array[Byte](16))
       uuidBytes.putLong(mutation.txid.getMostSignificantBits)
       uuidBytes.putLong(mutation.txid.getLeastSignificantBits)
-      record.put("txid", uuidBytes)
+      record.put("txid", new GenericData.Fixed(Guid.getClassSchema, uuidBytes.array))
     }
   }
 
@@ -145,18 +146,22 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
   }
 
   override def queue(input: Mutation): Boolean = {
-    val schemaTopic = avroSchemaSubject(input)
-    val mutationType = magicByte(input)
-    val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
-    val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
-    val records = avroRecord(input, schema)
+    try {
+      val schemaTopic = avroSchemaSubject(input)
+      val mutationType = magicByte(input)
+      val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
+      val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
+      val records = avroRecord(input, schema)
 
-    records foreach (record ⇒ {
-      val bytes = serialize(record, schema, schemaId.get, mutationType)
-      producer.send(getKafkaTopic(input), bytes)
-    })
+      records foreach (record ⇒ {
+        val bytes = serialize(record, schema, schemaId.get, mutationType)
+        producer.send(getKafkaTopic(input), bytes)
+      })
 
-    true
+      true
+    } catch {
+      case e: Exception ⇒ logger.error(s"failed to queue: ${e.getMessage}\n${e.getStackTraceString}"); false
+    }
   }
 
   override def toString(): String = {

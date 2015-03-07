@@ -32,7 +32,7 @@ class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord]()(implicit 
     Some(inputRecordInstance)
   } catch {
     case e: Exception ⇒
-      logger.severe(s"Got an exception while trying to decode a versioned avro event! Exception: ${e.getMessage}\n${e.getStackTraceString}")
+      logger.severe(s"Got an exception while trying to decode a versioned Avro event: ${e.getMessage}: schema=$schema bytes=$bytes\n${e.getStackTraceString}")
       None
   }
 }
