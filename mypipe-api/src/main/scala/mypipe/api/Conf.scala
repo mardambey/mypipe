@@ -28,17 +28,17 @@ object Conf {
     new File(DATADIR).mkdirs()
     new File(LOGDIR).mkdirs()
   } catch {
-    case e: Exception ⇒ println(s"Error while creating data and log dir ${DATADIR}, ${LOGDIR}: ${e.getMessage}")
+    case e: Exception ⇒ println(s"Error while creating data and log dir $DATADIR, $LOGDIR: ${e.getMessage}")
   }
 
-  def binlogGetStatusFilename(hostname: String, port: Int, pipe: String): String = {
-    s"$DATADIR/$pipe-$hostname-$port.pos"
+  def binlogGetStatusFilename(consumerId: String, pipe: String): String = {
+    s"$DATADIR/$pipe-$consumerId.pos"
   }
 
-  def binlogLoadFilePosition(hostname: String, port: Int, pipe: String): Option[BinaryLogFilePosition] = {
+  def binlogLoadFilePosition(consumerId: String, pipeName: String): Option[BinaryLogFilePosition] = {
     try {
 
-      val statusFile = binlogGetStatusFilename(hostname, port, pipe)
+      val statusFile = binlogGetStatusFilename(consumerId, pipeName)
       val filePos = scala.io.Source.fromFile(statusFile).getLines().mkString.split(":")
       Some(BinaryLogFilePosition(filePos(0), filePos(1).toLong))
 
@@ -47,21 +47,20 @@ object Conf {
     }
   }
 
-  def binlogSaveFilePosition(hostname: String, port: Int, filePos: BinaryLogFilePosition, pipe: String) {
+  def binlogSaveFilePosition(consumerId: String, filePos: BinaryLogFilePosition, pipe: String) {
 
-    val key = binlogGetStatusFilename(hostname, port, pipe)
+    val fileName = binlogGetStatusFilename(consumerId, pipe)
 
-    if (!lastBinlogFilePos.getOrElse(key, "").equals(filePos)) {
+    if (!lastBinlogFilePos.getOrElse(fileName, "").equals(filePos)) {
 
-      val fileName = binlogGetStatusFilename(hostname, port, pipe)
       val file = new File(fileName)
       val writer = new PrintWriter(file)
 
-      log.info(s"Saving binlog position for pipe $pipe/$hostname:$port -> $filePos")
+      log.info(s"Saving binlog position for pipe $pipe/$consumerId -> $filePos")
       writer.write(s"${filePos.filename}:${filePos.pos}")
       writer.close()
 
-      lastBinlogFilePos(key) = filePos
+      lastBinlogFilePos(fileName) = filePos
     }
   }
 

@@ -70,14 +70,14 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
     queue.clear()
 
-    val position1 = consumer.binaryLogPosition.get
+    val position1 = consumer.position.get
 
     Await.result(db.connection.sendQuery(Queries.TX.BEGIN), 1.second)
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
 
     queue.poll(10, TimeUnit.SECONDS)
 
-    val position2 = consumer.binaryLogPosition.get
+    val position2 = consumer.position.get
 
     Await.result(db.connection.sendQuery(Queries.TX.COMMIT), 1.second)
 
@@ -85,7 +85,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
     queue.poll(10, TimeUnit.SECONDS)
 
-    val position3 = consumer.binaryLogPosition.get
+    val position3 = consumer.position.get
 
     assert(position1.pos == position2.pos)
     assert(position2.pos < position3.pos)
@@ -95,14 +95,14 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
     queue.clear()
 
-    val position1 = consumer.binaryLogPosition.get
+    val position1 = consumer.position.get
 
     Await.result(db.connection.sendQuery(Queries.TX.BEGIN), 1.second)
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
 
     queue.poll(10, TimeUnit.SECONDS)
 
-    val position2 = consumer.binaryLogPosition.get
+    val position2 = consumer.position.get
 
     Await.result(db.connection.sendQuery(Queries.TX.ROLLBACK), 1.second)
 
@@ -110,7 +110,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
     queue.poll(10, TimeUnit.SECONDS)
 
-    val position3 = consumer.binaryLogPosition.get
+    val position3 = consumer.position.get
 
     assert(position1.pos == position2.pos)
     assert(position2.pos < position3.pos)

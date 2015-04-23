@@ -12,7 +12,7 @@ trait ConfigBasedErrorHandlingBehaviour extends BinaryLogConsumer {
   }
 }
 
-trait CacheableTableMapBehaviour extends BinaryLogConsumer {
+trait CacheableTableMapBehaviour extends AbstractMySQLBinaryLogConsumer {
 
   protected var tableCache = new TableCache(hostname, port, username, password)
 

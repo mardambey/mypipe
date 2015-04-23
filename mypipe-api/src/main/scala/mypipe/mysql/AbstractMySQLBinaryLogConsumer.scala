@@ -14,22 +14,13 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 
 abstract class AbstractMySQLBinaryLogConsumer(
-  override val hostname: String,
-  override val port: Int,
-  username: String,
-  password: String,
-  binlogFileAndPos: BinaryLogFilePosition)
+  protected val hostname: String,
+  protected val port: Int,
+  protected val username: String,
+  protected val password: String)
     extends AbstractBinaryLogConsumer[MEvent, BinaryLogFilePosition] {
 
   protected val client = new BinaryLogClient(hostname, port, username, password)
-
-  if (binlogFileAndPos != BinaryLogFilePosition.current) {
-    log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
-    client.setBinlogFilename(binlogFileAndPos.filename)
-    client.setBinlogPosition(binlogFileAndPos.pos)
-  } else {
-    log.info(s"Using current master binlog position for consuming from $hostname:$port")
-  }
 
   client.setServerId(MySQLServerId.next)
 
@@ -51,6 +42,20 @@ abstract class AbstractMySQLBinaryLogConsumer(
     override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
     override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
   })
+
+  def setBinaryLogPosition(binlogFileAndPos: BinaryLogFilePosition): Unit = {
+    if (binlogFileAndPos != BinaryLogFilePosition.current) {
+      log.info(s"Resuming binlog consumption from file=${binlogFileAndPos.filename} pos=${binlogFileAndPos.pos} for $hostname:$port")
+      client.setBinlogFilename(binlogFileAndPos.filename)
+      client.setBinlogPosition(binlogFileAndPos.pos)
+    } else {
+      log.info(s"Using current master binlog position for consuming from $hostname:$port")
+    }
+  }
+
+  override def id: String = {
+    s"$hostname-$port"
+  }
 
   override def getBinaryLogPosition: Option[BinaryLogFilePosition] = {
     Some(BinaryLogFilePosition(client.getBinlogFilename, client.getBinlogPosition))

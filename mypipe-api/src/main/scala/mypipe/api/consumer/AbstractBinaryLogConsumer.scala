@@ -9,24 +9,28 @@ import mypipe.api.data.Table
 import mypipe.api.event._
 import org.slf4j.LoggerFactory
 
+/** Defines what a log consumer should support for mypipe to use it.
+ */
 trait BinaryLogConsumer {
   type BinLogPos
   type BinLogEvent
 
-  val hostname: String
-  val port: Int
-  val username: String
-  val password: String
-
   protected def decodeEvent(binaryLogEvent: BinLogEvent): Option[Event]
   protected def findTable(event: AlterEvent): Option[Table]
   protected def findTable(event: TableMapEvent): Table
-  protected def getBinaryLogPosition: Option[BinLogPos]
   protected def getTableById(tableId: java.lang.Long): Table
   protected def handleError(binaryLogEvent: BinLogEvent)
   protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation)
 
-  def binaryLogPosition: Option[BinLogPos]
+  /** Gets the log's current position.
+   *  @return current BinLogPos
+   */
+  def getBinaryLogPosition: Option[BinLogPos]
+
+  /** Gets this consumer's unique ID.
+   *  @return Unique ID as a string.
+   */
+  def id: String
 }
 
 abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumer {
@@ -69,7 +73,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       log.error(s"Failed to process event $event from $binaryLogEvent")
 
       if (quitOnEventHandleFailure) {
-        log.error("Failure encountered and asked to quit on event handler failure, disconnecting from {}:{}", hostname, port)
+        log.error("Failure encountered and asked to quit on event handler failure, disconnecting consumer {}", id)
         handleError(binaryLogEvent)
       }
     }
@@ -82,7 +86,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def handleMutation(mutation: Mutation): Boolean = {
     if (transactionInProgress) {
-      val i = (curTxid.get)
+      val i = curTxid.get
       txQueue += mutation.txAware(txid = i)
       true
     } else {
@@ -112,7 +116,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def handleAlter(event: AlterEvent): Boolean = {
     val table = findTable(event)
-    table.map(t ⇒ listeners foreach (l ⇒ l.onTableAlter(this, t)))
+    table.foreach(t ⇒ listeners foreach (l ⇒ l.onTableAlter(this, t)))
     updateBinaryLogPosition()
   }
 
@@ -168,5 +172,5 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     listeners += listener
   }
 
-  def binaryLogPosition: Option[BinaryLogPosition] = binLogPos
+  def position: Option[BinaryLogPosition] = binLogPos
 }

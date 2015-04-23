@@ -30,8 +30,9 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
 
       flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS.seconds,
         Conf.FLUSH_INTERVAL_SECS.seconds) {
-          Conf.binlogSaveFilePosition(consumer.hostname, consumer.port,
-            consumer.binaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
+          Conf.binlogSaveFilePosition(consumer.id,
+            // FIXME: look into this ugly cast
+            consumer.getBinaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
             id)
           // TODO: if flush fails, stop and disconnect
           producer.flush()
@@ -43,9 +44,8 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       _connected = false
       flusher.foreach(_.cancel())
       Conf.binlogSaveFilePosition(
-        consumer.hostname,
-        consumer.port,
-        consumer.binaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
+        consumer.id,
+        consumer.getBinaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
         id)
       producer.flush()
     }
@@ -94,7 +94,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
         c.disconnect()
         t.join(CONSUMER_DISCONNECT_WAIT_SECS * 1000)
       } catch {
-        case e: Exception ⇒ log.error(s"Caught exception while trying to disconnect from ${c.hostname}:${c.port} at binlog position ${c.initialBinlogFileAndPos}.")
+        case e: Exception ⇒ log.error(s"Caught exception while trying to disconnect from $c.id at binlog position $c.getBinaryLogPosition.")
       }
     }
   }

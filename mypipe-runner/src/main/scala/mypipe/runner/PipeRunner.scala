@@ -72,15 +72,20 @@ object PipeRunnerUtil {
       if (enabled) {
 
         val consumers = pipeConf.getStringList("consumers").asScala
-        val consumerInstances = consumers.map(c ⇒ createConsumer(pipeName = name, consumerConfigs(c))).toList
+        val consumerInstances = consumers.map(c ⇒ {
+          val consumer = createConsumer(pipeName = name, consumerConfigs(c))
+          val binlogFileAndPos = Conf.binlogLoadFilePosition(consumer.id, pipeName = name).getOrElse(BinaryLogFilePosition.current)
+          consumer.setBinaryLogPosition(binlogFileAndPos)
+          consumer
+        }).toList
 
         // the following hack assumes a single producer per pipe
-        // since we don't support multiple producers well when
+        // since we don't support multiple producers correctly when
         // tracking offsets (we'll track offsets for the entire
         // pipe and not per producer
         val producers = pipeConf.getObject("producer")
-        val producerName = producers.entrySet().asScala.head.getKey()
-        val producerConfig = pipeConf.getConfig(s"producer.${producerName}")
+        val producerName = producers.entrySet().asScala.head.getKey
+        val producerConfig = pipeConf.getConfig(s"producer.$producerName")
         val producerInstance = createProducer(producerName, producerConfig, producerClasses(producerName))
 
         new Pipe(name, consumerInstances, producerInstance)
@@ -93,8 +98,7 @@ object PipeRunnerUtil {
   }
 
   protected def createConsumer(pipeName: String, params: HostPortUserPass): MySQLBinaryLogConsumer = {
-    val filePos = Conf.binlogLoadFilePosition(params.host, params.port, pipeName).getOrElse(BinaryLogFilePosition.current)
-    val consumer = MySQLBinaryLogConsumer(params.host, params.port, params.user, params.password, filePos)
+    val consumer = MySQLBinaryLogConsumer(params.host, params.port, params.user, params.password)
     consumer
   }
 
@@ -102,15 +106,14 @@ object PipeRunnerUtil {
     try {
       val ctor = clazz.getConstructor(classOf[Config])
 
-      if (ctor == null) throw new NullPointerException("Could not load ctor for class ${clazz}, aborting.")
+      if (ctor == null) throw new NullPointerException(s"Could not load ctor for class $clazz, aborting.")
 
       val producer = ctor.newInstance(config)
       producer
     } catch {
-      case e: Exception ⇒ {
-        log.error(s"Failed to configure producer $id: ${e.getMessage}\n${e.getStackTraceString}")
+      case e: Exception ⇒
+        log.error(s"Failed to configure producer $id: ${e.getMessage}\n${e.getStackTrace.mkString("\n")}")
         null
-      }
     }
   }
 }
