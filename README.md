@@ -1,7 +1,7 @@
 # mypipe
 mypipe latches onto a MySQL server with binary log replication enabled and
 allows for the creation of pipes that can consume the replication stream and
-act on the data.
+act on the data (primarily integrated with Apache Kafka).
 
 # API
 mypipe tries to provide enough information that usually is not part of the
@@ -14,7 +14,6 @@ information (composite, key order), and other such useful information.
 Look at `ColumnType.scala` and `Mutation.scala` for more details.
 
 # Producers
-
 Producers receive MySQL binary log events and act on them. They can funnel
 down to another data store, send them to some service, or just print them
 out to the screen in the case of the stdout producer.
@@ -334,6 +333,13 @@ used by invoking the following command:
 This will consume messages for the given `$database` / `$table` tuple from
 the Kafka cluster specified by the given ZooKeeper ensemble connection
 string and the consumer group ID to use.
+
+# Error Handling
+For now, the user can decide to abort and stop processing using the following flags:
+
+* `quit-on-event-handler-failure`: an event handler failed (commit)
+* `quit-on-event-decode-failure`: mypipe could not decode the event
+* `quit-on-listener-failure`: a specified listener could not process the event
 
 # Tests
 In order to run the tests you need to configure `test.conf` with proper MySQL

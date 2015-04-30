@@ -5,9 +5,7 @@ import mypipe.pipe.Pipe
 
 import scala.concurrent.duration._
 import mypipe._
-import mypipe.api._
 import mypipe.producer.KafkaMutationGenericAvroProducer
-import mypipe.mysql.BinaryLogFilePosition
 import scala.concurrent.{ Future, Await }
 import mypipe.mysql.MySQLBinaryLogConsumer
 import org.scalatest.BeforeAndAfterAll
@@ -25,7 +23,7 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
 
   val kafkaProducer = new KafkaMutationGenericAvroProducer(conf.getConfig("mypipe.test.kafka-generic-producer"))
 
-  val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+  val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
   val pipe = new Pipe("test-pipe-kafka-generic", List(binlogConsumer), kafkaProducer)
 
   override def beforeAll() {

@@ -66,7 +66,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     val binlogConsumer = actor(new Act {
 
       val queueProducer = new QueueProducer(binlogQueue)
-      val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+      val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
 
       consumer.registerListener(new BinaryLogConsumerListener() {
         override def onMutation(c: BinaryLogConsumer, mutation: Mutation): Boolean = {

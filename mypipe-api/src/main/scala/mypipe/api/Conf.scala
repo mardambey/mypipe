@@ -17,8 +17,14 @@ object Conf {
   val LOGDIR = conf.getString("mypipe.log-dir")
 
   val SHUTDOWN_FLUSH_WAIT_SECS = conf.getInt("mypipe.shutdown-wait-time-seconds")
-  val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
   val FLUSH_INTERVAL_SECS = conf.getInt("mypipe.flush-interval-seconds")
+
+  val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
+
+  val QUIT_ON_LISTENER_FAILURE = conf.getBoolean("mypipe.quit-on-listener-failure")
+  val QUIT_ON_EVENT_DECODE_FAILURE = conf.getBoolean("mypipe.quit-on-event-decode-failure")
+  val QUIT_ON_EVENT_HANDLER_FAILURE = conf.getBoolean("mypipe.quit-on-event-handler-failure")
+  val LISTENER_FAIL_FAST = conf.getBoolean("mypipe.quit-on-listener-failure")
 
   val MYSQL_SERVER_ID_PREFIX = conf.getInt("mypipe.mysql-server-id-prefix")
 

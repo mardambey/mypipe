@@ -17,10 +17,10 @@ trait BinaryLogConsumer {
 
   protected def decodeEvent(binaryLogEvent: BinLogEvent): Option[Event]
   protected def findTable(event: AlterEvent): Option[Table]
-  protected def findTable(event: TableMapEvent): Table
-  protected def getTableById(tableId: java.lang.Long): Table
-  protected def handleError(binaryLogEvent: BinLogEvent)
-  protected def handleError(listener: BinaryLogConsumerListener, mutation: Mutation)
+  protected def findTable(event: TableMapEvent): Option[Table]
+  protected def getTableById(tableId: java.lang.Long): Option[Table]
+
+  protected def disconnect(): Unit
 
   /** Gets the log's current position.
    *  @return current BinLogPos
@@ -38,8 +38,16 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   type BinLogPos = BinaryLogPosition
   type BinLogEvent = BinaryLogEvent
 
-  // TODO: make this configurable
-  private val quitOnEventHandleFailure = true
+  // abstract functions
+  protected def handleEventError(event: Option[Event], binaryLogEvent: BinaryLogEvent): Boolean
+  protected def handleMutationError(listeners: List[BinaryLogConsumerListener], listener: BinaryLogConsumerListener)(mutation: Mutation): Boolean
+  protected def handleTableMapError(listeners: List[BinaryLogConsumerListener], listener: BinaryLogConsumerListener)(table: Table, event: TableMapEvent): Boolean
+  protected def handleAlterError(listeners: List[BinaryLogConsumerListener], listener: BinaryLogConsumerListener)(table: Table, event: AlterEvent): Boolean
+  protected def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean
+  protected def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean
+
+  // TODO: make these configurable
+  private val listenerFailFast = Conf.LISTENER_FAIL_FAST
 
   private val listeners = collection.mutable.Set[BinaryLogConsumerListener]()
   private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
@@ -57,6 +65,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
     val success = event match {
 
+      // TODO: each of the following cases that can fail needs it's own error handler
       case Some(e: BeginEvent) if groupEventsByTx    ⇒ handleBegin(e)
       case Some(e: CommitEvent) if groupEventsByTx   ⇒ handleCommit(e)
       case Some(e: RollbackEvent) if groupEventsByTx ⇒ handleRollback(e)
@@ -64,24 +73,24 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       case Some(e: TableMapEvent)                    ⇒ handleTableMap(e)
       case Some(e: XidEvent)                         ⇒ handleXid(e)
       case Some(e: Mutation)                         ⇒ handleMutation(e)
-      case Some(e: UnknownEvent)                     ⇒ true // we move on if the event is unknown to us
-      case _                                         ⇒ handleEventDecodeError(binaryLogEvent)
+      // we move on if the event is unknown to us
+      case Some(e: UnknownEvent)                     ⇒
+        log.debug("Could not process unknown event: {}", e); true
+      // TODO: this is going to be the only error handler accepting the 3rd party event; allow the user to override?
+      case None                                      ⇒ handleEventDecodeError(binaryLogEvent)
     }
 
     if (!success) {
+      log.error(s"Consumer $id failed to process event $event from $binaryLogEvent")
 
-      log.error(s"Failed to process event $event from $binaryLogEvent")
-
-      if (quitOnEventHandleFailure) {
-        log.error("Failure encountered and asked to quit on event handler failure, disconnecting consumer {}", id)
-        handleError(binaryLogEvent)
-      }
+      if (!handleEventError(event, binaryLogEvent))
+        _disconnect()
     }
   }
 
-  private def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean = {
-    log.trace("Event ignored {}", binaryLogEvent)
-    false
+  private def _disconnect(): Unit = {
+    disconnect()
+    listeners foreach (l ⇒ l.onDisconnect(this))
   }
 
   private def handleMutation(mutation: Mutation): Boolean = {
@@ -95,32 +104,39 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   }
 
   private def _handleMutation(mutation: Mutation): Boolean = {
-    val results = listeners.takeWhile(l ⇒
-      try {
-        l.onMutation(this, mutation)
-      } catch {
-        case e: Exception ⇒
-          handleError(l, mutation)
-          false
-      })
 
-    if (results.size == listeners.size) true
-    else false
+    processList[BinaryLogConsumerListener](
+      listeners.toList,
+      op = _.onMutation(this, mutation),
+      onError = handleMutationError(_, _)(mutation))
   }
 
   private def handleTableMap(event: TableMapEvent): Boolean = {
-    val table = findTable(event)
-    listeners.foreach(_.onTableMap(this, table))
-    updateBinaryLogPosition()
+
+    val success = findTable(event).exists(table ⇒ {
+      processList[BinaryLogConsumerListener](
+        listeners.toList,
+        op = _.onTableMap(this, table),
+        onError = handleTableMapError(_, _)(table, event))
+    })
+
+    success && updateBinaryLogPosition()
   }
 
   private def handleAlter(event: AlterEvent): Boolean = {
-    val table = findTable(event)
-    table.foreach(t ⇒ listeners foreach (l ⇒ l.onTableAlter(this, t)))
-    updateBinaryLogPosition()
+
+    val success = findTable(event).exists(table ⇒ {
+      processList[BinaryLogConsumerListener](
+        listeners.toList,
+        op = _.onTableAlter(this, table),
+        onError = handleAlterError(_, _)(table, event))
+    })
+
+    success && updateBinaryLogPosition()
   }
 
   private def handleBegin(event: BeginEvent): Boolean = {
+    log.debug("Handling begin event {}", event)
     transactionInProgress = true
     curTxid = Some(uuidGen.generate())
     true
@@ -134,6 +150,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   }
 
   private def handleCommit(event: CommitEvent): Boolean = {
+    log.debug("Handling commit event {}", event)
     commit() && updateBinaryLogPosition()
   }
 
@@ -142,25 +159,44 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   }
 
   private def commit(): Boolean = {
-    // TODO: take care of _handleMutation's listeners returning false
-
     if (txQueue.nonEmpty) {
-      txQueue.foreach(_handleMutation)
+
+      val success = processList[Mutation](txQueue.toList,
+        op = _handleMutation,
+        onError = handleCommitError)
+
       txQueue.clear()
       transactionInProgress = false
       curTxid = None
+      success
+    } else {
+      false
     }
+  }
 
-    true
+  // TODO: move this to a util
+  def processList[T](list: List[T],
+                     op: (T) ⇒ Boolean,
+                     onError: (List[T], T) ⇒ Boolean): Boolean = {
+
+    list.forall(item ⇒ {
+      val res = try { op(item) } catch {
+        case e: Exception ⇒
+          log.error("Unhandled exception while processing list", e)
+          onError(list, item)
+      }
+
+      if (!res) {
+        // fail-fast if the error handler returns false
+        onError(list, item)
+      } else true
+
+    })
   }
 
   private def updateBinaryLogPosition(): Boolean = {
     binLogPos = getBinaryLogPosition
     binLogPos != None
-  }
-
-  protected def handleDisconnect() {
-    listeners foreach (l ⇒ l.onDisconnect(this))
   }
 
   protected def handleConnect() {

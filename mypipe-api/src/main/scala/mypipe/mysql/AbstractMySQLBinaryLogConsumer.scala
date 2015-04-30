@@ -32,7 +32,8 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
   client.registerLifecycleListener(new LifecycleListener {
     override def onDisconnect(client: BinaryLogClient): Unit = {
-      handleDisconnect()
+      // FIXME: call this properly
+      //handleDisconnect()
     }
 
     override def onConnect(client: BinaryLogClient) {
@@ -59,11 +60,6 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
   override def getBinaryLogPosition: Option[BinaryLogFilePosition] = {
     Some(BinaryLogFilePosition(client.getBinlogFilename, client.getBinlogPosition))
-  }
-
-  override protected def handleError(event: MEvent): Unit = {
-    // FIXME: we need better error handling
-    client.disconnect()
   }
 
   override protected def decodeEvent(event: MEvent): Option[Event] = {
@@ -97,10 +93,28 @@ abstract class AbstractMySQLBinaryLogConsumer(
       case q if q.indexOf("rollback") == 0 ⇒
         Some(RollbackEvent(queryEventData.getDatabase, queryEventData.getSql))
       case q if q.indexOf("alter") == 0 ⇒
-        Some(AlterEvent(queryEventData.getDatabase, queryEventData.getSql))
+        val database = {
+          if (!queryEventData.getDatabase.isEmpty) queryEventData.getDatabase
+          else decodeDatabaseFromAlter(queryEventData.getSql)
+        }
+
+        Some(AlterEvent(database, queryEventData.getSql))
       case q ⇒
         log.trace("ignoring query={}", q)
         Some(UnknownEvent(queryEventData.getDatabase, queryEventData.getSql))
+    }
+  }
+
+  private def decodeDatabaseFromAlter(sql: String): String = {
+    // FIXME: this sucks, parse properly, not "by hand"
+    val tokens = sql.split("""\s""")
+
+    if (tokens.size > 3 && tokens(1).toLowerCase == "table" && tokens(2).contains(".")) {
+      tokens(2).split("""\.""").head
+    } else {
+      // we could not find a database name, this is not good
+      log.error("Could not find database for query: {}", sql)
+      ""
     }
   }
 
@@ -128,17 +142,20 @@ abstract class AbstractMySQLBinaryLogConsumer(
   protected def createMutation(event: MEvent): Mutation = event.getHeader[EventHeader].getEventType match {
     case eventType if EventType.isWrite(eventType) ⇒
       val evData = event.getData[WriteRowsEventData]()
-      val table = getTableById(evData.getTableId)
+      // FIXME: handle table being None
+      val table = getTableById(evData.getTableId).get
       InsertMutation(table, createRows(table, evData.getRows))
 
     case eventType if EventType.isUpdate(eventType) ⇒
       val evData = event.getData[UpdateRowsEventData]()
-      val table = getTableById(evData.getTableId)
+      // FIXME: handle table being None
+      val table = getTableById(evData.getTableId).get
       UpdateMutation(table, createRowsUpdate(table, evData.getRows))
 
     case eventType if EventType.isDelete(eventType) ⇒
       val evData = event.getData[DeleteRowsEventData]()
-      val table = getTableById(evData.getTableId)
+      // FIXME: handle table being None
+      val table = getTableById(evData.getTableId).get
       DeleteMutation(table, createRows(table, evData.getRows))
   }
 

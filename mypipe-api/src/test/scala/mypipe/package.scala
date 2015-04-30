@@ -10,7 +10,7 @@ package object mypipe {
 
   case class Db(hostname: String, port: Int, username: String, password: String, dbName: String) {
 
-    private val configuration = new Configuration(username, hostname, port, Some(password), Some(dbName))
+    private val configuration = new Configuration(username, hostname, port, Some(password))
     var connection: Connection = _
 
     def connect(): Unit = connect(timeoutMillis = 5000)
@@ -18,6 +18,9 @@ package object mypipe {
       connection = new MySQLConnection(configuration)
       val future = connection.connect
       Await.result(future, timeoutMillis.millis)
+    }
+
+    def select(db: String): Unit = {
     }
 
     def disconnect(): Unit = disconnect(timeoutMillis = 5000)
@@ -33,25 +36,32 @@ package object mypipe {
 
   trait DatabaseSpec extends UnitSpec with ConfigSpec with BeforeAndAfterAll {
 
-    override def beforeAll(): Unit = {
-      db.connect()
-
-      while (!db.connection.isConnected) { Thread.sleep(10) }
-
-      Await.result(db.connection.sendQuery(Queries.DROP.statement), 1.second)
-      Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
-    }
-
-    override def afterAll(): Unit = {
-      db.disconnect()
-    }
-
     val db = Db(
       Queries.DATABASE.host,
       Queries.DATABASE.port,
       Queries.DATABASE.username,
       Queries.DATABASE.password,
       Queries.DATABASE.name)
+
+    override def beforeAll(): Unit = {
+      db.connect()
+
+      while (!db.connection.isConnected) { Thread.sleep(10) }
+
+      try {
+        Await.result(db.connection.sendQuery(Queries.DROPDB.statement), 1.second)
+        Await.result(db.connection.sendQuery(Queries.CREATEDB.statement), 1.second)
+        Await.result(db.connection.sendQuery(Queries.DROP.statement), 1.second)
+        Await.result(db.connection.sendQuery(Queries.CREATE.statement), 1.second)
+      } catch {
+        case e: Exception ⇒ println(s"Could not initialize database for tests ${e.getMessage}\n${e.getStackTrace.mkString("\n")}")
+      }
+    }
+
+    override def afterAll(): Unit = {
+
+      db.disconnect()
+    }
 
     def withDatabase(testCode: Db ⇒ Any) {
       try {
@@ -97,29 +107,37 @@ package object mypipe {
 
       def statement: String = statement()
       def statement(id: String = "NULL", username: String = this.username, password: String = this.password, loginCount: Int = this.loginCount): String =
-        s"""INSERT INTO user (id, username, password, login_count) values ($id, "$username", "$password", $loginCount)"""
+        s"""INSERT INTO mypipe.user (id, username, password, login_count) values ($id, "$username", "$password", $loginCount)"""
     }
 
     object UPDATE {
       val username = "username2"
       val password = "password2"
-      lazy val statement = s"""UPDATE user set username = "$username", password = "$password", login_count = login_count + 1"""
+      lazy val statement = s"""UPDATE mypipe.user set username = "$username", password = "$password", login_count = login_count + 1"""
     }
 
     object TRUNCATE {
-      val statement = """TRUNCATE user"""
+      val statement = """TRUNCATE mypipe.user"""
     }
 
     object DELETE {
-      val statement = """DELETE from user"""
+      val statement = """DELETE from mypipe.user"""
+    }
+
+    object CREATEDB {
+      val statement = conf.getString("mypipe.test.database.create.db")
+    }
+
+    object DROPDB {
+      val statement = conf.getString("mypipe.test.database.drop.db")
     }
 
     object CREATE {
-      val statement = conf.getString("mypipe.test.database.create")
+      val statement = conf.getString("mypipe.test.database.create.table")
     }
 
     object DROP {
-      val statement = conf.getString("mypipe.test.database.drop")
+      val statement = conf.getString("mypipe.test.database.drop.table")
     }
 
     object ALTER {

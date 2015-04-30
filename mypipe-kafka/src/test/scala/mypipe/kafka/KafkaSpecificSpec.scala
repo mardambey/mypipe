@@ -1,10 +1,11 @@
 package mypipe.kafka
 
 import mypipe._
+
 import mypipe.api.event.Mutation
 import mypipe.avro.{ AvroVersionedRecordDeserializer, InMemorySchemaRepo }
 import mypipe.avro.schema.{ AvroSchemaUtils, ShortSchemaId, AvroSchema, GenericSchemaRepository }
-import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition }
+import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
 import mypipe.producer.KafkaMutationSpecificAvroProducer
 import org.apache.avro.Schema
@@ -25,7 +26,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
   val kafkaProducer = new KafkaMutationSpecificAvroProducer(
     conf.getConfig("mypipe.test.kafka-specific-producer"))
 
-  val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+  val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
   val pipe = new Pipe("test-pipe-kafka-specific", List(binlogConsumer), kafkaProducer)
 
   override def beforeAll() {

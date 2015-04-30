@@ -8,7 +8,7 @@ trait BinaryLogConsumerListener {
   def onDisconnect(consumer: BinaryLogConsumer) {}
   def onMutation(consumer: BinaryLogConsumer, mutation: Mutation): Boolean = true
   def onMutation(consumer: BinaryLogConsumer, mutations: Seq[Mutation]): Boolean = true
-  def onTableMap(consumer: BinaryLogConsumer, table: Table) {}
-  def onTableAlter(consumer: BinaryLogConsumer, table: Table) {}
+  def onTableMap(consumer: BinaryLogConsumer, table: Table): Boolean = true
+  def onTableAlter(consumer: BinaryLogConsumer, table: Table): Boolean = true
 }
 

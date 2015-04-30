@@ -16,7 +16,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   val queue = new LinkedBlockingQueue[Mutation]()
   val queueProducer = new QueueProducer(queue)
-  val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password, BinaryLogFilePosition.current)
+  val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
   val pipe = new Pipe("test-pipe", List(consumer), queueProducer)
 
   override def beforeAll() {

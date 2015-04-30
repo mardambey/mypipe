@@ -150,7 +150,15 @@ declare -a extra_jvm_opts extra_sbt_opts
 [[ -e "$JAVA_HOME/bin/java" ]] && java_cmd="$JAVA_HOME/bin/java"
 
 # directory to store sbt launchers
-declare sbt_launch_dir="$HOME/.sbt/launchers"
+case $(uname -o) in
+	"Cygwin")
+		declare sbt_launch_dir="$USERPROFILE/.sbt/launchers"
+		;;
+	*)
+		declare sbt_launch_dir="$HOME/.sbt/launchers"
+		;;
+esac
+
 [[ -d "$sbt_launch_dir" ]] || mkdir -p "$sbt_launch_dir"
 [[ -w "$sbt_launch_dir" ]] || sbt_launch_dir="$(mktemp -d -t sbt_extras_launchers)"
 
