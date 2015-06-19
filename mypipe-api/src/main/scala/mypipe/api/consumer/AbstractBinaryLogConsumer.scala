@@ -74,10 +74,10 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       case Some(e: XidEvent)                         ⇒ handleXid(e)
       case Some(e: Mutation)                         ⇒ handleMutation(e)
       // we move on if the event is unknown to us
-      case Some(e: UnknownEvent)                     ⇒
+      case Some(e: UnknownEvent) ⇒
         log.debug("Could not process unknown event: {}", e); true
       // TODO: this is going to be the only error handler accepting the 3rd party event; allow the user to override?
-      case None                                      ⇒ handleEventDecodeError(binaryLogEvent)
+      case None ⇒ handleEventDecodeError(binaryLogEvent)
     }
 
     if (!success) {
