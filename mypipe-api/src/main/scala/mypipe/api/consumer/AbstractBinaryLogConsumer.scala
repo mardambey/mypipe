@@ -15,14 +15,39 @@ trait BinaryLogConsumer {
   type BinLogPos
   type BinLogEvent
 
+  /** Given a third-party BinLogEvent, this method decodes it to an
+   *  mypipe specific Event type if it recognizes it.
+   *  @param binaryLogEvent third-party BinLogEvent to decode
+   *  @return the decoded Event or None
+   */
   protected def decodeEvent(binaryLogEvent: BinLogEvent): Option[Event]
-  protected def findTable(event: AlterEvent): Option[Table]
-  protected def findTable(event: TableMapEvent): Option[Table]
-  protected def getTableById(tableId: java.lang.Long): Option[Table]
 
+  /** Given an AlterTable event, returns a valid Table instance
+   *  if possible.
+   *  @param event the AlterEvent who's database and table will be used to build the Table
+   *  @return a Table instance or None if not possible
+   */
+  protected def findTable(event: AlterEvent): Option[Table]
+
+  /** Given an TableMapEvent event, returns a valid Table instance
+   *  if possible.
+   *  @param event the TableMapEvent who's database, table name, and table ID will be used to build the Table
+   *  @return a Table instance or None if not possible
+   */
+  protected def findTable(event: TableMapEvent): Option[Table]
+
+  /** Given an table ID, returns a valid Table instance
+   *  if possible.
+   *  @param tableId the table ID to find a Table for
+   *  @return a Table instance or None if not possible
+   */
+  protected def findTable(tableId: java.lang.Long): Option[Table]
+
+  /** Disconnects the consumer from it's source.
+   */
   protected def disconnect(): Unit
 
-  /** Gets the log's current position.
+  /** Gets the consumer's current position in the binary log.
    *  @return current BinLogPos
    */
   def getBinaryLogPosition: Option[BinLogPos]
@@ -106,8 +131,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   private def _handleMutation(mutation: Mutation): Boolean = {
 
     processList[BinaryLogConsumerListener](
-      listeners.toList,
-      op = _.onMutation(this, mutation),
+      list = listeners.toList,
+      listOp = _.onMutation(this, mutation),
       onError = handleMutationError(_, _)(mutation))
   }
 
@@ -115,8 +140,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
     val success = findTable(event).exists(table ⇒ {
       processList[BinaryLogConsumerListener](
-        listeners.toList,
-        op = _.onTableMap(this, table),
+        list = listeners.toList,
+        listOp = _.onTableMap(this, table),
         onError = handleTableMapError(_, _)(table, event))
     })
 
@@ -127,8 +152,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
     val success = findTable(event).exists(table ⇒ {
       processList[BinaryLogConsumerListener](
-        listeners.toList,
-        op = _.onTableAlter(this, table),
+        list = listeners.toList,
+        listOp = _.onTableAlter(this, table),
         onError = handleAlterError(_, _)(table, event))
     })
 
@@ -161,8 +186,9 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   private def commit(): Boolean = {
     if (txQueue.nonEmpty) {
 
-      val success = processList[Mutation](txQueue.toList,
-        op = _handleMutation,
+      val success = processList[Mutation](
+        list = txQueue.toList,
+        listOp = _handleMutation,
         onError = handleCommitError)
 
       txQueue.clear()
@@ -176,11 +202,11 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   // TODO: move this to a util
   def processList[T](list: List[T],
-                     op: (T) ⇒ Boolean,
+                     listOp: (T) ⇒ Boolean,
                      onError: (List[T], T) ⇒ Boolean): Boolean = {
 
     list.forall(item ⇒ {
-      val res = try { op(item) } catch {
+      val res = try { listOp(item) } catch {
         case e: Exception ⇒
           log.error("Unhandled exception while processing list", e)
           onError(list, item)

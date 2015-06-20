@@ -11,7 +11,7 @@ import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 
-/** A cache for tables who's metadata needs to be looked up against
+/** A cache for tables whose metadata needs to be looked up against
  *  the database in order to determine column and key structure.
  *
  *  @param hostname of the database

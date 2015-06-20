@@ -143,19 +143,19 @@ abstract class AbstractMySQLBinaryLogConsumer(
     case eventType if EventType.isWrite(eventType) ⇒
       val evData = event.getData[WriteRowsEventData]()
       // FIXME: handle table being None
-      val table = getTableById(evData.getTableId).get
+      val table = findTable(evData.getTableId).get
       InsertMutation(table, createRows(table, evData.getRows))
 
     case eventType if EventType.isUpdate(eventType) ⇒
       val evData = event.getData[UpdateRowsEventData]()
       // FIXME: handle table being None
-      val table = getTableById(evData.getTableId).get
+      val table = findTable(evData.getTableId).get
       UpdateMutation(table, createRowsUpdate(table, evData.getRows))
 
     case eventType if EventType.isDelete(eventType) ⇒
       val evData = event.getData[DeleteRowsEventData]()
       // FIXME: handle table being None
-      val table = getTableById(evData.getTableId).get
+      val table = findTable(evData.getTableId).get
       DeleteMutation(table, createRows(table, evData.getRows))
   }
 

@@ -55,7 +55,7 @@ trait CacheableTableMapBehaviour extends AbstractMySQLBinaryLogConsumer {
     Some(table)
   }
 
-  protected def getTableById(tableId: java.lang.Long): Option[Table] =
+  protected def findTable(tableId: java.lang.Long): Option[Table] =
     tableCache.getTable(tableId)
 
   protected def findTable(event: AlterEvent): Option[Table] = {
