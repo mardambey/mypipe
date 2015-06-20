@@ -13,6 +13,7 @@ import akka.util.Timeout
 import akka.agent.Agent
 import scala.collection.mutable.ListBuffer
 import org.slf4j.LoggerFactory
+import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
 
 class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
@@ -68,18 +69,18 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
       val queueProducer = new QueueProducer(binlogQueue)
       val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
 
-      consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onMutation(c: BinaryLogConsumer, mutation: Mutation): Boolean = {
+      consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
+        override def onMutation(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutation: Mutation): Boolean = {
           queueProducer.queue(mutation)
           true
         }
 
-        override def onMutation(c: BinaryLogConsumer, mutations: Seq[Mutation]): Boolean = {
+        override def onMutation(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutations: Seq[Mutation]): Boolean = {
           queueProducer.queueList(mutations.toList)
           true
         }
 
-        override def onConnect(c: BinaryLogConsumer) { connected = true }
+        override def onConnect(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) { connected = true }
       })
 
       val f = Future { consumer.connect() }

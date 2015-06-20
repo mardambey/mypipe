@@ -335,11 +335,28 @@ the Kafka cluster specified by the given ZooKeeper ensemble connection
 string and the consumer group ID to use.
 
 # Error Handling
-For now, the user can decide to abort and stop processing using the following flags:
+If the default configuration based error handler is used:
+
+    mypipe.error-handler { default { class = "mypipe.mysql.ConfigBasedErrorHandler" } }
+
+then user can decide to abort and stop processing using the following flags:
 
 * `quit-on-event-handler-failure`: an event handler failed (commit)
 * `quit-on-event-decode-failure`: mypipe could not decode the event
 * `quit-on-listener-failure`: a specified listener could not process the event
+
+Errors are handled as such:
+
+* The first handler deals with event decoding errors (ie: mypipe can not determine the event type and decode it).
+* The second layer of error handlers deals with specific event errors, for example: mutation, alter, table map, commit.
+* The third and final layer is the global error handler.
+
+Error handler invocation:
+
+* If the first layer or second layer are invoked and they return true, the next event will be consumed and the global error handler is not called.
+* If the first layer or second layer are invoked and they return false, then the third layer (global error handler) is invoked, otherwise, processing of the next event continues
+
+A custom error handler can also be provided if available in the classpath.
 
 # Tests
 In order to run the tests you need to configure `test.conf` with proper MySQL

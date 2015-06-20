@@ -8,6 +8,8 @@ import mypipe.api.producer.Producer
 import mypipe.mysql._
 import org.slf4j.LoggerFactory
 
+import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent }
+
 import scala.concurrent.duration._
 
 class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Producer) {
@@ -21,9 +23,9 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
   protected var threads = List.empty[Thread]
   protected var flusher: Option[Cancellable] = None
 
-  protected val listener = new BinaryLogConsumerListener() {
+  protected val listener = new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
 
-    override def onConnect(consumer: BinaryLogConsumer) {
+    override def onConnect(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) {
       log.info(s"Pipe $id connected!")
 
       _connected = true
@@ -39,22 +41,22 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
         })
     }
 
-    override def onDisconnect(consumer: BinaryLogConsumer) {
+    override def onDisconnect(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
       Conf.binlogSaveFilePosition(
         consumer.id,
-        consumer.getBinaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
+        consumer.getBinaryLogPosition.get,
         id)
       producer.flush()
     }
 
-    override def onMutation(consumer: BinaryLogConsumer, mutation: Mutation): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutation: Mutation): Boolean = {
       producer.queue(mutation)
     }
 
-    override def onMutation(consumer: BinaryLogConsumer, mutations: Seq[Mutation]): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutations: Seq[Mutation]): Boolean = {
       producer.queueList(mutations.toList)
     }
   }

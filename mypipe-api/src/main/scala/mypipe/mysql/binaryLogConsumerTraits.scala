@@ -1,46 +1,69 @@
 package mypipe.mysql
 
 import mypipe.api.Conf
-import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
+import mypipe.api.consumer.{ BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event.{ Event, Mutation, AlterEvent, TableMapEvent }
 import org.slf4j.LoggerFactory
 
-trait ConfigBasedErrorHandlingBehaviour extends BinaryLogConsumer {
+trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] {
 
+  val handler = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition]]("mypipe.error-handler")
+    .headOption
+    .map(_._2.newInstance())
+
+  def handleEventError(event: Option[Event], binaryLogEvent: BinaryLogEvent): Boolean =
+    handler.exists(_.handleEventError(event, binaryLogEvent))
+
+  def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean =
+    handler.exists(_.handleMutationError(listeners, listener)(mutation))
+
+  def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean =
+    handler.exists(_.handleTableMapError(listeners, listener)(table, event))
+
+  def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: AlterEvent): Boolean =
+    handler.exists(_.handleAlterError(listeners, listener)(table, event))
+
+  def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean =
+    handler.exists(_.handleCommitError(mutationList, faultyMutation))
+
+  def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean =
+    handler.exists(_.handleEventDecodeError(binaryLogEvent))
+}
+
+class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] {
   private val log = LoggerFactory.getLogger(getClass)
 
   private val quitOnEventHandlerFailure = Conf.QUIT_ON_EVENT_HANDLER_FAILURE
   private val quitOnEventDecodeFailure = Conf.QUIT_ON_EVENT_DECODE_FAILURE
   private val quitOnEventListenerFailure = Conf.QUIT_ON_LISTENER_FAILURE
-  //  val handlers = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler]("mypipe.")
 
-  protected def handleEventError(event: Option[Event], binaryLogEvent: BinLogEvent): Boolean = {
+  def handleEventError(event: Option[Event], binaryLogEvent: BinaryLogEvent): Boolean = {
     log.error("Could not handle event {} from raw event {}", event, binaryLogEvent)
     !quitOnEventHandlerFailure
   }
 
-  protected def handleMutationError(listeners: List[BinaryLogConsumerListener], listener: BinaryLogConsumerListener)(mutation: Mutation): Boolean = {
+  def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean = {
     log.error("Could not handle mutation {} from listener {}", mutation.asInstanceOf[Any], listener)
     !quitOnEventListenerFailure
   }
 
-  protected def handleTableMapError(listeners: List[BinaryLogConsumerListener], listener: BinaryLogConsumerListener)(table: Table, event: TableMapEvent): Boolean = {
+  def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean = {
     log.error("Could not handle table map event {} for table from listener {}", table, event, listener)
     !quitOnEventListenerFailure
   }
 
-  protected def handleAlterError(listeners: List[BinaryLogConsumerListener], listener: BinaryLogConsumerListener)(table: Table, event: AlterEvent): Boolean = {
+  def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: AlterEvent): Boolean = {
     log.error("Could not handle alter event {} for table {} from listener {}", table, event, listener)
     !quitOnEventListenerFailure
   }
 
-  protected def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean = {
+  def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean = {
     log.error("Could not handle commit due to faulty mutation {} for mutations {}", faultyMutation.asInstanceOf[Any], mutationList)
     !quitOnEventHandlerFailure
   }
 
-  protected def handleEventDecodeError(binaryLogEvent: BinLogEvent): Boolean = {
+  def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean = {
     log.trace("Event could not be decoded {}", binaryLogEvent)
     !quitOnEventDecodeFailure
   }

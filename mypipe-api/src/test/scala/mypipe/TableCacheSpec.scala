@@ -1,6 +1,7 @@
 package mypipe
 
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
+import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
 
 import akka.util.Timeout
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
@@ -28,9 +29,9 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     val future = Future[Boolean] {
 
       val queue = new LinkedBlockingQueue[Table](1)
-      consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onConnect(c: BinaryLogConsumer): Unit = connected = true
-        override def onTableMap(c: BinaryLogConsumer, table: Table): Boolean = queue.add(table)
+      consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
+        override def onConnect(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]): Unit = connected = true
+        override def onTableMap(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], table: Table): Boolean = queue.add(table)
       })
 
       Future { consumer.connect() }
@@ -71,9 +72,9 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     val future = Future[Boolean] {
 
       val queue = new LinkedBlockingQueue[Table](1)
-      consumer.registerListener(new BinaryLogConsumerListener() {
-        override def onConnect(c: BinaryLogConsumer): Unit = connected = true
-        override def onTableAlter(c: BinaryLogConsumer, table: Table): Boolean = queue.add(table)
+      consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
+        override def onConnect(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]): Unit = connected = true
+        override def onTableAlter(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], table: Table): Boolean = queue.add(table)
       })
 
       Future { consumer.connect() }
