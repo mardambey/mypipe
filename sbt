@@ -232,9 +232,9 @@ download_url () {
   echo "    To  $jar"
 
   mkdir -p $(dirname "$jar") && {
-    if which curl >/dev/null; then
+	  if [ -x "$(which curl)" ]; then
       curl --fail --silent "$url" --output "$jar"
-    elif which wget >/dev/null; then
+		elif [ -x "$(which wget)" ]; then
       wget --quiet -O "$jar" "$url"
     fi
   } && [[ -r "$jar" ]]
