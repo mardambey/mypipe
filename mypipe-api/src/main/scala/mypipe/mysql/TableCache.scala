@@ -32,14 +32,17 @@ class TableCache(hostname: String, port: Int, username: String, password: String
   }
 
   def refreshTable(tableId: Long): Option[Table] = {
+    // FIXME: if the table is not in the map we can't refresh it.
     tablesById.get(tableId).flatMap(refreshTable)
   }
 
   def refreshTable(database: String, table: String): Option[Table] = {
+    // FIXME: if the table is not in the map we can't refresh it.
     tableNameToId.get(database + table).flatMap(refreshTable)
   }
 
   def refreshTable(table: Table): Option[Table] = {
+    // FIXME: if the table is not in the map we can't refresh it.
     Some(addTable(table.id, table.db, table.name, flushCache = true))
   }
 

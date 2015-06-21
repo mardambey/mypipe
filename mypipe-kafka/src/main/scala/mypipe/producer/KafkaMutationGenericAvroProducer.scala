@@ -2,7 +2,7 @@ package mypipe.producer
 
 import com.typesafe.config.Config
 import mypipe.api.data.{ Column, ColumnType }
-import mypipe.api.event.{ DeleteMutation, UpdateMutation, InsertMutation, Mutation }
+import mypipe.api.event._
 import mypipe.avro.schema.AvroSchemaUtils
 import mypipe.avro.{ AvroVersionedRecordSerializer, GenericInMemorySchemaRepo }
 import mypipe.kafka.KafkaUtil
@@ -28,6 +28,8 @@ class KafkaMutationGenericAvroProducer(config: Config)
 
   override protected val schemaRepoClient = GenericInMemorySchemaRepo
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
+
+  override def handleAlter(event: AlterEvent): Boolean = true // no special support for alters needed, "generic" schema
 
   /** Given a short, returns a byte array.
    *  @param s

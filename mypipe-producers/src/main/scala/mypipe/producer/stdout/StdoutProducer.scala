@@ -1,7 +1,7 @@
 package mypipe.producer.stdout
 
 import mypipe.api._
-import mypipe.api.event.{ DeleteMutation, Mutation, UpdateMutation, InsertMutation }
+import mypipe.api.event._
 import mypipe.api.producer.Producer
 import org.slf4j.LoggerFactory
 import com.typesafe.config.Config
@@ -10,6 +10,11 @@ class StdoutProducer(config: Config) extends Producer(config) {
 
   protected val mutations = scala.collection.mutable.ListBuffer[String]()
   protected val log = LoggerFactory.getLogger(getClass)
+
+  override def handleAlter(event: AlterEvent): Boolean = {
+    log.info(s"\n$event\n")
+    true
+  }
 
   override def flush(): Boolean = {
     if (mutations.size > 0) {

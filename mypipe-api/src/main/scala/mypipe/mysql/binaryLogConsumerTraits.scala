@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
 
 trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] {
 
-  val handler = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition]]("mypipe.error-handler")
+  val handler = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition]]("mypipe.error.handler")
     .headOption
     .map(_._2.newInstance())
 

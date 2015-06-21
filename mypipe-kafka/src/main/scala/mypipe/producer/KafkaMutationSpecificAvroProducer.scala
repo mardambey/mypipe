@@ -1,7 +1,7 @@
 package mypipe.producer
 
 import com.typesafe.config.Config
-import mypipe.api.event.{ UpdateMutation, SingleValuedMutation, Mutation }
+import mypipe.api.event.{ AlterEvent, UpdateMutation, SingleValuedMutation, Mutation }
 import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
 import mypipe.avro.AvroVersionedRecordSerializer
 import mypipe.kafka.KafkaUtil
@@ -19,6 +19,26 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
 
+  override def handleAlter(event: AlterEvent): Boolean = {
+    // FIXME: if the table is not in the cache already, by it's ID, this will fail
+    // FIXME: this sucks and needs to be parsed properly
+    val tableName = {
+      val t = event.sql.split(" ")(2)
+      // account for db.table
+      if (t.contains(".")) t.split("""\.""")(1)
+      else t
+    }
+
+    // refresh insert, update, and delete schemas
+    (for (
+      i ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.InsertString));
+      u ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.UpdateString));
+      d ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.DeleteString))
+    ) yield {
+      true
+    }).getOrElse(false)
+  }
+
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
   override protected def getKafkaTopic(mutation: Mutation): String = KafkaUtil.specificTopic(mutation)
@@ -35,10 +55,10 @@ class KafkaMutationSpecificAvroProducer(config: Config)
     }
   }
 
-  /** Given a mutation, returns the "subject" that this mutation's
+  /** Given a mutation, returns the Avro subject that this mutation's
    *  Schema is registered under in the Avro schema repository.
    *
-   *  @param mutation
+   *  @param mutation mutation to get subject for
    *  @return returns "mutationDbName_mutationTableName_mutationType" where mutationType is "insert", "update", or "delete"
    */
   override protected def avroSchemaSubject(mutation: Mutation): String = AvroSchemaUtils.specificSubject(mutation)
@@ -47,7 +67,7 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
     mutation.rows.map(row ⇒ {
       val record = new GenericData.Record(schema)
-      row.columns.foreach(col ⇒ Option(schema.getField(col._1)).map(f ⇒ record.put(f.name(), col._2.value)))
+      row.columns.foreach(col ⇒ Option(schema.getField(col._1)).foreach(f ⇒ record.put(f.name(), col._2.value)))
       header(record, mutation)
       record
     })
@@ -57,8 +77,8 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
     mutation.rows.map(row ⇒ {
       val record = new GenericData.Record(schema)
-      row._1.columns.foreach(col ⇒ Option(schema.getField("old_" + col._1)).map(f ⇒ record.put(f.name(), col._2.value)))
-      row._2.columns.foreach(col ⇒ Option(schema.getField("new_" + col._1)).map(f ⇒ record.put(f.name(), col._2.value)))
+      row._1.columns.foreach(col ⇒ Option(schema.getField("old_" + col._1)).foreach(f ⇒ record.put(f.name(), col._2.value)))
+      row._2.columns.foreach(col ⇒ Option(schema.getField("new_" + col._1)).foreach(f ⇒ record.put(f.name(), col._2.value)))
       header(record, mutation)
       record
     })

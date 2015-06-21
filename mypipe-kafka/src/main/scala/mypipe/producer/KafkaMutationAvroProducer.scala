@@ -3,7 +3,7 @@ package mypipe.producer
 import java.nio.ByteBuffer
 
 import mypipe.api._
-import mypipe.api.event.{ Serializer, Mutation }
+import mypipe.api.event.{ AlterEvent, Serializer, Mutation }
 import mypipe.api.producer.Producer
 import mypipe.avro.Guid
 import mypipe.kafka.KafkaProducer
