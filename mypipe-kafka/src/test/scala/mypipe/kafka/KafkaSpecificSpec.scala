@@ -109,9 +109,16 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 
     val future = kafkaConsumer.start
 
+    // insert, update, delete tests
     Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT)), 2.seconds)
     Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2.seconds)
     Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2.seconds)
+
+    // alter test
+    // TODO: register new schema before issuing alter
+    Await.result(db.connection.sendQuery(Queries.ALTER.statementAdd), 2.seconds)
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT, email = Some("test@test.com"))), 2.seconds)
+    // TODO: look for email field in the "insertCallback", ideally make this it's own test
     Await.result(Future { while (!done) Thread.sleep(100) }, 20.seconds)
 
     try {

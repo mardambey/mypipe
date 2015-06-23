@@ -106,8 +106,10 @@ package object mypipe {
       val loginCount = 0
 
       def statement: String = statement()
-      def statement(id: String = "NULL", username: String = this.username, password: String = this.password, loginCount: Int = this.loginCount): String =
-        s"""INSERT INTO mypipe.user (id, username, password, login_count) values ($id, "$username", "$password", $loginCount)"""
+      def statement(id: String = "NULL", username: String = this.username, password: String = this.password, loginCount: Int = this.loginCount, email: Option[String] = None): String = {
+        val eml = email.map(e ⇒ s", '${e}'").getOrElse("")
+        s"""INSERT INTO mypipe.user values ($id, "$username", "$password", $loginCount $eml)"""
+      }
     }
 
     object UPDATE {
