@@ -48,6 +48,50 @@
   {
     "namespace": "mypipe.kafka",
     "type": "record",
+    "name": "UserInsert2",
+    "fields": [
+  	    {
+  			"name": "database",
+  			"type": "string"
+  		},
+  		{
+  			"name": "table",
+  			"type": "string"
+  		},
+  		{
+  			"name": "tableId",
+  			"type": "int"
+  		},
+  		{
+    	    "name": "txid",
+            "type": ["null", "mypipe.avro.Guid"],
+            "default": "null"
+    	},
+  		{
+  			"name": "id",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "username",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "password",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "login_count",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "email",
+  			"type": ["string", "null"]
+  		}
+  	]
+  },
+  {
+    "namespace": "mypipe.kafka",
+    "type": "record",
     "name": "UserDelete",
     "fields": [
   	    {
