@@ -6,7 +6,7 @@ import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
 import akka.util.Timeout
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.data.Table
-import mypipe.api.event.TableMapEvent
+import mypipe.api.event.{ AlterEvent, TableMapEvent }
 import mypipe.mysql._
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
@@ -71,10 +71,18 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
     val future = Future[Boolean] {
 
-      val queue = new LinkedBlockingQueue[Table](1)
+      val queue = new LinkedBlockingQueue[String](1)
       consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
         override def onConnect(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]): Unit = connected = true
-        override def onTableAlter(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], table: Table): Boolean = queue.add(table)
+        override def onTableAlter(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], event: AlterEvent): Boolean =
+          queue.add({
+            // FIXME: this sucks and needs to be parsed properly
+            val t = event.sql.split(" ")(2)
+            // account for db.table
+            if (t.contains(".")) t.split("""\.""")(1)
+            else t
+          })
+
       })
 
       Future { consumer.connect() }
@@ -86,14 +94,14 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
       val alterAddFuture = db.connection.sendQuery(Queries.ALTER.statementAdd)
       Await.result(alterAddFuture, 5 seconds)
 
-      val table = queue.poll(10, TimeUnit.SECONDS)
-      assert(table.columns.exists(_.name == "email"))
+      val alter = queue.poll(10, TimeUnit.SECONDS)
+      assert(alter.contains("email"))
 
       val alterDropFuture = db.connection.sendQuery(Queries.ALTER.statementDrop)
       Await.result(alterDropFuture, 5 seconds)
 
-      val table2 = queue.poll(10, TimeUnit.SECONDS)
-      assert(table2.columns.find(column ⇒ column.name == "email").isEmpty)
+      val alter2 = queue.poll(10, TimeUnit.SECONDS)
+      assert(alter2.contains("drop") && alter2.contains("email"))
 
       true
     }

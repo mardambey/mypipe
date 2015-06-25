@@ -2,7 +2,8 @@ package mypipe.pipe
 
 import akka.actor.{ ActorSystem, Cancellable }
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
-import mypipe.api.event.Mutation
+import mypipe.api.data.Table
+import mypipe.api.event.{ AlterEvent, Mutation }
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
 import mypipe.mysql._
@@ -33,8 +34,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS.seconds,
         Conf.FLUSH_INTERVAL_SECS.seconds) {
           Conf.binlogSaveFilePosition(consumer.id,
-            // FIXME: look into this ugly cast
-            consumer.getBinaryLogPosition.get.asInstanceOf[BinaryLogFilePosition],
+            consumer.getBinaryLogPosition.get,
             id)
           // TODO: if flush fails, stop and disconnect
           producer.flush()
@@ -58,6 +58,10 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
 
     override def onMutation(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutations: Seq[Mutation]): Boolean = {
       producer.queueList(mutations.toList)
+    }
+
+    override def onTableAlter(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], event: AlterEvent): Boolean = {
+      producer.handleAlter(event)
     }
   }
 

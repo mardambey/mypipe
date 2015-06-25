@@ -31,9 +31,9 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
     // refresh insert, update, and delete schemas
     (for (
-      i ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.InsertString));
-      u ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.UpdateString));
-      d ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.DeleteString))
+      i ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.InsertString), flushCache = true);
+      u ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.UpdateString), flushCache = true);
+      d ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, tableName, Mutation.DeleteString), flushCache = true)
     ) yield {
       true
     }).getOrElse(false)

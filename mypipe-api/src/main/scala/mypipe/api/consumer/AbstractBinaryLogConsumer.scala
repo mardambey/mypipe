@@ -162,15 +162,13 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     val success = findTable(event).map(table ⇒ {
       processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
         list = listeners.toList,
-        listOp = _.onTableAlter(this, table),
+        listOp = _.onTableAlter(this, event),
         onError = handleAlterError(_, _)(table, event))
     }).getOrElse({
       // if we don't find the table we continue, which means downstream handlers don't get called
       log.warn(s"Encountered an alter event but could not find a corresponding Table for it, ignoring and continuing: ${event}")
       true
     })
-
-    // TODO: findTable should return a Try[Option[Table]] to account for errors and when a table is not found separately
 
     success && updateBinaryLogPosition()
   }

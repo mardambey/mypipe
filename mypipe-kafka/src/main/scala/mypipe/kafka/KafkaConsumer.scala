@@ -21,11 +21,7 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
   protected val log = LoggerFactory.getLogger(getClass.getName)
   protected var future: Future[Unit] = _
   @volatile protected var loop = true
-
-  protected val consumerConnector = createConsumerConnector(zkConnect, groupId)
-  protected val mapStreams = consumerConnector.createMessageStreams(Map(topic -> 1))
-  protected val stream = mapStreams.get(topic).get.head
-  protected val consumerIterator = stream.iterator()
+  val iterator = new KafkaIterator(topic, zkConnect, groupId)
 
   /** Called every time a new message is pulled from
    *  the Kafka topic.
@@ -35,17 +31,16 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
    */
   def onEvent(bytes: Array[Byte]): Boolean
 
-  @tailrec private def consume {
-    val message = consumerIterator.next()
+  @tailrec private def consume(): Unit = {
+    val message = iterator.next()
 
-    if (message != null) {
-      val next = try {
-        onEvent(message.message())
-      } catch {
-        case e: Exception ⇒ log.error("Failed deserializing or processing message."); false
+    if (message.isDefined) {
+      val next = try { onEvent(message.get) }
+      catch {
+        case e: Exception ⇒ log.error(s"Failed deserializing or processing message. ${e.getMessage} at ${e.getStackTrace.mkString(sys.props("line.separator"))}"); false
       }
 
-      if (next && loop) consume
+      if (next && loop) consume()
     } else {
       // do nothing
     }
@@ -55,7 +50,7 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
 
     future = Future {
       try {
-        consume
+        consume()
         stop
       } catch {
         case e: Exception ⇒ stop
@@ -67,8 +62,15 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
 
   def stop {
     loop = false
-    consumerConnector.shutdown()
+    iterator.stop()
   }
+}
+
+class KafkaIterator(topic: String, zkConnect: String, groupId: String) {
+  protected val consumerConnector = createConsumerConnector(zkConnect, groupId)
+  protected val mapStreams = consumerConnector.createMessageStreams(Map(topic -> 1))
+  protected val stream = mapStreams.get(topic).get.head
+  protected val consumerIterator = stream.iterator()
 
   protected def createConsumerConnector(zkConnect: String, groupId: String): ConsumerConnector = {
     val props = new Properties()
@@ -79,5 +81,7 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
     props.put("auto.commit.interval.ms", "1000")
     KConsumer.create(new ConsumerConfig(props))
   }
-}
 
+  def next(): Option[Array[Byte]] = Option(consumerIterator.next()).map(_.message())
+  def stop(): Unit = consumerConnector.shutdown()
+}
