@@ -24,6 +24,7 @@ object Conf {
   val QUIT_ON_LISTENER_FAILURE = conf.getBoolean("mypipe.error.quit-on-listener-failure")
   val QUIT_ON_EVENT_DECODE_FAILURE = conf.getBoolean("mypipe.error.quit-on-event-decode-failure")
   val QUIT_ON_EVENT_HANDLER_FAILURE = conf.getBoolean("mypipe.error.quit-on-event-handler-failure")
+  val QUIT_ON_EMPTY_MUTATION_COMMIT_FAILURE = conf.getBoolean("mypipe.error.quit-on-empty-mutation-commit-failure")
 
   val MYSQL_SERVER_ID_PREFIX = conf.getInt("mypipe.mysql-server-id-prefix")
 

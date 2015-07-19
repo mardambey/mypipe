@@ -14,6 +14,7 @@ package object event {
   }
 
   case class UnknownEvent(database: String = "", sql: String = "") extends QueryEvent
+  case class UnknownQueryEvent(database: String = "", sql: String = "") extends QueryEvent
   case class BeginEvent(database: String, sql: String) extends QueryEvent
   case class CommitEvent(database: String, sql: String) extends QueryEvent
   case class RollbackEvent(database: String, sql: String) extends QueryEvent

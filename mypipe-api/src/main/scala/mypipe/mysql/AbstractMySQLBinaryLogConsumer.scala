@@ -100,8 +100,8 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
         Some(AlterEvent(database, queryEventData.getSql))
       case q ⇒
-        log.trace("ignoring query={}", q)
-        Some(UnknownEvent(queryEventData.getDatabase, queryEventData.getSql))
+        log.warn("Consumer {} ignoring unknown query query={}", Array(id, q): _*)
+        Some(UnknownQueryEvent(queryEventData.getDatabase, queryEventData.getSql))
     }
   }
 

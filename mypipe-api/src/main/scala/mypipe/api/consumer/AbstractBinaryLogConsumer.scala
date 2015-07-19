@@ -31,6 +31,7 @@ trait BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] extends B
   def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean
   def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: AlterEvent): Boolean
   def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean
+  def handleEmptyCommitError(queryList: List[QueryEvent]): Boolean
   def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean
 }
 
@@ -88,6 +89,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   private val listeners = collection.mutable.Set[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]]()
   private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   private val txQueue = new scala.collection.mutable.ListBuffer[Mutation]
+  private val txQueries = new scala.collection.mutable.ListBuffer[QueryEvent]
   private val uuidGen = Generators.timeBasedGenerator(EthernetAddress.fromInterface())
   private var curTxid: Option[UUID] = None
 
@@ -107,11 +109,10 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       case Some(e: TableMapEvent)                    ⇒ handleTableMap(e)
       case Some(e: XidEvent)                         ⇒ handleXid(e)
       case Some(e: Mutation)                         ⇒ handleMutation(e)
-      // we move on if the event is unknown to us
-      case Some(e: UnknownEvent) ⇒
-        log.debug("Could not process unknown event: {}", e); true
+      case Some(e: UnknownQueryEvent)                ⇒ handleUnknownQueryEvent(e)
+      case Some(e: UnknownEvent)                     ⇒ handleUnknownEvent(e)
       // TODO: this is going to be the only error handler accepting the 3rd party event; allow the user to override?
-      case None ⇒ handleEventDecodeError(binaryLogEvent)
+      case None                                      ⇒ handleEventDecodeError(binaryLogEvent)
     }
 
     if (!success) {
@@ -125,6 +126,22 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   private def _disconnect(): Unit = {
     disconnect()
     listeners foreach (l ⇒ l.onDisconnect(this))
+  }
+
+  private def handleUnknownEvent(e: UnknownEvent): Boolean = {
+    log.debug("Could not process unknown event: {}", e)
+    // we move on if the event is unknown to us
+    true
+  }
+
+  private def handleUnknownQueryEvent(e: UnknownQueryEvent): Boolean = {
+    if (transactionInProgress) {
+      txQueries += e
+    }
+
+    log.debug("Could not process unknown query event: {}", e)
+    // we move on if the event is unknown to us
+    true
   }
 
   private def handleMutation(mutation: Mutation): Boolean = {
@@ -181,9 +198,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   }
 
   private def handleRollback(event: RollbackEvent): Boolean = {
-    txQueue.clear()
-    transactionInProgress = false
-    curTxid = None
+    clearTxState()
     updateBinaryLogPosition()
   }
 
@@ -196,6 +211,13 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     commit() && updateBinaryLogPosition()
   }
 
+  private def clearTxState() {
+    txQueue.clear()
+    txQueries.clear()
+    transactionInProgress = false
+    curTxid = None
+  }
+
   private def commit(): Boolean = {
     if (txQueue.nonEmpty) {
 
@@ -204,11 +226,14 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
         listOp = _handleMutation,
         onError = handleCommitError)
 
-      txQueue.clear()
-      transactionInProgress = false
-      curTxid = None
+      clearTxState()
       success
+    } else if (txQueries.nonEmpty) {
+      val ret = handleEmptyCommitError(txQueries.toList)
+      clearTxState()
+      ret
     } else {
+      log.error("Consumer {} asked to commit empty transaction, failing.", id);
       false
     }
   }
