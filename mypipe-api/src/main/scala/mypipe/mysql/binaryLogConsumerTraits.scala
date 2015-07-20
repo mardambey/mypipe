@@ -18,6 +18,9 @@ trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent, BinaryLogPosition] exten
   def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean =
     handler.exists(_.handleMutationError(listeners, listener)(mutation))
 
+  def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutations: Seq[Mutation]): Boolean =
+    handler.exists(_.handleMutationsError(listeners, listener)(mutations))
+
   def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean =
     handler.exists(_.handleTableMapError(listeners, listener)(table, event))
 
@@ -49,6 +52,11 @@ class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryL
 
   override def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean = {
     log.error("Could not handle mutation {} from listener {}", mutation.asInstanceOf[Any], listener)
+    !quitOnEventListenerFailure
+  }
+
+  override def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutations: Seq[Mutation]): Boolean = {
+    log.error("Could not handle {} mutation(s) from listener {}", mutations.length, listener)
     !quitOnEventListenerFailure
   }
 
