@@ -232,9 +232,12 @@ latches onto a MySQL server, it will attempt to pick up where it last
 left of if an offset was previously saved for the given database host
 and database name combination. mypipe saves it's offsets in files for
 now. These files are stored in the location indicated by the config
-entry `data-dir` in the `mypipe-api` project's `application.conf`.
+entry `data-dir` in the `mypipe-api` project's `reference.conf`.
 
     data-dir = "/tmp/mypipe"
+
+You can either override that config in `application.conf` of `mypipe-runner`
+or edit it in `mypipe-api` directly.
 
 The simplest way to observe the replication stream that mypipe is 
 ingesting is to configure the `stdout` producer. This producer will
