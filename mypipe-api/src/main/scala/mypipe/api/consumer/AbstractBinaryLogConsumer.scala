@@ -28,6 +28,7 @@ trait BinaryLog[BinaryLogEvent, BinaryLogPosition]
 trait BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryLog[BinaryLogPosition, BinaryLogEvent] {
   def handleEventError(event: Option[Event], binaryLogEvent: BinaryLogEvent): Boolean
   def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean
+  def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutations: Seq[Mutation]): Boolean
   def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean
   def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: AlterEvent): Boolean
   def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean
@@ -88,6 +89,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private val listeners = collection.mutable.Set[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]]()
   private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
+  private val groupMutationsByTx = Conf.GROUP_MUTATIONS_BY_TX
   private val txQueue = new scala.collection.mutable.ListBuffer[Mutation]
   private val txQueries = new scala.collection.mutable.ListBuffer[QueryEvent]
   private val uuidGen = Generators.timeBasedGenerator(EthernetAddress.fromInterface())
@@ -220,11 +222,19 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def commit(): Boolean = {
     if (txQueue.nonEmpty) {
-
-      val success = processList[Mutation](
-        list = txQueue.toList,
-        listOp = _handleMutation,
-        onError = handleCommitError)
+      val success =
+        if (groupMutationsByTx) {
+          val mutations = txQueue.toList
+          processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
+            list = listeners.toList,
+            listOp = _.onMutation(this, mutations),
+            onError = handleMutationsError(_, _)(mutations))
+        } else {
+          processList[Mutation](
+            list = txQueue.toList,
+            listOp = _handleMutation,
+            onError = handleCommitError)
+        }
 
       clearTxState()
       success
