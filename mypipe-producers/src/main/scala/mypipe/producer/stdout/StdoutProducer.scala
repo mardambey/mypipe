@@ -1,6 +1,5 @@
 package mypipe.producer.stdout
 
-import mypipe.api._
 import mypipe.api.event._
 import mypipe.api.producer.Producer
 import org.slf4j.LoggerFactory
@@ -17,7 +16,7 @@ class StdoutProducer(config: Config) extends Producer(config) {
   }
 
   override def flush(): Boolean = {
-    if (mutations.size > 0) {
+    if (mutations.nonEmpty) {
       log.info("\n" + mutations.mkString("\n"))
       mutations.clear()
     }
@@ -33,11 +32,10 @@ class StdoutProducer(config: Config) extends Producer(config) {
   override def queue(mutation: Mutation): Boolean = {
     mutation match {
 
-      case i: InsertMutation ⇒ {
+      case i: InsertMutation ⇒
         mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}) VALUES (${i.rows.head.columns.values.map(_.value).mkString(", ")})"
-      }
 
-      case u: UpdateMutation ⇒ {
+      case u: UpdateMutation ⇒
         u.rows.foreach(rr ⇒ {
 
           val old = rr._1
@@ -62,16 +60,15 @@ class StdoutProducer(config: Config) extends Producer(config) {
           val updates = colNames.zip(curValues).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")
           mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ($updates) $where"
         })
-      }
 
-      case d: DeleteMutation ⇒ {
+      case d: DeleteMutation ⇒
         d.rows.foreach(row ⇒ {
 
           val pKeyColNames = if (d.table.primaryKey.isDefined) d.table.primaryKey.get.columns.map(_.name) else List.empty[String]
 
           val p = pKeyColNames.map(colName ⇒ {
             val cols = row.columns
-            cols.filter(_._1.equals(colName))
+            cols.filter(_._1 == colName)
             cols.head
           })
 
@@ -80,17 +77,15 @@ class StdoutProducer(config: Config) extends Producer(config) {
           mutations += s"DELETE FROM ${d.table.db}.${d.table.name} WHERE ($where)"
 
         })
-      }
 
-      case _ ⇒ {
-      }
+      case _ ⇒
 
     }
 
     true
   }
 
-  override def toString(): String = {
+  override def toString: String = {
     "StdoutProducer"
   }
 

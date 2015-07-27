@@ -2,7 +2,6 @@ package mypipe.pipe
 
 import akka.actor.{ ActorSystem, Cancellable }
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
-import mypipe.api.data.Table
 import mypipe.api.event.{ AlterEvent, Mutation }
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
@@ -69,7 +68,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
 
   def connect() {
 
-    if (threads.size > 0) {
+    if (threads.nonEmpty) {
 
       log.warn("Attempting to reconnect pipe while already connected, aborting!")
 

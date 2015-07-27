@@ -32,7 +32,7 @@ class KafkaMutationGenericAvroProducer(config: Config)
   override def handleAlter(event: AlterEvent): Boolean = true // no special support for alters needed, "generic" schema
 
   /** Given a short, returns a byte array.
-   *  @param s
+   *  @param s schema id
    *  @return
    */
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
@@ -94,22 +94,22 @@ class KafkaMutationGenericAvroProducer(config: Config)
     val strings = new java.util.HashMap[CharSequence, CharSequence]()
     val longs = new java.util.HashMap[CharSequence, java.lang.Long]()
 
-    cols.foreach(_ match {
+    cols.foreach({
 
-      case (ColumnType.INT24, columns) ⇒
-        columns.foreach(c ⇒ {
+      case (ColumnType.INT24, colz) ⇒
+        colz.foreach(c ⇒ {
           val v = c.valueOption[Int]
           if (v.isDefined) integers.put(c.metadata.name, v.get)
         })
 
-      case (ColumnType.VARCHAR, columns) ⇒
-        columns.foreach(c ⇒ {
+      case (ColumnType.VARCHAR, colz) ⇒
+        colz.foreach(c ⇒ {
           val v = c.valueOption[String]
           if (v.isDefined) strings.put(c.metadata.name, v.get)
         })
 
-      case (ColumnType.LONG, columns) ⇒
-        columns.foreach(c ⇒ {
+      case (ColumnType.LONG, colz) ⇒
+        colz.foreach(c ⇒ {
           // this damn thing can come in as an Integer or Long
           val v = c.value match {
             case i: java.lang.Integer ⇒ new java.lang.Long(i.toLong)
@@ -128,7 +128,7 @@ class KafkaMutationGenericAvroProducer(config: Config)
 
   /** Given a mutation, returns the "subject" that this mutation's
    *  Schema is registered under in the Avro schema repository.
-   *  @param mutation
+   *  @param mutation mutation to get subject for
    *  @return
    */
   override protected def avroSchemaSubject(mutation: Mutation): String = AvroSchemaUtils.genericSubject(mutation)

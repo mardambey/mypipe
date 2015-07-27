@@ -1,6 +1,5 @@
 package mypipe.producer
 
-import mypipe.api._
 import java.util
 import mypipe.api.event.{ AlterEvent, Mutation }
 import mypipe.api.producer.Producer
@@ -23,7 +22,7 @@ class QueueProducer(queue: util.Queue[Mutation]) extends Producer(config = null)
     true
   }
 
-  override def toString(): String = {
+  override def toString: String = {
     s"QueueProducer(elems=${queue.size})"
   }
 

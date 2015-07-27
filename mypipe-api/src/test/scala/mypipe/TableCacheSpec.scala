@@ -1,7 +1,7 @@
 package mypipe
 
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
-import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
+import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent }
 
 import akka.util.Timeout
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
@@ -18,7 +18,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
 
   val log = LoggerFactory.getLogger(getClass)
 
-  implicit val timeout = Timeout(1 second)
+  implicit val timeout = Timeout(1.second)
 
   var consumer: MySQLBinaryLogConsumer = _
   var tableCache: TableCache = _
@@ -38,7 +38,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
         queueTableMap.add(table)
       }
       override def onTableAlter(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], event: AlterEvent): Boolean = {
-        val table = tableCache.refreshTable(event.database, event.table)
+        val table = tableCache.refreshTable(event.database, event.tableName)
         queueTableAlter.add(table.get)
         true
       }
@@ -75,10 +75,9 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       val ret = Await.result(future, 10.seconds)
       assert(ret)
     } catch {
-      case e: Exception ⇒ {
+      case e: Exception ⇒
         log.error(s"Caught exception: ${e.getMessage} at ${e.getStackTraceString}")
         assert(false)
-      }
     }
   }
 
@@ -108,10 +107,9 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       val ret = Await.result(future, 35.seconds)
       assert(ret)
     } catch {
-      case e: TimeoutException ⇒ {
+      case e: TimeoutException ⇒
         log.error(s"Caught exception: ${e.getMessage} at ${e.getStackTraceString}")
         assert(false)
-      }
     }
   }
 }

@@ -18,8 +18,17 @@ package object event {
   case class BeginEvent(database: String, sql: String) extends QueryEvent
   case class CommitEvent(database: String, sql: String) extends QueryEvent
   case class RollbackEvent(database: String, sql: String) extends QueryEvent
-  case class AlterEvent(database: String, table: String, sql: String) extends QueryEvent
+
+  trait TableContainingEvent extends QueryEvent {
+    override val database: String
+    override val sql: String
+    val tableName: String
+    val table: Option[Table]
+  }
+
+  case class AlterEvent(database: String, tableName: String, table: Option[Table], sql: String) extends TableContainingEvent
   case class XidEvent(xid: Long) extends Event
+
   case class TableMapEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]) extends Event
 
   /** Represents a row change event (Insert, Update, or Delete).

@@ -47,12 +47,13 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
    */
   protected def decodeEvent(binaryLogEvent: BinaryLogEvent): Option[Event]
 
-  /** Given an AlterTable event, returns a valid Table instance
+  /** Given a database and table name, returns a valid Table instance
    *  if possible.
-   *  @param event the AlterEvent who's database and table will be used to build the Table
+   *  @param database the database name
+   *  @param table the table name
    *  @return a Table instance or None if not possible
    */
-  protected def findTable(event: AlterEvent): Option[Table]
+  protected def findTable(database: String, table: String): Option[Table]
 
   /** Given an TableMapEvent event, returns a valid Table instance
    *  if possible.
@@ -177,14 +178,14 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def handleAlter(event: AlterEvent): Boolean = {
 
-    val success = findTable(event).map(table ⇒ {
+    val success = event.table.map(table ⇒ {
       processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
         list = listeners.toList,
         listOp = _.onTableAlter(this, event),
         onError = handleAlterError(_, _)(table, event))
     }).getOrElse({
       // if we don't find the table we continue, which means downstream handlers don't get called
-      log.warn(s"Encountered an alter event but could not find a corresponding Table for it, ignoring and continuing: ${event}")
+      log.warn(s"Encountered an alter event but could not find a corresponding Table for it, ignoring and continuing: $event")
       true
     })
 
@@ -242,7 +243,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       clearTxState()
       ret
     } else {
-      log.error("Consumer {} asked to commit empty transaction, failing.", id);
+      log.error("Consumer {} asked to commit empty transaction, failing.", id)
       false
     }
   }

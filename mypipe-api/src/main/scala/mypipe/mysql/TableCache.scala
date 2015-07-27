@@ -5,7 +5,6 @@ import mypipe.api.event.TableMapEvent
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import mypipe.api._
 import scala.concurrent.{ Future, Await }
 import akka.actor._
 import akka.pattern.ask
@@ -73,12 +72,12 @@ class TableCache(hostname: String, port: Int, username: String, password: String
   private def lookupTable(tableId: Long, database: String, tableName: String): Table = {
 
     // TODO: make this configurable
-    implicit val timeout = Timeout(2 second)
+    implicit val timeout = Timeout(2.second)
 
     val future = ask(dbMetadata, GetColumns(database, tableName, flushCache = true)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
 
     // FIXME: handle timeout
-    val columns = Await.result(future, 2 seconds)
+    val columns = Await.result(future, 2.seconds)
 
     Table(tableId, tableName, database, columns._1, columns._2)
   }

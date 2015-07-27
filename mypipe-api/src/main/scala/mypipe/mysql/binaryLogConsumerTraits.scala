@@ -98,7 +98,7 @@ trait CacheableTableMapBehaviour extends AbstractMySQLBinaryLogConsumer {
   override protected def findTable(tableId: java.lang.Long): Option[Table] =
     tableCache.getTable(tableId)
 
-  override protected def findTable(event: AlterEvent): Option[Table] = {
-    tableCache.refreshTable(event.database, event.table)
+  override protected def findTable(database: String, table: String): Option[Table] = {
+    tableCache.refreshTable(database, table)
   }
 }
