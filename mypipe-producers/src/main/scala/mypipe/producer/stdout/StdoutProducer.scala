@@ -42,7 +42,7 @@ class StdoutProducer(config: Config) extends Producer(config) {
 
           val old = rr._1
           val cur = rr._2
-          val pKeyColNames = if (u.table.primaryKey.isDefined) u.table.primaryKey.get.columns.map(_.name) else List.empty[String]
+          val pKeyColNames = u.table.primaryKey.map(pKey ⇒ pKey.columns.map(_.name))
 
           val p = pKeyColNames.map(colName ⇒ {
             val cols = old.columns
@@ -51,7 +51,12 @@ class StdoutProducer(config: Config) extends Producer(config) {
           })
 
           val pKeyVals = p.map(_._2.value.toString)
-          val where = Some(pKeyColNames.zip(pKeyVals).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")).map(w ⇒ s"WHERE ($w)")
+          val where = pKeyColNames
+            .map(_.zip(pKeyVals)
+            .map(kv ⇒ kv._1 + "=" + kv._2))
+            .map(_.mkString(", "))
+            .map(w ⇒ s"WHERE ($w)").getOrElse("")
+
           val curValues = cur.columns.values.map(_.value)
           val colNames = u.table.columns.map(_.name)
           val updates = colNames.zip(curValues).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")

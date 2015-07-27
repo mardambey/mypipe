@@ -59,8 +59,13 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
 
       val cols = createColumns(results1.asInstanceOf[List[(String, String, Boolean)]])
       val primaryKey: Option[PrimaryKey] = try {
-        val primaryKeys: List[ColumnMetadata] = results2.asInstanceOf[List[String]].map(colName ⇒ cols.find(_.name.equals(colName)).get)
-        Some(PrimaryKey(primaryKeys))
+        val primaryKeyCols: Option[List[ColumnMetadata]] = results2.asInstanceOf[Option[List[String]]].map(colNames ⇒ {
+          colNames.map(colName ⇒ {
+            cols.find(_.name.equals(colName)).get
+          })
+        })
+
+        primaryKeyCols.map(PrimaryKey(_))
       } catch {
         case t: Throwable ⇒ None
       }
@@ -73,6 +78,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
 
   protected def getTableColumns(db: String, table: String, dbConn: Connection): Future[List[(String, String, Boolean)]] = {
     val futureCols: Future[QueryResult] = dbConn.sendQuery(
+      // TODO: move this into the config file
       s"""select COLUMN_NAME, DATA_TYPE, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
 
     val mapCols: Future[List[(String, String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
@@ -89,20 +95,25 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     mapCols
   }
 
-  protected def getPrimaryKey(db: String, table: String, dbConn: Connection): Future[List[String]] = {
+  protected def getPrimaryKey(db: String, table: String, dbConn: Connection): Future[Option[List[String]]] = {
     val futurePkey: Future[QueryResult] = dbConn.sendQuery(
+      // TODO: move this into the config file
       s"""select COLUMN_NAME from KEY_COLUMN_USAGE where TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' and CONSTRAINT_NAME='PRIMARY' order by ORDINAL_POSITION""")
 
-    val pKey: Future[List[String]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
+    val pKey: Future[Option[List[String]]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
+
+      case Some(resultSet) if (resultSet.nonEmpty) ⇒ {
+        Some(resultSet.map(row ⇒ row(0).asInstanceOf[String]).toList)
+      }
+
       case Some(resultSet) ⇒ {
-        resultSet.map(row ⇒ {
-          row(0).asInstanceOf[String]
-        }).toList
+        log.debug(s"No primary key determined for $db:$table")
+        None
       }
 
       case None ⇒ {
         log.error(s"Failed to determine primary key for $db:$table")
-        List.empty[String]
+        None
       }
     })
 
