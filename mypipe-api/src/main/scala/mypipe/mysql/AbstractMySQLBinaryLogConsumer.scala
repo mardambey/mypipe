@@ -32,8 +32,7 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
   client.registerLifecycleListener(new LifecycleListener {
     override def onDisconnect(client: BinaryLogClient): Unit = {
-      // FIXME: call this properly
-      //handleDisconnect()
+      handleDisconnect()
     }
 
     override def onConnect(client: BinaryLogClient) {

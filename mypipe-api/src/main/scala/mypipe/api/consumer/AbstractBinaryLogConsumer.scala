@@ -280,6 +280,11 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     listeners foreach (l ⇒ l.onConnect(this))
   }
 
+  protected def handleDisconnect() {
+    updateBinaryLogPosition()
+    listeners foreach (l ⇒ l.onDisconnect(this))
+  }
+
   def registerListener(listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]) {
     listeners += listener
   }
