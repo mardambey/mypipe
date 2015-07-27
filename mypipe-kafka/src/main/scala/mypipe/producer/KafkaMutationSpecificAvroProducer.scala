@@ -23,9 +23,9 @@ class KafkaMutationSpecificAvroProducer(config: Config)
     // FIXME: if the table is not in the cache already, by it's ID, this will fail
     // refresh insert, update, and delete schemas
     (for (
-      i ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.tableName, Mutation.InsertString), flushCache = true);
-      u ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.tableName, Mutation.UpdateString), flushCache = true);
-      d ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.tableName, Mutation.DeleteString), flushCache = true)
+      i ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.InsertString), flushCache = true);
+      u ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.UpdateString), flushCache = true);
+      d ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.DeleteString), flushCache = true)
     ) yield {
       true
     }).getOrElse(false)

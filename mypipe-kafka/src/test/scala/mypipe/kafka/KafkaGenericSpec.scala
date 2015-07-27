@@ -94,6 +94,7 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2.seconds)
     Await.result(Future { while (!done) Thread.sleep(100) }, 20.seconds)
 
+    // FIXME: add catch
     try {
       kafkaConsumer.stop
       Await.result(future, 5.seconds)

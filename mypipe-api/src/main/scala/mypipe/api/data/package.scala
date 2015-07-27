@@ -10,6 +10,7 @@ package object data {
   case class Row(table: Table, columns: Map[String, Column])
 
   case class Table(id: JLong, name: String, db: String, columns: List[ColumnMetadata], primaryKey: Option[PrimaryKey])
+  class UnknownTable(override val id: JLong, override val name: String, override val db: String) extends Table(id, name, db, columns = List.empty, primaryKey = None)
 
   case class Column(metadata: ColumnMetadata, value: java.io.Serializable = null) {
 

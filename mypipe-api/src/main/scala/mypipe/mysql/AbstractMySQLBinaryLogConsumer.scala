@@ -3,7 +3,7 @@ package mypipe.mysql
 import com.github.shyiko.mysql.binlog.BinaryLogClient.{ LifecycleListener, EventListener }
 import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
 import mypipe.api.consumer.AbstractBinaryLogConsumer
-import mypipe.api.data.{ Column, Table, Row }
+import mypipe.api.data.{ UnknownTable, Column, Table, Row }
 import mypipe.api.event.Event
 import mypipe.api.event._
 
@@ -99,8 +99,8 @@ abstract class AbstractMySQLBinaryLogConsumer(
         }
 
         val tableName = decodeTableFromAlter(queryEventData.getSql)
-        val table = findTable(databaseName, tableName)
-        AlterEvent(databaseName, tableName, table, queryEventData.getSql)
+        val table = findTable(databaseName, tableName).getOrElse(new UnknownTable(-1.toLong, name = tableName, db = databaseName))
+        AlterEvent(databaseName, table, queryEventData.getSql)
       case q ⇒
         log.debug("Consumer {} ignoring unknown query query={}", Array(id, q): _*)
         UnknownQueryEvent(queryEventData.getDatabase, queryEventData.getSql)

@@ -6,7 +6,7 @@ import mypipe.api.data.{ Row, Table }
 
 package object event {
 
-  sealed trait Event
+  sealed abstract class Event
 
   sealed trait QueryEvent extends Event {
     val database: String
@@ -20,13 +20,10 @@ package object event {
   case class RollbackEvent(database: String, sql: String) extends QueryEvent
 
   trait TableContainingEvent extends QueryEvent {
-    override val database: String
-    override val sql: String
-    val tableName: String
-    val table: Option[Table]
+    val table: Table
   }
 
-  case class AlterEvent(database: String, tableName: String, table: Option[Table], sql: String) extends TableContainingEvent
+  case class AlterEvent(database: String, table: Table, sql: String) extends TableContainingEvent
   case class XidEvent(xid: Long) extends Event
 
   case class TableMapEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]) extends Event
@@ -35,7 +32,10 @@ package object event {
    *
    *  @param table that the row belongs to
    */
-  sealed abstract class Mutation(val table: Table, val txid: UUID) extends Event {
+  sealed abstract class Mutation(override val table: Table, val txid: UUID) extends TableContainingEvent {
+    // TODO: populate this field
+    val sql = ""
+    val database = table.db
     def txAware(txid: UUID): Mutation
   }
 
@@ -72,7 +72,7 @@ package object event {
    */
   case class UpdateMutation(
     override val table: Table,
-    val rows: List[(Row, Row)],
+    rows: List[(Row, Row)],
     override val txid: UUID = null)
       extends Mutation(table, txid) {
 

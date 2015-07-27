@@ -5,7 +5,7 @@ import java.util.UUID
 import mypipe.api._
 import com.fasterxml.uuid.{ EthernetAddress, Generators }
 
-import mypipe.api.data.Table
+import mypipe.api.data.{ UnknownTable, Table }
 import mypipe.api.event._
 import org.slf4j.LoggerFactory
 
@@ -94,8 +94,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   private val txQueue = new scala.collection.mutable.ListBuffer[Mutation]
   private val txQueries = new scala.collection.mutable.ListBuffer[QueryEvent]
   private val uuidGen = Generators.timeBasedGenerator(EthernetAddress.fromInterface())
-  private var curTxid: Option[UUID] = None
 
+  private var curTxid: Option[UUID] = None
   private var transactionInProgress = false
   private var binLogPos: Option[BinaryLogPosition] = None
 
@@ -104,17 +104,18 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
     val success = event match {
 
-      case Some(e: BeginEvent) if groupEventsByTx    ⇒ handleBegin(e)
-      case Some(e: CommitEvent) if groupEventsByTx   ⇒ handleCommit(e)
-      case Some(e: RollbackEvent) if groupEventsByTx ⇒ handleRollback(e)
-      case Some(e: AlterEvent)                       ⇒ handleAlter(e)
-      case Some(e: TableMapEvent)                    ⇒ handleTableMap(e)
-      case Some(e: XidEvent)                         ⇒ handleXid(e)
-      case Some(e: Mutation)                         ⇒ handleMutation(e)
-      case Some(e: UnknownQueryEvent)                ⇒ handleUnknownQueryEvent(e)
-      case Some(e: UnknownEvent)                     ⇒ handleUnknownEvent(e)
-      // TODO: this is going to be the only error handler accepting the 3rd party event; allow the user to override?
-      case None                                      ⇒ handleEventDecodeError(binaryLogEvent)
+      case Some(e) ⇒ e match {
+        case e: AlterEvent                       ⇒ handleAlter(e)
+        case e: BeginEvent if groupEventsByTx    ⇒ handleBegin(e)
+        case e: CommitEvent if groupEventsByTx   ⇒ handleCommit(e)
+        case e: RollbackEvent if groupEventsByTx ⇒ handleRollback(e)
+        case e: TableMapEvent                    ⇒ handleTableMap(e)
+        case e: XidEvent                         ⇒ handleXid(e)
+        case e: Mutation                         ⇒ handleMutation(e)
+        case e: UnknownQueryEvent                ⇒ handleUnknownQueryEvent(e)
+        case e: UnknownEvent                     ⇒ handleUnknownEvent(e)
+      }
+      case None ⇒ handleEventDecodeError(binaryLogEvent)
     }
 
     if (!success) {
@@ -178,16 +179,17 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def handleAlter(event: AlterEvent): Boolean = {
 
-    val success = event.table.map(table ⇒ {
-      processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
-        list = listeners.toList,
-        listOp = _.onTableAlter(this, event),
-        onError = handleAlterError(_, _)(table, event))
-    }).getOrElse({
-      // if we don't find the table we continue, which means downstream handlers don't get called
-      log.warn(s"Encountered an alter event but could not find a corresponding Table for it, ignoring and continuing: $event")
-      true
-    })
+    val success = event.table match {
+      case u: UnknownTable ⇒
+        // if we don't find the table we continue, which means downstream handlers don't get called
+        log.warn(s"Encountered an alter event but could not find a corresponding Table for it, ignoring and continuing: $event")
+        true
+      case table: Table ⇒
+        processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
+          list = listeners.toList,
+          listOp = _.onTableAlter(this, event),
+          onError = handleAlterError(_, _)(table, event))
+    }
 
     success && updateBinaryLogPosition()
   }
