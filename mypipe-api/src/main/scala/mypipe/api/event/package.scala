@@ -18,7 +18,7 @@ package object event {
   case class BeginEvent(database: String, sql: String) extends QueryEvent
   case class CommitEvent(database: String, sql: String) extends QueryEvent
   case class RollbackEvent(database: String, sql: String) extends QueryEvent
-  case class AlterEvent(database: String, sql: String) extends QueryEvent
+  case class AlterEvent(database: String, table: String, sql: String) extends QueryEvent
   case class XidEvent(xid: Long) extends Event
   case class TableMapEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]) extends Event
 

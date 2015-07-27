@@ -34,7 +34,6 @@ class KafkaProducer[MessageType](metadataBrokers: String) {
     queue.drainTo(s)
     val a = s.toArray[KeyedMessage[Array[Byte], Array[Byte]]](Array[KeyedMessage[Array[Byte], Array[Byte]]]())
     producer.send(a: _*)
-    // TODO: return value properly
     true
   }
 }

@@ -85,24 +85,25 @@ abstract class AbstractMySQLBinaryLogConsumer(
     val queryEventData = event.getData[QueryEventData]
     val query = queryEventData.getSql
 
-    query.toLowerCase match {
+    Some(query.toLowerCase match {
       case q if q.indexOf("begin") == 0 ⇒
-        Some(BeginEvent(queryEventData.getDatabase, queryEventData.getSql))
+        BeginEvent(queryEventData.getDatabase, queryEventData.getSql)
       case q if q.indexOf("commit") == 0 ⇒
-        Some(CommitEvent(queryEventData.getDatabase, queryEventData.getSql))
+        CommitEvent(queryEventData.getDatabase, queryEventData.getSql)
       case q if q.indexOf("rollback") == 0 ⇒
-        Some(RollbackEvent(queryEventData.getDatabase, queryEventData.getSql))
+        RollbackEvent(queryEventData.getDatabase, queryEventData.getSql)
       case q if q.indexOf("alter") == 0 ⇒
-        val database = {
-          if (!queryEventData.getDatabase.isEmpty) queryEventData.getDatabase
+        val databaseName = {
+          if (queryEventData.getDatabase.nonEmpty) queryEventData.getDatabase
           else decodeDatabaseFromAlter(queryEventData.getSql)
         }
 
-        Some(AlterEvent(database, queryEventData.getSql))
+        val tableName = decodeTableFromAlter(queryEventData.getSql)
+        AlterEvent(databaseName, tableName, queryEventData.getSql)
       case q ⇒
         log.debug("Consumer {} ignoring unknown query query={}", Array(id, q): _*)
-        Some(UnknownQueryEvent(queryEventData.getDatabase, queryEventData.getSql))
-    }
+        UnknownQueryEvent(queryEventData.getDatabase, queryEventData.getSql)
+    })
   }
 
   private def decodeDatabaseFromAlter(sql: String): String = {
@@ -116,6 +117,14 @@ abstract class AbstractMySQLBinaryLogConsumer(
       log.error("Could not find database for query: {}", sql)
       ""
     }
+  }
+
+  private def decodeTableFromAlter(sql: String): String = {
+    // FIXME: this sucks and needs to be parsed properly
+    val t = sql.split(" ")(2)
+    // account for db.table
+    if (t.contains(".")) t.split("""\.""")(1)
+    else t
   }
 
   protected def decodeXidEvent(event: MEvent): Option[XidEvent] = {

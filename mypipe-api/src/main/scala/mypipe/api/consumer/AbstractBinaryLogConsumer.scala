@@ -103,7 +103,6 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
     val success = event match {
 
-      // TODO: each of the following cases that can fail needs it's own error handler
       case Some(e: BeginEvent) if groupEventsByTx    ⇒ handleBegin(e)
       case Some(e: CommitEvent) if groupEventsByTx   ⇒ handleCommit(e)
       case Some(e: RollbackEvent) if groupEventsByTx ⇒ handleRollback(e)

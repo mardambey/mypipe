@@ -99,14 +99,6 @@ trait CacheableTableMapBehaviour extends AbstractMySQLBinaryLogConsumer {
     tableCache.getTable(tableId)
 
   override protected def findTable(event: AlterEvent): Option[Table] = {
-    // FIXME: this sucks and needs to be parsed properly
-    val tableName = {
-      val t = event.sql.split(" ")(2)
-      // account for db.table
-      if (t.contains(".")) t.split("""\.""")(1)
-      else t
-    }
-
-    tableCache.refreshTable(event.database, tableName)
+    tableCache.refreshTable(event.database, event.table)
   }
 }

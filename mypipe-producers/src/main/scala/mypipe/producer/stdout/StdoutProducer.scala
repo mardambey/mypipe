@@ -53,7 +53,7 @@ class StdoutProducer(config: Config) extends Producer(config) {
           val pKeyVals = p.map(_._2.value.toString)
           val where = pKeyColNames
             .map(_.zip(pKeyVals)
-            .map(kv ⇒ kv._1 + "=" + kv._2))
+              .map(kv ⇒ kv._1 + "=" + kv._2))
             .map(_.mkString(", "))
             .map(w ⇒ s"WHERE ($w)").getOrElse("")
 
