@@ -23,7 +23,10 @@ package object event {
     val table: Table
   }
 
-  case class AlterEvent(database: String, table: Table, sql: String) extends TableContainingEvent
+  case class AlterEvent(table: Table, sql: String) extends TableContainingEvent {
+    val database = table.db
+  }
+
   case class XidEvent(xid: Long) extends Event
 
   case class TableMapEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]) extends Event

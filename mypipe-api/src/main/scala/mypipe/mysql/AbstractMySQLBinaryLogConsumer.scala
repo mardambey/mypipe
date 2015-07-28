@@ -99,7 +99,7 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
         val tableName = decodeTableFromAlter(queryEventData.getSql)
         val table = findTable(databaseName, tableName).getOrElse(new UnknownTable(-1.toLong, name = tableName, db = databaseName))
-        AlterEvent(databaseName, table, queryEventData.getSql)
+        AlterEvent(table, queryEventData.getSql)
       case q ⇒
         log.debug("Consumer {} ignoring unknown query query={}", Array(id, q): _*)
         UnknownQueryEvent(queryEventData.getDatabase, queryEventData.getSql)
