@@ -54,7 +54,10 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
           assert(insertMutation.getDatabase.toString == Queries.DATABASE.name)
           assert(insertMutation.getTable.toString == Queries.TABLE.name)
           assert(insertMutation.getStrings.get(username).toString.equals(Queries.INSERT.username))
+        } catch {
+          case e: Exception ⇒ log.error("Failed testing insert: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
         }
+
         true
       },
 
@@ -65,7 +68,10 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
           assert(updateMutation.getTable.toString == Queries.TABLE.name)
           assert(updateMutation.getOldStrings.get(username).toString == Queries.INSERT.username)
           assert(updateMutation.getNewStrings.get(username).toString == Queries.UPDATE.username)
+        } catch {
+          case e: Exception ⇒ log.error("Failed testing update: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
         }
+
         true
       },
 
@@ -75,9 +81,13 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
           assert(deleteMutation.getDatabase.toString == Queries.DATABASE.name)
           assert(deleteMutation.getTable.toString == Queries.TABLE.name)
           assert(deleteMutation.getStrings.get(username).toString == Queries.UPDATE.username)
+        } catch {
+          case e: Exception ⇒ log.error("Failed testing delete: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
         }
+
         done = true
         true
+
       }) {
 
       protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
@@ -94,10 +104,11 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2.seconds)
     Await.result(Future { while (!done) Thread.sleep(100) }, 20.seconds)
 
-    // FIXME: add catch
     try {
       kafkaConsumer.stop
       Await.result(future, 5.seconds)
+    } catch {
+      case e: Exception ⇒ log.error("Failed stopping consumer: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
     }
 
     if (!done) assert(false)

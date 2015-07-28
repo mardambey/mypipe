@@ -62,7 +62,10 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
           assert(insertMutation.getTable.toString == TABLE)
           assert(insertMutation.getUsername.toString == USERNAME)
           assert(insertMutation.getLoginCount == LOGIN_COUNT)
+        } catch {
+          case e: Exception ⇒ log.error("Failed testing insert: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
         }
+
         true
       },
 
@@ -75,7 +78,10 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
           assert(updateMutation.getNewUsername.toString == USERNAME2)
           assert(updateMutation.getOldLoginCount == LOGIN_COUNT)
           assert(updateMutation.getNewLoginCount == LOGIN_COUNT + 1)
+        } catch {
+          case e: Exception ⇒ log.error("Failed testing update: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
         }
+
         true
       },
 
@@ -86,7 +92,10 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
           assert(deleteMutation.getTable.toString == TABLE)
           assert(deleteMutation.getUsername.toString == USERNAME2)
           assert(deleteMutation.getLoginCount == LOGIN_COUNT + 1)
+        } catch {
+          case e: Exception ⇒ log.error("Failed testing delete: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
         }
+
         done = true
         true
       },
@@ -117,6 +126,8 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
     try {
       kafkaConsumer.stop
       Await.result(future, 5.seconds)
+    } catch {
+      case e: Exception ⇒ log.error("Failed stopping consumer: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
     }
 
     if (!done) assert(false)
