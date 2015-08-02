@@ -13,23 +13,22 @@ package object event {
     val sql: String
   }
 
-  case class UnknownEvent(database: String = "", sql: String = "") extends QueryEvent
-  case class UnknownQueryEvent(database: String = "", sql: String = "") extends QueryEvent
-  case class BeginEvent(database: String, sql: String) extends QueryEvent
-  case class CommitEvent(database: String, sql: String) extends QueryEvent
-  case class RollbackEvent(database: String, sql: String) extends QueryEvent
+  final case class UnknownEvent(database: String = "", sql: String = "") extends QueryEvent
+  final case class UnknownQueryEvent(database: String = "", sql: String = "") extends QueryEvent
+  final case class BeginEvent(database: String, sql: String) extends QueryEvent
+  final case class CommitEvent(database: String, sql: String) extends QueryEvent
+  final case class RollbackEvent(database: String, sql: String) extends QueryEvent
 
-  trait TableContainingEvent extends QueryEvent {
+  sealed trait TableContainingEvent extends QueryEvent {
     val table: Table
   }
 
-  case class AlterEvent(table: Table, sql: String) extends TableContainingEvent {
+  final case class AlterEvent(table: Table, sql: String) extends TableContainingEvent {
     val database = table.db
   }
 
-  case class XidEvent(xid: Long) extends Event
-
-  case class TableMapEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]) extends Event
+  final case class XidEvent(xid: Long) extends Event
+  final case class TableMapEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]) extends Event
 
   /** Represents a row change event (Insert, Update, or Delete).
    *

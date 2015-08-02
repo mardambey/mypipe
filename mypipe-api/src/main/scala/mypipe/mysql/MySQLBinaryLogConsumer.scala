@@ -9,5 +9,6 @@ case class MySQLBinaryLogConsumer(
     extends AbstractMySQLBinaryLogConsumer(hostname, port, username, password)
 
     with ConfigBasedErrorHandlingBehaviour[MEvent, BinaryLogFilePosition]
+    with ConfigBasedEventSkippingBehaviour
     with CacheableTableMapBehaviour
 

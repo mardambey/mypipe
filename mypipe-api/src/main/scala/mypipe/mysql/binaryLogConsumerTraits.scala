@@ -1,10 +1,39 @@
 package mypipe.mysql
 
 import mypipe.api.Conf
-import mypipe.api.consumer.{ BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
+import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event._
+import mypipe.util.Eval
 import org.slf4j.LoggerFactory
+
+/** Used when no event skipping behaviour is desired.
+ */
+trait NoEventSkippingBehaviour {
+  this: BinaryLogConsumer[_, _] ⇒
+
+  protected def skipEvent(e: TableContainingEvent): Boolean = false
+}
+
+/** Used alongside the the configuration in order to read in and
+ *  compile the code responsible for keeping or skipping events.
+ */
+// TODO: write a test for this functionality
+trait ConfigBasedEventSkippingBehaviour {
+  this: BinaryLogConsumer[_, _] ⇒
+
+  val includeEventCond = Conf.INCLUDE_EVENT_CONDITION
+
+  val skipFn: (String, String) ⇒ Boolean =
+    if (includeEventCond.isDefined)
+      Eval(s"""{ (db: String, table: String) => { ! ( ${includeEventCond.get} ) } }""")
+    else
+      (_, _) ⇒ false
+
+  protected def skipEvent(e: TableContainingEvent): Boolean = {
+    skipFn(e.table.db, e.table.name)
+  }
+}
 
 trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] {
 
@@ -76,7 +105,8 @@ class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryL
   }
 
   override def handleEmptyCommitError(queryList: List[QueryEvent]): Boolean = {
-    log.error("Could not handle commit due to empty mutation list, missed queries: {}", queryList)
+    val l: (String, Any) ⇒ Unit = if (quitOnEmptyMutationCommitFailure) log.error else log.warn
+    l("Could not handle commit due to empty mutation list, missed queries: {}", queryList)
     !quitOnEmptyMutationCommitFailure
   }
 

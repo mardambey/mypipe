@@ -73,6 +73,15 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
    */
   protected def disconnect(): Unit
 
+  /** Whether or not to skip the given event. If this method returns true
+   *  then the consumer does not process this event and continues to the next one
+   *  as if it were processed successfully.
+   *
+   *  @param e the event to potentially skip
+   *  @return true / false to skip or not to skip the event
+   */
+  protected def skipEvent(e: TableContainingEvent): Boolean
+
   /** Gets the consumer's current position in the binary log.
    *  @return current BinLogPos
    */
@@ -105,15 +114,16 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     val success = event match {
 
       case Some(e) ⇒ e match {
-        case e: AlterEvent                       ⇒ handleAlter(e)
-        case e: BeginEvent if groupEventsByTx    ⇒ handleBegin(e)
-        case e: CommitEvent if groupEventsByTx   ⇒ handleCommit(e)
-        case e: RollbackEvent if groupEventsByTx ⇒ handleRollback(e)
-        case e: TableMapEvent                    ⇒ handleTableMap(e)
-        case e: XidEvent                         ⇒ handleXid(e)
-        case e: Mutation                         ⇒ handleMutation(e)
-        case e: UnknownQueryEvent                ⇒ handleUnknownQueryEvent(e)
-        case e: UnknownEvent                     ⇒ handleUnknownEvent(e)
+        case e: TableContainingEvent if skipEvent(e) ⇒ true
+        case e: AlterEvent                           ⇒ handleAlter(e)
+        case e: BeginEvent if groupEventsByTx        ⇒ handleBegin(e)
+        case e: CommitEvent if groupEventsByTx       ⇒ handleCommit(e)
+        case e: RollbackEvent if groupEventsByTx     ⇒ handleRollback(e)
+        case e: TableMapEvent                        ⇒ handleTableMap(e)
+        case e: XidEvent                             ⇒ handleXid(e)
+        case e: Mutation                             ⇒ handleMutation(e)
+        case e: UnknownQueryEvent                    ⇒ handleUnknownQueryEvent(e)
+        case e: UnknownEvent                         ⇒ handleUnknownEvent(e)
       }
       case None ⇒ handleEventDecodeError(binaryLogEvent)
     }
@@ -240,13 +250,10 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
       clearTxState()
       success
-    } else if (txQueries.nonEmpty) {
+    } else {
       val ret = handleEmptyCommitError(txQueries.toList)
       clearTxState()
       ret
-    } else {
-      log.error("Consumer {} asked to commit empty transaction, failing.", id)
-      false
     }
   }
 
