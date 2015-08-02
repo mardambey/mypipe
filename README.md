@@ -347,6 +347,7 @@ then user can decide to abort and stop processing using the following flags:
 * `quit-on-event-handler-failure`: an event handler failed (commit)
 * `quit-on-event-decode-failure`: mypipe could not decode the event
 * `quit-on-listener-failure`: a specified listener could not process the event
+* `quit-on-empty-mutation-commit-failure`: quit upon encountering an empty transaction
 
 Errors are handled as such:
 
@@ -360,6 +361,15 @@ Error handler invocation:
 * If the first layer or second layer are invoked and they return false, then the third layer (global error handler) is invoked, otherwise, processing of the next event continues
 
 A custom error handler can also be provided if available in the classpath.
+
+# Event Filtering
+If not all events are to be processed, they can be filtered by setting `include-event-condition`.
+This allows for controlling what dbs and tables will be consumed. Effectively, this is treated as Scala code and is compiled at runtime. Setting this value to blank ignores it.
+Example:
+
+    include-event-condition = """ db == "mypipe" && table =="user" """
+
+The above will only process events originating from the database named "mypipe" and the table named "user".
 
 # Tests
 In order to run the tests you need to configure `test.conf` with proper MySQL
