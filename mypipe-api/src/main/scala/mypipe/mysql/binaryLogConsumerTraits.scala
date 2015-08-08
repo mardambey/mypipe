@@ -105,7 +105,7 @@ class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryL
   }
 
   override def handleEmptyCommitError(queryList: List[QueryEvent]): Boolean = {
-    val l: (String, Any) ⇒ Unit = if (quitOnEmptyMutationCommitFailure) log.error else log.warn
+    val l: (String, Any) ⇒ Unit = if (quitOnEmptyMutationCommitFailure) log.error else log.debug
     l("Could not handle commit due to empty mutation list, missed queries: {}", queryList)
     !quitOnEmptyMutationCommitFailure
   }
