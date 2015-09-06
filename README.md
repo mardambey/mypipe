@@ -95,12 +95,48 @@ following structure in the case of an insert (`InsertMutation.avsc`):
 Updates will contain both the old row values and the new ones (see 
 `UpdateMutation.avsc`) and deletes are similar to inserts (`DeleteMutation.avsc`). 
 Once transformed into Avro data the mutations are pushed into Kafka topics 
-based on the following convention:
+based on the following convention (this is configurable):
 
     topicName = s"$db_$table_generic"
 
 This ensures that all mutations destined to a specific database / table tuple are
 all added to a single topic with mutation ordering guarantees.
+
+## MySQL to "specific" Kafka topics
+If you are running an Avro schema repository you can encode binary log events based on 
+the structures specified in that repository for the incoming database / table streams. 
+
+In order to configure a specific producer you should add a `pipe` using a `mypipe.producer.KafkaMutationSpecificAvroProducer` 
+as it's producer. The producer needs some configuration values in order to find the Kafka brokers, 
+ZooKeeper ensemble, and the Avro schema repository. Here is a sample configuration:
+
+    kafka-specific {
+	  enabled = true
+	  consumers = ["localhost"]
+	  producer {
+	    kafka-specific {
+	      schema-repo-client = "mypipe.avro.schema.SchemaRepo"
+          metadata-brokers = "localhost:9092"
+          zk-connect = "localhost:2181"
+	    }
+	  }
+	}
+
+Note that if you use `mypipe.avro.schema.SchemaRepo` as the schema repository client, you have to 
+provide the running JVM with the system property `avro.repo.server-url` in order for the client to 
+know where to reach the repository.
+
+## Configuring Kafka topic names
+mypipe will push events into Kafka based on the `topic-format` configuration value. `reference.conf` 
+has the default values under `mypipe.kafka`, `specific-producer` and `generic-producer`.
+
+    specific-producer {
+      topic-format = "${db}_${table}_specific"
+    }
+     
+    generic-producer {
+      topic-format = "${db}_${table}_generic"
+    }
 
 ## `ALTER` queries and "generic" Kafka topics
 mypipe handles `ALTER` table queries (as described below) allowing it to add 
