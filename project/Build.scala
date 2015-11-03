@@ -20,6 +20,7 @@ object Dependencies {
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
   val xinject = "javax.inject" % "javax.inject" % "1"
+  val redisclient = "net.debasishg" %% "redisclient" % "3.0"
 }
 
 object AvroCompiler {
