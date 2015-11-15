@@ -113,3 +113,4 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     }
   }
 }
+

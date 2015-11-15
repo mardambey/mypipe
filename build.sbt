@@ -34,6 +34,13 @@ lazy val runnerDependencies = Seq(
   typesafeConfig
 )
 
+lazy val snapshotterDependencies = Seq(
+  logback,
+  mysqlAsync,
+  scalaTest,
+  typesafeConfig
+)
+
 lazy val producersDependencies = Seq(
   akkaActor,
   typesafeConfig
@@ -56,7 +63,7 @@ lazy val kafkaDependencies = Seq(
 lazy val root = (project in file(".")).
   settings(commonSettings: _*).
   settings(name := "mypipe").
-  aggregate(api, producers, runner, myavro, mykafka)
+  aggregate(api, producers, runner, snapshotter, myavro, mykafka)
 
 lazy val runner = (project in file("mypipe-runner")).
   settings(commonSettings: _*).
@@ -65,6 +72,14 @@ lazy val runner = (project in file("mypipe-runner")).
     fork in run := false,
     libraryDependencies ++= runnerDependencies).
   settings(Format.settings) dependsOn(api, producers, myavro, mykafka)
+
+lazy val snapshotter = (project in file("mypipe-snapshotter")).
+  settings(commonSettings: _*).
+  settings(
+    name := "snapshotter",
+    fork in run := false,
+    libraryDependencies ++= snapshotterDependencies).
+  settings(Format.settings) dependsOn(api % "compile->compile;test->test", producers, myavro, mykafka)
 
 lazy val producers = (project in file("mypipe-producers")).
   settings(commonSettings: _*).
