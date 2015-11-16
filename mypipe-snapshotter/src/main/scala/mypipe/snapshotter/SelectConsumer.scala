@@ -1,27 +1,26 @@
-package mypipe.runner
+package mypipe.snapshotter
 
 import java.lang.Long
 
-import mypipe.api.consumer.{ BinaryLogConsumerListener, BinaryLogConsumer }
-import mypipe.api.data.{ Column, Row, Table }
+import mypipe.api.consumer.{BinaryLogConsumer, BinaryLogConsumerListener}
+import mypipe.api.data.{Column, Row, Table}
 import mypipe.api.event._
 import mypipe.mysql.BinaryLogFilePosition
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 
-case class SelectEvent(database: String, table: String, query: String)
+case class SelectEvent(database: String, table: String, rows: Seq[Seq[Any]])
 
 class SelectConsumer extends BinaryLogConsumer[SelectEvent, BinaryLogFilePosition] {
   /** Given a third-party BinLogEvent, this method decodes it to an
    *  mypipe specific Event type if it recognizes it.
-   *  @param binaryLogEvent third-party BinLogEvent to decode
+   *  @param event the event to decode
    *  @return the decoded Event or None
    */
-  override protected def decodeEvent(binaryLogEvent: SelectEvent): Option[Event] = {
-
-    val table = findTable(binaryLogEvent.database, binaryLogEvent.table)
-    val rowData = ???
+  override protected def decodeEvent(event: SelectEvent): Option[Event] = {
+    val table = findTable(event.database, event.table)
+    val rowData = event.rows.map(_.map(_.asInstanceOf[java.io.Serializable]).toArray).toList.asJava
     val rows = createRows(table.get, rowData)
     Some(InsertMutation(table.get, rows))
   }
