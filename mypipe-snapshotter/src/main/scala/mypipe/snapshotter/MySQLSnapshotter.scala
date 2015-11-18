@@ -20,6 +20,30 @@ object MySQLSnapshotter {
     runQueries(queries(tableQueries))
   }
 
+  def snapshotToSelects(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SelectEvent]]] = snapshot map {
+    results ⇒
+      {
+        results.map { result ⇒
+          val colData = result._2.rows.map(identity) map { rows ⇒
+            val colCount = rows.columnNames.length
+            rows.map { row ⇒
+              (0 until colCount) map { i ⇒
+                row(i)
+              }
+            }
+          }
+
+          val firstDot = result._1.indexOf('.')
+          if (firstDot == result._1.lastIndexOf('.') && firstDot > 0) {
+            val Array(db, table) = result._1.split('.')
+            Some(SelectEvent(db, table, colData.getOrElse(Seq.empty)))
+          } else {
+            None
+          }
+        }
+      }
+  }
+
   private def queries(tableQueries: Seq[(String, String)]) = Seq(
     "" -> trxIsolationLevel,
     "" -> autoCommit,

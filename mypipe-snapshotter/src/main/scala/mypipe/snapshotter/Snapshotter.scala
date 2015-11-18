@@ -1,46 +1,78 @@
 package mypipe.snapshotter
 
+import com.github.mauricio.async.db.mysql.MySQLConnection
+import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
+import mypipe.api.event.Mutation
+
 import scala.concurrent.duration._
-import com.github.mauricio.async.db.{QueryResult, Connection}
+import scala.concurrent.ExecutionContext.Implicits.global
+import com.github.mauricio.async.db.{ Configuration, QueryResult, Connection }
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{Future, Await}
+import scala.concurrent.{ Future, Await }
 
 object Snapshotter extends App {
 
-  protected val log = LoggerFactory.getLogger(getClass)
-  protected val conf = ConfigFactory.load()
-
-  implicit val c: Connection = ???
-
+  val log = LoggerFactory.getLogger(getClass)
+  val conf = ConfigFactory.load()
+  val Array(dbHost, dbPort, dbUsername, dbPassword, dbName) = conf.getString("mypipe.snapshotter.database.info").split(":")
   val tables = Seq("mypipe.user")
 
-  val selects = snapshotToSelects(MySQLSnapshotter.snapshot(tables))
+  val db = Db(dbHost, dbPort.toInt, dbUsername, dbPassword, dbName)
+  implicit lazy val c: Connection = db.connection
 
-  selects
+  db.connect()
 
-  sys.addShutdownHook({
-    log.info("Shutting down...")
-  })
+  while (!db.connection.isConnected) Thread.sleep(10)
 
-  def snapshotToSelects(snapshot: Future[Seq[(String, QueryResult)]]): Future[Seq[SelectEvent]] = snapshot map {
-    results ⇒ {
-      results.map { result ⇒
-        val colData = result._2.rows.map(identity) map { rows ⇒
-          val colCount = rows.columnNames.length
-          rows.map { row ⇒
-            (0 until colCount) map { i ⇒
-              row(i)
-            }
-          }
-        }
+  log.info(s"Connected to ${db.hostname}:${db.port}")
 
-        val (db, table) = result._1.split('.')
-        SelectEvent(db, table, colData.getOrElse(Seq.empty))
-      }
+  val selects = MySQLSnapshotter.snapshotToSelects(MySQLSnapshotter.snapshot(tables))
+  val selectConsumer = new SelectConsumer(dbUsername, dbHost, dbPassword, dbPort.toInt)
+  val listener = new BinaryLogConsumerListener[SelectEvent, Nothing] {
+    override def onMutation(consumer: BinaryLogConsumer[SelectEvent, Nothing], mutation: Mutation): Boolean = {
+      log.info(s"Got mutation: $mutation")
+      true
+    }
+
+    override def onMutation(consumer: BinaryLogConsumer[SelectEvent, Nothing], mutations: Seq[Mutation]): Boolean = {
+      log.info(s"Got mutation: $mutations")
+      true
     }
   }
 
+  sys.addShutdownHook({
+    // TODO: expose this
+    //selectConsumer.disconnect
+    log.info(s"Disconnecting from ${db.hostname}:${db.port}")
+    db.disconnect()
+    log.info("Shutting down...")
+  })
+
+  selectConsumer.handleEvents(Await.result(selects, 10.seconds))
+
+  sys.exit()
 }
 
+case class Db(hostname: String, port: Int, username: String, password: String, dbName: String) {
+
+  private val configuration = new Configuration(username, hostname, port, Some(password))
+  var connection: Connection = _
+
+  def connect(): Unit = connect(timeoutMillis = 5000)
+  def connect(timeoutMillis: Int) {
+    connection = new MySQLConnection(configuration)
+    val future = connection.connect
+    Await.result(future, timeoutMillis.millis)
+  }
+
+  def select(db: String): Unit = {
+  }
+
+  def disconnect(): Unit = disconnect(timeoutMillis = 5000)
+  def disconnect(timeoutMillis: Int) {
+    val future = connection.disconnect
+    Await.result(future, timeoutMillis.millis)
+  }
+}

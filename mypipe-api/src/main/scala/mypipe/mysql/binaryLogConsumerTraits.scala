@@ -1,7 +1,7 @@
 package mypipe.mysql
 
 import mypipe.api.Conf
-import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
+import mypipe.api.consumer.{ BinaryLogConsumerTableFinder, BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event._
 import mypipe.util.Eval
@@ -116,7 +116,12 @@ class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryL
   }
 }
 
-trait CacheableTableMapBehaviour extends AbstractMySQLBinaryLogConsumer {
+trait CacheableTableMapBehaviour extends BinaryLogConsumerTableFinder {
+
+  protected val hostname: String
+  protected val port: Int
+  protected val username: String
+  protected val password: String
 
   protected var tableCache = new TableCache(hostname, port, username, password)
 
@@ -129,6 +134,7 @@ trait CacheableTableMapBehaviour extends AbstractMySQLBinaryLogConsumer {
     tableCache.getTable(tableId)
 
   override protected def findTable(database: String, table: String): Option[Table] = {
+    println(s"behaviour, findTable($database, $table)")
     tableCache.refreshTable(database, table)
   }
 }

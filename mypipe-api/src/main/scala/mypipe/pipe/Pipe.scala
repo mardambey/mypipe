@@ -31,24 +31,26 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       _connected = true
 
       flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS.seconds,
-        Conf.FLUSH_INTERVAL_SECS.seconds) {
-          Conf.binlogSaveFilePosition(consumer.id,
-            consumer.getBinaryLogPosition.get,
-            id)
-          // TODO: if flush fails, stop and disconnect
-          producer.flush()
-        })
+        Conf.FLUSH_INTERVAL_SECS.seconds)(saveBinaryLogPosition(consumer)))
+    }
+
+    private def saveBinaryLogPosition(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) {
+      val binlogPos = consumer.getBinaryLogPosition
+      if (producer.flush() || binlogPos.isEmpty) {
+        Conf.binlogSaveFilePosition(consumer.id, binlogPos.get, id)
+      } else {
+        if (binlogPos.isDefined)
+          log.error(s"Producer ($producer) failed to flush, not saving binary log position: $binlogPos for consumer $consumer.")
+        else
+          log.error(s"Producer ($producer) flushed, but encountered no binary log position to save for consumer $consumer.")
+      }
     }
 
     override def onDisconnect(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
-      Conf.binlogSaveFilePosition(
-        consumer.id,
-        consumer.getBinaryLogPosition.get,
-        id)
-      producer.flush()
+      saveBinaryLogPosition(consumer)
     }
 
     override def onMutation(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutation: Mutation): Boolean = {

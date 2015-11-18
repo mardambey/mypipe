@@ -30,17 +30,7 @@ trait BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] extends B
   def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean
 }
 
-/** Defines what a log consumer should support for mypipe to use it.
- */
-trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] {
-
-  /** Given a third-party BinLogEvent, this method decodes it to an
-   *  mypipe specific Event type if it recognizes it.
-   *  @param binaryLogEvent third-party BinLogEvent to decode
-   *  @return the decoded Event or None
-   */
-  protected def decodeEvent(binaryLogEvent: BinaryLogEvent): Option[Event]
-
+trait BinaryLogConsumerTableFinder {
   /** Given a database and table name, returns a valid Table instance
    *  if possible.
    *  @param database the database name
@@ -62,6 +52,22 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
    *  @return a Table instance or None if not possible
    */
   protected def findTable(tableId: java.lang.Long): Option[Table]
+}
+
+/** Defines what a log consumer should support for mypipe to use it.
+ */
+trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] with BinaryLogConsumerTableFinder {
+
+  /** Set of listeners receiving events from this consumer.
+   */
+  protected val listeners = collection.mutable.Set[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]]()
+
+  /** Given a third-party BinLogEvent, this method decodes it to an
+   *  mypipe specific Event type if it recognizes it.
+   *  @param binaryLogEvent third-party BinLogEvent to decode
+   *  @return the decoded Event or None
+   */
+  protected def decodeEvent(binaryLogEvent: BinaryLogEvent): Option[Event]
 
   /** Disconnects the consumer from it's source.
    */
@@ -75,6 +81,13 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
    *  @return true / false to skip or not to skip the event
    */
   protected def skipEvent(e: TableContainingEvent): Boolean
+
+  /** Registers a listener for this consumer's events.
+   *  @param listener the BinaryLogConsumerListener to register
+   */
+  def registerListener(listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]) {
+    listeners += listener
+  }
 
   /** Gets the consumer's current position in the binary log.
    *  @return current BinLogPos

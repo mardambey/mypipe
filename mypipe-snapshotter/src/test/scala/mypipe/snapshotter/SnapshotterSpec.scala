@@ -44,10 +44,11 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
           colData.map {
             case (dbAndTable, rows) ⇒
               if (dbAndTable.equals("showMasterStatus")) {
+                log.info(s"found show master status data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
                 rows.length == 1 &&
                   rows(0).length >= 2 // file and position at least
               } else if (dbAndTable.startsWith("mypipe.")) {
-                log.debug(s"found select data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
+                log.info(s"found select data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
                 rows.length == 2 &&
                   rows(0).toArray.deep.equals(Array(123, "username", "password", 0).deep) &&
                   rows(1).toArray.deep.equals(Array(124, "username", "password", 0).deep)
@@ -58,6 +59,7 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
         }
 
       ret.map { results ⇒
+        log.info("results: " + results)
         !results.contains(false)
       }
     }

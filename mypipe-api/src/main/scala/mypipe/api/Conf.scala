@@ -73,20 +73,28 @@ object Conf {
     }
   }
 
-  def binlogSaveFilePosition(consumerId: String, filePos: BinaryLogFilePosition, pipe: String) {
+  def binlogSaveFilePosition(consumerId: String, filePos: BinaryLogFilePosition, pipe: String): Boolean = {
 
-    val fileName = binlogGetStatusFilename(consumerId, pipe)
+    try {
+      val fileName = binlogGetStatusFilename(consumerId, pipe)
 
-    if (!lastBinlogFilePos.getOrElse(fileName, "").equals(filePos)) {
+      if (!lastBinlogFilePos.getOrElse(fileName, "").equals(filePos)) {
 
-      val file = new File(fileName)
-      val writer = new PrintWriter(file)
+        val file = new File(fileName)
+        val writer = new PrintWriter(file)
 
-      log.info(s"Saving binlog position for pipe $pipe/$consumerId -> $filePos")
-      writer.write(s"${filePos.filename}:${filePos.pos}")
-      writer.close()
+        log.info(s"Saving binlog position for pipe $pipe/$consumerId -> $filePos")
+        writer.write(s"${filePos.filename}:${filePos.pos}")
+        writer.close()
 
-      lastBinlogFilePos(fileName) = filePos
+        lastBinlogFilePos(fileName) = filePos
+      }
+
+      true
+    } catch {
+      case e: Exception ⇒
+        log.error(s"Failed saving binary log position $filePos for consumer $consumerId and pipe $pipe.")
+        false
     }
   }
 

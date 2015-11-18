@@ -13,7 +13,6 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   protected val log = LoggerFactory.getLogger(getClass)
 
-  private val listeners = collection.mutable.Set[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]]()
   private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   private val groupMutationsByTx = Conf.GROUP_MUTATIONS_BY_TX
   private val txQueue = new scala.collection.mutable.ListBuffer[Mutation]
@@ -206,10 +205,6 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   protected def handleDisconnect() {
     updateBinaryLogPosition()
     listeners foreach (l ⇒ l.onDisconnect(this))
-  }
-
-  def registerListener(listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]) {
-    listeners += listener
   }
 
   def position: Option[BinaryLogPosition] = binLogPos
