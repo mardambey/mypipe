@@ -48,12 +48,15 @@ class SelectConsumer(
    *  @return the decoded Event or None
    */
   override protected def decodeEvent(event: SelectEvent): Option[Event] = {
-    val future = ask(dbMetadata, GetColumns(event.database, event.table)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
-    val columns = Await.result(future, 2.seconds)
-    val table = Table(0L, event.table, event.database, columns._1, columns._2)
     val rowData = event.rows.map(_.map(_.asInstanceOf[java.io.Serializable]).toArray).toList.asJava
-    val rows = createRows(table, rowData)
-    Some(InsertMutation(table, rows))
+    getTable(event.database, event.table) match {
+      case Some(table) ⇒
+        val rows = createRows(table, rowData)
+        Some(InsertMutation(table, rows))
+      case None ⇒
+        log.error(s"Could not find table for event, skipping: $event")
+        None
+    }
   }
 
   protected def createRows(table: Table, evRows: java.util.List[Array[java.io.Serializable]]): List[Row] = {
@@ -81,4 +84,24 @@ class SelectConsumer(
 
   override protected def onStop(): Unit = Unit
   override protected def onStart(): Unit = Unit
+
+  private val tables = scala.collection.mutable.HashMap[String, Table]()
+
+  private def getTable(database: String, table: String): Option[Table] = {
+    tables.get(s"$database.$table") match {
+      case table @ Some(_) ⇒ table
+      case None ⇒
+        val future = ask(dbMetadata, GetColumns(database, table)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
+        try {
+          val columns = Await.result(future, 2.seconds)
+          val t = Table(0L, table, database, columns._1, columns._2)
+          tables.put(s"$database.$table", t)
+          Some(t)
+        } catch {
+          case e: Exception ⇒
+            log.error(s"Exception caught while fetching table information for $database.$table")
+            None
+        }
+    }
+  }
 }
