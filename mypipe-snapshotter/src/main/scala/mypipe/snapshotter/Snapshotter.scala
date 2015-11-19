@@ -29,6 +29,8 @@ object Snapshotter extends App {
   log.info(s"Connected to ${db.hostname}:${db.port}")
 
   val selects = MySQLSnapshotter.snapshotToSelects(MySQLSnapshotter.snapshot(tables))
+
+  log.info("Fetched snapshot.")
   val selectConsumer = new SelectConsumer(dbUsername, dbHost, dbPassword, dbPort.toInt)
   val listener = new BinaryLogConsumerListener[SelectEvent, Nothing] {
     override def onMutation(consumer: BinaryLogConsumer[SelectEvent, Nothing], mutation: Mutation): Boolean = {
@@ -42,6 +44,8 @@ object Snapshotter extends App {
     }
   }
 
+  selectConsumer.registerListener(listener)
+
   sys.addShutdownHook({
     // TODO: expose this
     //selectConsumer.disconnect
@@ -50,9 +54,11 @@ object Snapshotter extends App {
     log.info("Shutting down...")
   })
 
+  log.info("Consumer setup done.")
+
   selectConsumer.handleEvents(Await.result(selects, 10.seconds))
 
-  sys.exit()
+  log.info("All events handled, exiting.")
 }
 
 case class Db(hostname: String, port: Int, username: String, password: String, dbName: String) {

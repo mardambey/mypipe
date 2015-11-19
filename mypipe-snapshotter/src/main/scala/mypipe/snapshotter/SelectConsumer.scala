@@ -29,8 +29,8 @@ class SelectConsumer(
     with CacheableTableMapBehaviour {
 
   protected val log = LoggerFactory.getLogger(getClass)
-  protected val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
   protected val system = ActorSystem("mypipe-snapshotter")
+  protected val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
   protected implicit val ec = system.dispatcher
   protected implicit val timeout = Timeout(2.second)
 
