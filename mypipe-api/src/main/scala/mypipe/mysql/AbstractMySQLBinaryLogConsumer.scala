@@ -138,9 +138,9 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
   override def toString: String = s"$hostname:$port"
 
-  def connect(): Unit = client.connect()
+  override protected def onStart(): Unit = client.connect()
 
-  def disconnect(): Unit = client.disconnect()
+  override protected def onStop(): Unit = client.disconnect()
 
   protected def isMutation(eventType: EventType): Boolean = {
     EventType.isDelete(eventType) ||

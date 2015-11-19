@@ -44,12 +44,12 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       }
     })
 
-    Future { consumer.connect() }
+    Future { consumer.start() }
     while (!connected) Thread.sleep(1)
   }
 
   override def afterAll(): Unit = {
-    consumer.disconnect()
+    consumer.stop()
     super.afterAll()
   }
 

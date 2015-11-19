@@ -78,7 +78,7 @@ class StdoutProducer(config: Config) extends Producer(config) {
 
         })
 
-      case _ ⇒
+      case _ ⇒ log.info(s"Ignored mutation: $mutation")
 
     }
 

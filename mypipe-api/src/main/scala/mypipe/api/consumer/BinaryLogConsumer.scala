@@ -69,10 +69,6 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
    */
   protected def decodeEvent(binaryLogEvent: BinaryLogEvent): Option[Event]
 
-  /** Disconnects the consumer from it's source.
-   */
-  protected def disconnect(): Unit
-
   /** Whether or not to skip the given event. If this method returns true
    *  then the consumer does not process this event and continues to the next one
    *  as if it were processed successfully.
@@ -81,6 +77,14 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
    *  @return true / false to skip or not to skip the event
    */
   protected def skipEvent(e: TableContainingEvent): Boolean
+
+  /** Consumer specific startup logic.
+   */
+  protected def onStart(): Unit
+
+  /** Consumer specific shutdown logic.
+   */
+  protected def onStop(): Unit
 
   /** Registers a listener for this consumer's events.
    *  @param listener the BinaryLogConsumerListener to register
@@ -98,4 +102,16 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
    *  @return Unique ID as a string.
    */
   def id: String
+
+  /** Starts the consumer.
+   */
+  final def start(): Unit = {
+    listeners foreach (l ⇒ l.onConnect(this))
+  }
+
+  /** Stops the consumer.
+   */
+  final def stop(): Unit = {
+    listeners.foreach(_.onDisconnect(this))
+  }
 }

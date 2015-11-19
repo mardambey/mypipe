@@ -52,7 +52,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   }
 
   private def _disconnect(): Unit = {
-    disconnect()
+    stop()
     listeners foreach (l ⇒ l.onDisconnect(this))
   }
 
@@ -199,12 +199,10 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   protected def handleConnect() {
     updateBinaryLogPosition()
-    listeners foreach (l ⇒ l.onConnect(this))
   }
 
   protected def handleDisconnect() {
     updateBinaryLogPosition()
-    listeners foreach (l ⇒ l.onDisconnect(this))
   }
 
   def position: Option[BinaryLogPosition] = binLogPos

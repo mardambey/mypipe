@@ -1,16 +1,16 @@
 package mypipe.snapshotter
 
 import com.github.mauricio.async.db.mysql.MySQLConnection
-import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
-import mypipe.api.event.Mutation
+import mypipe.pipe.Pipe
+import mypipe.producer.stdout.StdoutProducer
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import com.github.mauricio.async.db.{ Configuration, QueryResult, Connection }
+import com.github.mauricio.async.db.{ Configuration, Connection }
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ Future, Await }
+import scala.concurrent.Await
 
 object Snapshotter extends App {
 
@@ -32,23 +32,11 @@ object Snapshotter extends App {
 
   log.info("Fetched snapshot.")
   val selectConsumer = new SelectConsumer(dbUsername, dbHost, dbPassword, dbPort.toInt)
-  val listener = new BinaryLogConsumerListener[SelectEvent, Nothing] {
-    override def onMutation(consumer: BinaryLogConsumer[SelectEvent, Nothing], mutation: Mutation): Boolean = {
-      log.info(s"Got mutation: $mutation")
-      true
-    }
-
-    override def onMutation(consumer: BinaryLogConsumer[SelectEvent, Nothing], mutations: Seq[Mutation]): Boolean = {
-      log.info(s"Got mutation: $mutations")
-      true
-    }
-  }
-
-  selectConsumer.registerListener(listener)
+  val stdoutProducer = new StdoutProducer(conf)
+  val pipe = new Pipe("selectConsumer-$dbHost:$dbPort-to-stdoutProducer-pipe", List(selectConsumer), stdoutProducer)
 
   sys.addShutdownHook({
-    // TODO: expose this
-    //selectConsumer.disconnect
+    pipe.disconnect()
     log.info(s"Disconnecting from ${db.hostname}:${db.port}")
     db.disconnect()
     log.info("Shutting down...")
@@ -56,6 +44,7 @@ object Snapshotter extends App {
 
   log.info("Consumer setup done.")
 
+  pipe.connect()
   selectConsumer.handleEvents(Await.result(selects, 10.seconds))
 
   log.info("All events handled, exiting.")

@@ -20,10 +20,12 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
     implicit lazy val c: Connection = db.connection
 
     val future = {
-      // make an insert
+      // make inserts
       Await.result(db.connection.sendQuery(Queries.INSERT.statement(id = "123")), 2000.millis)
       Await.result(db.connection.sendQuery(Queries.INSERT.statement(id = "124")), 2000.millis)
+
       val tables = Seq("mypipe.user")
+
       val colData = MySQLSnapshotter.snapshot(tables) map { results ⇒
         results.map { result ⇒
           val colData = result._2.rows.map(identity) map { rows ⇒
@@ -59,7 +61,6 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
         }
 
       ret.map { results ⇒
-        log.info("results: " + results)
         !results.contains(false)
       }
     }

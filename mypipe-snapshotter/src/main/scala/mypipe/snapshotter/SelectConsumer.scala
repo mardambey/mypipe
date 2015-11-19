@@ -23,8 +23,8 @@ class SelectConsumer(
   override protected val hostname: String,
   override protected val password: String,
   override protected val port: Int)
-    extends BinaryLogConsumer[SelectEvent, Nothing]
-    with ConfigBasedErrorHandlingBehaviour[SelectEvent, Nothing]
+    extends BinaryLogConsumer[SelectEvent, Unit]
+    with ConfigBasedErrorHandlingBehaviour[SelectEvent, Unit]
     with ConfigBasedEventSkippingBehaviour
     with CacheableTableMapBehaviour {
 
@@ -72,14 +72,13 @@ class SelectConsumer(
   /** Gets the consumer's current position in the binary log.
    *  @return current BinLogPos
    */
-  override def getBinaryLogPosition: Option[Nothing] = None
+  override def getBinaryLogPosition: Option[Unit] = None
 
   /** Gets this consumer's unique ID.
    *  @return Unique ID as a string.
    */
   override def id: String = s"select-consumer-$hostname-$port"
 
-  /** Disconnects the consumer from it's source.
-   */
-  override protected def disconnect(): Unit = Unit
+  override protected def onStop(): Unit = Unit
+  override protected def onStart(): Unit = Unit
 }

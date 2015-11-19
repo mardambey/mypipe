@@ -19,7 +19,7 @@ object PipeRunner extends App {
 
   lazy val producers: Map[String, Class[Producer]] = loadProducerClasses(conf, "mypipe.producers")
   lazy val consumers: Map[String, HostPortUserPass] = loadConsumerConfigs(conf, "mypipe.consumers")
-  lazy val pipes: Seq[Pipe] = createPipes(conf, "mypipe.pipes", producers, consumers)
+  lazy val pipes: Seq[Pipe[_, _]] = createPipes(conf, "mypipe.pipes", producers, consumers)
 
   if (pipes.isEmpty) {
     log.info("No pipes defined, exiting.")
@@ -28,7 +28,7 @@ object PipeRunner extends App {
 
   sys.addShutdownHook({
     log.info("Shutting down...")
-    pipes.foreach(p ⇒ p.disconnect())
+    pipes.foreach(_.disconnect())
   })
 
   log.info(s"Connecting ${pipes.size} pipes...")
@@ -56,11 +56,11 @@ object PipeRunnerUtil {
   def createPipes(conf: Config,
                   key: String,
                   producerClasses: Map[String, Class[Producer]],
-                  consumerConfigs: Map[String, HostPortUserPass]): Seq[Pipe] = {
+                  consumerConfigs: Map[String, HostPortUserPass]): Seq[Pipe[_, _]] = {
 
-    val PIPES = conf.getObject("mypipe.pipes").asScala
+    val pipes = conf.getObject("mypipe.pipes").asScala
 
-    PIPES.map(kv ⇒ {
+    pipes.map(kv ⇒ {
 
       val name = kv._1
 

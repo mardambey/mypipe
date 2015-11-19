@@ -8,11 +8,9 @@ import mypipe.api.producer.Producer
 import mypipe.mysql._
 import org.slf4j.LoggerFactory
 
-import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent }
-
 import scala.concurrent.duration._
 
-class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Producer) {
+class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumers: List[BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]], producer: Producer) {
 
   protected val log = LoggerFactory.getLogger(getClass)
   protected var CONSUMER_DISCONNECT_WAIT_SECS = 2
@@ -23,9 +21,9 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
   protected var threads = List.empty[Thread]
   protected var flusher: Option[Cancellable] = None
 
-  protected val listener = new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
+  protected val listener = new BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]() {
 
-    override def onConnect(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) {
+    override def onConnect(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
       log.info(s"Pipe $id connected!")
 
       _connected = true
@@ -34,10 +32,12 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
         Conf.FLUSH_INTERVAL_SECS.seconds)(saveBinaryLogPosition(consumer)))
     }
 
-    private def saveBinaryLogPosition(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) {
+    private def saveBinaryLogPosition(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
+      log.info(s"saveBinaryLogPosition: $consumer")
       val binlogPos = consumer.getBinaryLogPosition
-      if (producer.flush() || binlogPos.isEmpty) {
-        Conf.binlogSaveFilePosition(consumer.id, binlogPos.get, id)
+      // TODO: we should be able to generically save the binary log position
+      if (producer.flush() && binlogPos.isDefined && binlogPos.get.isInstanceOf[BinaryLogFilePosition]) {
+        Conf.binlogSaveFilePosition(consumer.id, binlogPos.get.asInstanceOf[BinaryLogFilePosition], id)
       } else {
         if (binlogPos.isDefined)
           log.error(s"Producer ($producer) failed to flush, not saving binary log position: $binlogPos for consumer $consumer.")
@@ -46,22 +46,22 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
       }
     }
 
-    override def onDisconnect(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) {
+    override def onDisconnect(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
       saveBinaryLogPosition(consumer)
     }
 
-    override def onMutation(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutation: Mutation): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], mutation: Mutation): Boolean = {
       producer.queue(mutation)
     }
 
-    override def onMutation(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutations: Seq[Mutation]): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], mutations: Seq[Mutation]): Boolean = {
       producer.queueList(mutations.toList)
     }
 
-    override def onTableAlter(consumer: BinaryLogConsumer[MEvent, BinaryLogFilePosition], event: AlterEvent): Boolean = {
+    override def onTableAlter(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], event: AlterEvent): Boolean = {
       producer.handleAlter(event)
     }
   }
@@ -81,7 +81,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
         val t = new Thread() {
           override def run() {
             log.info(s"Connecting pipe between $c -> $producer")
-            c.connect()
+            c.start()
           }
         }
 
@@ -98,7 +98,7 @@ class Pipe(id: String, consumers: List[MySQLBinaryLogConsumer], producer: Produc
     ) {
       try {
         log.info(s"Disconnecting pipe between $c -> $producer")
-        c.disconnect()
+        c.stop()
         t.join(CONSUMER_DISCONNECT_WAIT_SECS * 1000)
       } catch {
         case e: Exception ⇒ log.error(s"Caught exception while trying to disconnect from $c.id at binlog position $c.getBinaryLogPosition.")
