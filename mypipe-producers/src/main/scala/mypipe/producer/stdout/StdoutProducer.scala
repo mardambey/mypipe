@@ -30,10 +30,11 @@ class StdoutProducer(config: Config) extends Producer(config) {
   }
 
   override def queue(mutation: Mutation): Boolean = {
+    // TODO: quote column values if they are strings before printing
     mutation match {
 
       case i: InsertMutation ⇒
-        mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}) VALUES (${i.rows.head.columns.values.map(_.value).mkString(", ")})"
+        mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}) VALUES ${i.rows.map("(" + _.columns.values.map(_.value).mkString(", ") + ")").mkString(",")}"
 
       case u: UpdateMutation ⇒
         u.rows.foreach(rr ⇒ {

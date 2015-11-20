@@ -38,6 +38,7 @@ lazy val snapshotterDependencies = Seq(
   logback,
   mysqlAsync,
   scalaTest,
+  scopt,
   typesafeConfig
 )
 

@@ -1,6 +1,7 @@
 package mypipe.snapshotter
 
 import com.github.mauricio.async.db.mysql.MySQLConnection
+import scopt.OptionParser
 import mypipe.pipe.Pipe
 import mypipe.producer.stdout.StdoutProducer
 
@@ -14,40 +15,59 @@ import scala.concurrent.Await
 
 object Snapshotter extends App {
 
+  private[Snapshotter] case class CmdLineOptions(tables: Seq[String] = Seq.empty)
+
   val log = LoggerFactory.getLogger(getClass)
   val conf = ConfigFactory.load()
   val Array(dbHost, dbPort, dbUsername, dbPassword, dbName) = conf.getString("mypipe.snapshotter.database.info").split(":")
-  val tables = Seq("mypipe.user")
-
   val db = Db(dbHost, dbPort.toInt, dbUsername, dbPassword, dbName)
   implicit lazy val c: Connection = db.connection
+  val parser = new OptionParser[CmdLineOptions]("mypipe-snapshotter") {
+    head("mypipe-snapshotter", "1.0")
+    opt[Seq[String]]('t', "tables") required () valueName "<db1.table1>,<db1.table2>,<db2.table1>..." action { (x, c) ⇒
+      c.copy(tables = x)
+    } text "tables to include, format is: database.table" validate (t ⇒ if (t.nonEmpty) success else failure("at least one table must be given"))
+  }
 
-  db.connect()
+  val cmdLineOptions = parser.parse(args, CmdLineOptions())
 
-  while (!db.connection.isConnected) Thread.sleep(10)
+  cmdLineOptions match {
+    case Some(c) ⇒
+      val tables = c.tables
+      snapshot(tables)
+    case None ⇒
+      log.debug(s"Could not parser parameters, aborting: ${args.mkString(" ")}")
+  }
 
-  log.info(s"Connected to ${db.hostname}:${db.port}")
+  private def snapshot(tables: Seq[String]): Unit = {
 
-  val selects = MySQLSnapshotter.snapshotToSelects(MySQLSnapshotter.snapshot(tables))
+    db.connect()
 
-  log.info("Fetched snapshot.")
-  val selectConsumer = new SelectConsumer(dbUsername, dbHost, dbPassword, dbPort.toInt)
-  val stdoutProducer = new StdoutProducer(conf)
-  val pipe = new Pipe("selectConsumer-$dbHost:$dbPort-to-stdoutProducer-pipe", List(selectConsumer), stdoutProducer)
+    while (!db.connection.isConnected) Thread.sleep(10)
 
-  sys.addShutdownHook({
-    pipe.disconnect()
-    log.info(s"Disconnecting from ${db.hostname}:${db.port}")
-    db.disconnect()
-    log.info("Shutting down...")
-  })
+    log.info(s"Connected to ${db.hostname}:${db.port}.")
 
-  log.info("Consumer setup done.")
+    val selects = MySQLSnapshotter.snapshotToSelects(MySQLSnapshotter.snapshot(tables))
 
-  pipe.connect()
-  selectConsumer.handleEvents(Await.result(selects, 10.seconds))
+    log.info("Fetched snapshot.")
+    val selectConsumer = new SelectConsumer(dbUsername, dbHost, dbPassword, dbPort.toInt)
+    val stdoutProducer = new StdoutProducer(conf)
+    val pipe = new Pipe("selectConsumer-$dbHost:$dbPort-to-stdoutProducer-pipe", List(selectConsumer), stdoutProducer)
 
-  log.info("All events handled, exiting.")
+    sys.addShutdownHook({
+      pipe.disconnect()
+      log.info(s"Disconnecting from ${db.hostname}:${db.port}.")
+      db.disconnect()
+      log.info("Shutting down...")
+    })
+
+    log.info("Consumer setup done.")
+
+    pipe.connect()
+    selectConsumer.handleEvents(Await.result(selects, 10.seconds))
+
+    log.info("All events handled, safe to shut down.")
+  }
 }
 
 case class Db(hostname: String, port: Int, username: String, password: String, dbName: String) {

@@ -28,15 +28,18 @@ class SelectConsumer(
     with ConfigBasedEventSkippingBehaviour
     with CacheableTableMapBehaviour {
 
-  protected val log = LoggerFactory.getLogger(getClass)
-  protected val system = ActorSystem("mypipe-snapshotter")
-  protected val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
-  protected implicit val ec = system.dispatcher
-  protected implicit val timeout = Timeout(2.second)
+  private val log = LoggerFactory.getLogger(getClass)
+  private val system = ActorSystem("mypipe-snapshotter")
+  private val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"SelectConsumer-DBMetadataActor-$hostname:$port")
+  private implicit val ec = system.dispatcher
+  private implicit val timeout = Timeout(2.second)
+  private val tables = scala.collection.mutable.HashMap[String, Table]()
 
   def handleEvents(selects: Seq[Option[SelectEvent]]) = {
+    log.info(s"handling seelcts, size=${selects.length}")
     selects.foreach {
       case Some(select) ⇒
+        log.info(s"handling select $select")
         decodeEvent(select).foreach(s ⇒ listeners.foreach(_.onMutation(this, s.asInstanceOf[Mutation])))
       case None ⇒
     }
@@ -52,6 +55,7 @@ class SelectConsumer(
     getTable(event.database, event.table) match {
       case Some(table) ⇒
         val rows = createRows(table, rowData)
+        log.info(s"Got back rows: $rows")
         Some(InsertMutation(table, rows))
       case None ⇒
         log.error(s"Could not find table for event, skipping: $event")
@@ -84,8 +88,6 @@ class SelectConsumer(
 
   override protected def onStop(): Unit = Unit
   override protected def onStart(): Unit = Unit
-
-  private val tables = scala.collection.mutable.HashMap[String, Table]()
 
   private def getTable(database: String, table: String): Option[Table] = {
     tables.get(s"$database.$table") match {

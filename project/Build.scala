@@ -18,6 +18,7 @@ object Dependencies {
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % "2.11.2"
   val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.11.2"
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
+  val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
   val xinject = "javax.inject" % "javax.inject" % "1"
 }
