@@ -39,7 +39,8 @@ trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent, BinaryLogPosition] exten
 
   val handler = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition]]("mypipe.error.handler")
     .headOption
-    .map(_._2.newInstance())
+    .map(_._2.map(_.newInstance()))
+    .getOrElse(None)
 
   def handleEventError(event: Option[Event], binaryLogEvent: BinaryLogEvent): Boolean =
     handler.exists(_.handleEventError(event, binaryLogEvent))

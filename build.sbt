@@ -80,7 +80,7 @@ lazy val snapshotter = (project in file("mypipe-snapshotter")).
     name := "snapshotter",
     fork in run := false,
     libraryDependencies ++= snapshotterDependencies).
-  settings(Format.settings) dependsOn(api % "compile->compile;test->test", producers, myavro, mykafka)
+  settings(Format.settings) dependsOn(api % "compile->compile;test->test", producers, myavro, mykafka, runner)
 
 lazy val producers = (project in file("mypipe-producers")).
   settings(commonSettings: _*).

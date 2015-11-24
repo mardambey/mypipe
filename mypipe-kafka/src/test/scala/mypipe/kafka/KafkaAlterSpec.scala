@@ -25,7 +25,7 @@ class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     conf.getConfig("mypipe.test.kafka-specific-producer"))
 
   val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
-  val pipe = new Pipe("test-pipe-kafka-alter", List(binlogConsumer), kafkaProducer)
+  val pipe = new Pipe("test-pipe-kafka-alter", binlogConsumer, kafkaProducer)
 
   override def beforeAll() {
     pipe.connect()

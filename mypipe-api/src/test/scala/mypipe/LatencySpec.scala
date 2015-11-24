@@ -80,7 +80,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
           true
         }
 
-        override def onConnect(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) { connected = true }
+        override def onStart(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) { connected = true }
       })
 
       val f = Future { consumer.start() }

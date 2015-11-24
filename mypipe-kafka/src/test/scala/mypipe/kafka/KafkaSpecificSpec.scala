@@ -27,7 +27,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
     conf.getConfig("mypipe.test.kafka-specific-producer"))
 
   val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
-  val pipe = new Pipe("test-pipe-kafka-specific", List(binlogConsumer), kafkaProducer)
+  val pipe = new Pipe("test-pipe-kafka-specific", binlogConsumer, kafkaProducer)
 
   override def beforeAll() {
     pipe.connect()

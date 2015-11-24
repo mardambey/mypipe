@@ -93,18 +93,18 @@ object Conf {
       true
     } catch {
       case e: Exception ⇒
-        log.error(s"Failed saving binary log position $filePos for consumer $consumerId and pipe $pipe.")
+        log.error(s"Failed saving binary log position $filePos for consumer $consumerId and pipe $pipe: ${e.getMessage}\n${e.getStackTraceString}")
         false
     }
   }
 
-  def loadClassesForKey[T](key: String): Map[String, Class[T]] = {
+  def loadClassesForKey[T](key: String): Map[String, Option[Class[T]]] = {
     val classes = Conf.conf.getObject(key).asScala
     classes.map(kv ⇒ {
       val subKey = kv._1
       val classConf = conf.getConfig(s"$key.$subKey")
-      val clazz = classConf.getString("class")
-      (subKey, Class.forName(clazz).asInstanceOf[Class[T]])
+      val className = try { Some(classConf.getString("class")) } catch { case e: Exception ⇒ None }
+      (subKey, className.map(Class.forName(_).asInstanceOf[Class[T]]))
     }).toMap
   }
 }

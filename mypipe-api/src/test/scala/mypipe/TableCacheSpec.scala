@@ -33,7 +33,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
 
     consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
-      override def onConnect(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]): Unit = connected = true
+      override def onStart(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]): Unit = connected = true
       override def onTableMap(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], table: Table): Boolean = {
         queueTableMap.add(table)
       }
@@ -44,8 +44,18 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       }
     })
 
-    Future { consumer.start() }
+    log.info(s"starting consumer $consumer")
+
+    val f = consumer.start()
+    val started = Await.result(f, 10.seconds)
+
+    if (!started) throw new Exception(s"Could not start consumer $consumer}")
+
+    log.info(s"started consumer $consumer, waiting to connect")
+
     while (!connected) Thread.sleep(1)
+
+    log.info(s"connected!")
   }
 
   override def afterAll(): Unit = {

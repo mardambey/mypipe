@@ -24,7 +24,7 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
   val kafkaProducer = new KafkaMutationGenericAvroProducer(conf.getConfig("mypipe.test.kafka-generic-producer"))
 
   val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
-  val pipe = new Pipe("test-pipe-kafka-generic", List(binlogConsumer), kafkaProducer)
+  val pipe = new Pipe("test-pipe-kafka-generic", binlogConsumer, kafkaProducer)
 
   override def beforeAll() {
     pipe.connect()

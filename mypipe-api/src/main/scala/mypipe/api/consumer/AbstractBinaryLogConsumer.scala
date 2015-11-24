@@ -7,11 +7,8 @@ import com.fasterxml.uuid.{ EthernetAddress, Generators }
 
 import mypipe.api.data.{ UnknownTable, Table }
 import mypipe.api.event._
-import org.slf4j.LoggerFactory
 
 abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] {
-
-  protected val log = LoggerFactory.getLogger(getClass)
 
   private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   private val groupMutationsByTx = Conf.GROUP_MUTATIONS_BY_TX
@@ -53,7 +50,6 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def _disconnect(): Unit = {
     stop()
-    listeners foreach (l ⇒ l.onDisconnect(this))
   }
 
   private def handleUnknownEvent(e: UnknownEvent): Boolean = {

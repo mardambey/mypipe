@@ -2,6 +2,9 @@ package mypipe.api.consumer
 
 import mypipe.api.data.Table
 import mypipe.api.event._
+import org.slf4j.LoggerFactory
+
+import scala.concurrent.{ ExecutionContext, Future }
 
 trait BinaryLog[BinaryLogEvent, BinaryLogPosition]
 
@@ -58,6 +61,8 @@ trait BinaryLogConsumerTableFinder {
  */
 trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] with BinaryLogConsumerTableFinder {
 
+  protected val log = LoggerFactory.getLogger(getClass)
+
   /** Set of listeners receiving events from this consumer.
    */
   protected val listeners = collection.mutable.Set[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]]()
@@ -80,7 +85,7 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
 
   /** Consumer specific startup logic.
    */
-  protected def onStart(): Unit
+  protected def onStart(): Future[Boolean]
 
   /** Consumer specific shutdown logic.
    */
@@ -105,13 +110,19 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
 
   /** Starts the consumer.
    */
-  final def start(): Unit = {
-    listeners foreach (l ⇒ l.onConnect(this))
+  final def start()(implicit ec: ExecutionContext): Future[Boolean] = {
+    val f = onStart()
+    f.map {
+      case true ⇒
+        listeners foreach (l ⇒ l.onStart(this)); true
+      case false ⇒ log.error(s"Problem starting consumer $id."); false
+    }
   }
 
   /** Stops the consumer.
    */
   final def stop(): Unit = {
-    listeners.foreach(_.onDisconnect(this))
+    onStop()
+    listeners.foreach(_.onStop(this))
   }
 }

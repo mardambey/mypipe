@@ -12,6 +12,9 @@ import com.github.shyiko.mysql.binlog.event.EventType._
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
+import scala.compat.Platform
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 abstract class AbstractMySQLBinaryLogConsumer(
   protected val hostname: String,
@@ -23,25 +26,6 @@ abstract class AbstractMySQLBinaryLogConsumer(
   protected val client = new BinaryLogClient(hostname, port, username, password)
 
   client.setServerId(MySQLServerId.next)
-
-  client.registerEventListener(new EventListener() {
-    override def onEvent(event: MEvent) {
-      handleEvent(event)
-    }
-  })
-
-  client.registerLifecycleListener(new LifecycleListener {
-    override def onDisconnect(client: BinaryLogClient): Unit = {
-      handleDisconnect()
-    }
-
-    override def onConnect(client: BinaryLogClient) {
-      handleConnect()
-    }
-
-    override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
-    override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
-  })
 
   def setBinaryLogPosition(binlogFileAndPos: BinaryLogFilePosition): Unit = {
     if (binlogFileAndPos != BinaryLogFilePosition.current) {
@@ -138,7 +122,29 @@ abstract class AbstractMySQLBinaryLogConsumer(
 
   override def toString: String = s"$hostname:$port"
 
-  override protected def onStart(): Unit = client.connect()
+  override protected def onStart(): Future[Boolean] = {
+    Future {
+      @volatile var connected = false
+
+      client.registerEventListener(new EventListener() {
+        override def onEvent(event: MEvent) = handleEvent(event)
+      })
+
+      client.registerLifecycleListener(new LifecycleListener {
+        override def onDisconnect(client: BinaryLogClient) = handleDisconnect()
+        override def onConnect(client: BinaryLogClient) = connected = true; handleConnect()
+        override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
+        override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
+      })
+
+      Future { client.connect() }
+
+      val curTime = Platform.currentTime
+      while (Platform.currentTime - curTime < 10000 && !connected) Thread.sleep(10)
+
+      connected
+    }
+  }
 
   override protected def onStop(): Unit = client.disconnect()
 

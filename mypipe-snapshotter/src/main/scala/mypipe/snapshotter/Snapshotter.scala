@@ -1,9 +1,12 @@
 package mypipe.snapshotter
 
 import com.github.mauricio.async.db.mysql.MySQLConnection
+import mypipe.api.HostPortUserPass
+import mypipe.api.consumer.BinaryLogConsumer
+import mypipe.api.producer.Producer
+import mypipe.runner.PipeRunnerUtil
 import scopt.OptionParser
 import mypipe.pipe.Pipe
-import mypipe.producer.stdout.StdoutProducer
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -50,9 +53,20 @@ object Snapshotter extends App {
     val selects = MySQLSnapshotter.snapshotToSelects(MySQLSnapshotter.snapshot(tables))
 
     log.info("Fetched snapshot.")
-    val selectConsumer = new SelectConsumer(dbUsername, dbHost, dbPassword, dbPort.toInt)
-    val stdoutProducer = new StdoutProducer(conf)
-    val pipe = new Pipe("selectConsumer-$dbHost:$dbPort-to-stdoutProducer-pipe", List(selectConsumer), stdoutProducer)
+
+    lazy val producers: Map[String, Option[Class[Producer]]] = PipeRunnerUtil.loadProducerClasses(conf, "mypipe.snapshotter.producers")
+    lazy val consumers: Seq[(String, HostPortUserPass, Option[Class[BinaryLogConsumer[_, _]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
+    lazy val pipes: Seq[Pipe[_, _]] = PipeRunnerUtil.createPipes(conf, "mypipe.snapshotter.pipes", producers, consumers)
+
+    if (pipes.length != 1) {
+      throw new Exception("Exactly 1 pipe should be configured configured for snapshotter.")
+    }
+
+    if (!pipes.head.consumer.isInstanceOf[SelectConsumer]) {
+      throw new Exception(s"Snapshotter requires a SelectConsumer, ${pipes.head.consumer.getClass.getName} found instead.")
+    }
+
+    val pipe = pipes.head
 
     sys.addShutdownHook({
       pipe.disconnect()
@@ -64,7 +78,7 @@ object Snapshotter extends App {
     log.info("Consumer setup done.")
 
     pipe.connect()
-    selectConsumer.handleEvents(Await.result(selects, 10.seconds))
+    pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(Await.result(selects, 10.seconds))
 
     log.info("All events handled, safe to shut down.")
   }

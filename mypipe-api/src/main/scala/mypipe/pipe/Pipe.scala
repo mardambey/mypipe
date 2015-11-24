@@ -6,26 +6,49 @@ import mypipe.api.event.{ AlterEvent, Mutation }
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
 import mypipe.mysql._
+import mypipe.util.Enum
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumers: List[BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]], producer: Producer) {
+case class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], producer: Producer) {
+
+  object State extends Enum {
+
+    sealed trait EnumVal extends Value
+
+    val STOPPED = new EnumVal {
+      val value = 0
+    }
+
+    val STARTING = new EnumVal {
+      val value = 1
+    }
+
+    val STARTED = new EnumVal {
+      val value = 2
+    }
+
+    val CRASHED = new EnumVal {
+      val value = 3
+    }
+  }
 
   protected val log = LoggerFactory.getLogger(getClass)
+  protected var state = State.STOPPED
   protected var CONSUMER_DISCONNECT_WAIT_SECS = 2
   protected val system = ActorSystem("mypipe")
   implicit val ec = system.dispatcher
 
   @volatile protected var _connected: Boolean = false
-  protected var threads = List.empty[Thread]
   protected var flusher: Option[Cancellable] = None
-
   protected val listener = new BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]() {
 
-    override def onConnect(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
+    override def onStart(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
       log.info(s"Pipe $id connected!")
 
+      state = State.STARTED
       _connected = true
 
       flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS.seconds,
@@ -33,7 +56,6 @@ class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumers: List[Binary
     }
 
     private def saveBinaryLogPosition(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
-      log.info(s"saveBinaryLogPosition: $consumer")
       val binlogPos = consumer.getBinaryLogPosition
       // TODO: we should be able to generically save the binary log position
       if (producer.flush() && binlogPos.isDefined && binlogPos.get.isInstanceOf[BinaryLogFilePosition]) {
@@ -46,11 +68,12 @@ class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumers: List[Binary
       }
     }
 
-    override def onDisconnect(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
+    override def onStop(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
       saveBinaryLogPosition(consumer)
+      state = State.STOPPED
     }
 
     override def onMutation(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], mutation: Mutation): Boolean = {
@@ -68,40 +91,30 @@ class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumers: List[Binary
 
   def isConnected = _connected
 
-  def connect() {
+  def connect(): Future[Boolean] = {
 
-    if (threads.nonEmpty) {
-
-      log.warn("Attempting to reconnect pipe while already connected, aborting!")
-
+    if (state != State.STOPPED) {
+      val error = "Attempting to reconnect pipe while already connected, aborting!"
+      log.error(error)
+      Future.failed(new Exception(error))
     } else {
-
-      threads = consumers.map(c ⇒ {
-        c.registerListener(listener)
-        val t = new Thread() {
-          override def run() {
-            log.info(s"Connecting pipe between $c -> $producer")
-            c.start()
-          }
-        }
-
-        t.start()
-        t
-      })
+      state = State.STARTING
+      consumer.registerListener(listener)
+      log.info(s"Connecting pipe between $consumer -> $producer")
+      consumer.start()
     }
   }
 
   def disconnect() {
-    for (
-      c ← consumers;
-      t ← threads
-    ) {
+    if (state != State.STOPPED && state != State.CRASHED) {
       try {
-        log.info(s"Disconnecting pipe between $c -> $producer")
-        c.stop()
-        t.join(CONSUMER_DISCONNECT_WAIT_SECS * 1000)
+        log.info(s"Disconnecting pipe between $consumer -> $producer")
+        consumer.stop()
+        state = State.STOPPED
       } catch {
-        case e: Exception ⇒ log.error(s"Caught exception while trying to disconnect from $c.id at binlog position $c.getBinaryLogPosition.")
+        case e: Exception ⇒
+          state = State.CRASHED
+          log.error(s"Caught exception while trying to disconnect from ${consumer.id} at binlog position ${consumer.getBinaryLogPosition}.")
       }
     }
   }
