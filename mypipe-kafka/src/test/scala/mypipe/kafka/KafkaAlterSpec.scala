@@ -1,5 +1,6 @@
 package mypipe.kafka
 
+import com.typesafe.config.ConfigFactory
 import mypipe.Queries
 import mypipe._
 
@@ -24,7 +25,13 @@ class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
   val kafkaProducer = new KafkaMutationSpecificAvroProducer(
     conf.getConfig("mypipe.test.kafka-specific-producer"))
 
-  val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
+  val c = ConfigFactory.parseString(
+    s"""
+         |{
+         |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
+         |}
+         """.stripMargin)
+  val binlogConsumer = MySQLBinaryLogConsumer(c)
   val pipe = new Pipe("test-pipe-kafka-alter", binlogConsumer, kafkaProducer)
 
   override def beforeAll() {

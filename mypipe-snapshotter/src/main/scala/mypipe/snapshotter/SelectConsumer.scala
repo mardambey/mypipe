@@ -1,12 +1,14 @@
 package mypipe.snapshotter
 
+import com.typesafe.config.Config
+
 import scala.concurrent.duration._
 import scala.concurrent.{ Future, Await }
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 
-import mypipe.api.consumer.BinaryLogConsumer
+import mypipe.api.consumer.{ ConfigLoader, BinaryLogConsumer }
 import mypipe.api.data._
 import mypipe.api.event._
 import mypipe.mysql._
@@ -18,15 +20,13 @@ import scala.collection.immutable.ListMap
 
 case class SelectEvent(database: String, table: String, rows: Seq[Seq[Any]])
 
-class SelectConsumer(
-  override protected val username: String,
-  override protected val hostname: String,
-  override protected val password: String,
-  override protected val port: Int)
+class SelectConsumer(override val config: Config)
     extends BinaryLogConsumer[SelectEvent, Unit]
     with ConfigBasedErrorHandlingBehaviour[SelectEvent, Unit]
     with ConfigBasedEventSkippingBehaviour
-    with CacheableTableMapBehaviour {
+    with CacheableTableMapBehaviour
+    with ConfigLoader
+    with ConfigBasedConnectionSource {
 
   private val system = ActorSystem("mypipe-snapshotter")
   private val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"SelectConsumer-DBMetadataActor-$hostname:$port")

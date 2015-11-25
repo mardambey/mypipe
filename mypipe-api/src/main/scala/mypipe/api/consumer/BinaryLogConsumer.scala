@@ -1,5 +1,6 @@
 package mypipe.api.consumer
 
+import com.typesafe.config.Config
 import mypipe.api.data.Table
 import mypipe.api.event._
 import org.slf4j.LoggerFactory
@@ -55,6 +56,10 @@ trait BinaryLogConsumerTableFinder {
    *  @return a Table instance or None if not possible
    */
   protected def findTable(tableId: java.lang.Long): Option[Table]
+}
+
+trait ConfigLoader {
+  val config: Config
 }
 
 /** Defines what a log consumer should support for mypipe to use it.

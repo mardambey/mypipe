@@ -1,5 +1,6 @@
 package mypipe
 
+import com.typesafe.config.ConfigFactory
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.event.{ Mutation, InsertMutation }
 import mypipe.mysql._
@@ -23,7 +24,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
   val maxLatency = conf.getLong("mypipe.test.max-latency")
   val latencies = ListBuffer[Long]()
 
-  implicit val timeout = Timeout(1 second)
+  implicit val timeout = Timeout(1.second)
 
   val maxId = Agent(0)
   val insertQueue = new LinkedBlockingQueue[(Int, Long)]()
@@ -47,7 +48,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
           try {
             val f = db.connection.sendQuery(Queries.INSERT.statement(id = id.toString))
-            Await.result(f, 1000 millis)
+            Await.result(f, 1000.millis)
 
             maxId.alter(id)
             insertQueue.add((id, System.nanoTime()))
@@ -67,7 +68,13 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     val binlogConsumer = actor(new Act {
 
       val queueProducer = new QueueProducer(binlogQueue)
-      val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
+      val conf = ConfigFactory.parseString(
+        s"""
+           |{
+           |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
+           |}
+         """.stripMargin)
+      val consumer = MySQLBinaryLogConsumer(conf)
 
       consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
         override def onMutation(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutation: Mutation): Boolean = {
@@ -87,11 +94,10 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
       become {
 
-        case Quit ⇒ {
+        case Quit ⇒
           consumer.stop()
-          Await.result(f, 5 seconds)
+          Await.result(f, 5.seconds)
           sender ! true
-        }
       }
 
     })
@@ -103,7 +109,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     val insertConsumer = actor(new Act {
 
       become {
-        case Consume ⇒ {
+        case Consume ⇒
 
           val id = insertQueue.poll(1, TimeUnit.SECONDS)
           var found = false
@@ -129,8 +135,6 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
           self ! Consume
 
-        }
-
         case Quit ⇒ sender ! true
       }
     })
@@ -149,7 +153,7 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     val future = Future.sequence(List(ask(insertProducer, Quit), ask(binlogConsumer, Quit), ask(insertConsumer, Quit)))
 
     try {
-      Await.result(future, 30 seconds)
+      Await.result(future, 30.seconds)
     } catch {
       case e: Exception ⇒ log.debug("Timed out waiting for actors to shutdown, proceeding anyway.")
     }

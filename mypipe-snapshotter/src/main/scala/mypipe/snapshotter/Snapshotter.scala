@@ -11,7 +11,7 @@ import mypipe.pipe.Pipe
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.mauricio.async.db.{ Configuration, Connection }
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ Config, ConfigFactory }
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Await
@@ -55,7 +55,7 @@ object Snapshotter extends App {
     log.info("Fetched snapshot.")
 
     lazy val producers: Map[String, Option[Class[Producer]]] = PipeRunnerUtil.loadProducerClasses(conf, "mypipe.snapshotter.producers")
-    lazy val consumers: Seq[(String, HostPortUserPass, Option[Class[BinaryLogConsumer[_, _]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
+    lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
     lazy val pipes: Seq[Pipe[_, _]] = PipeRunnerUtil.createPipes(conf, "mypipe.snapshotter.pipes", producers, consumers)
 
     if (pipes.length != 1) {

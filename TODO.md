@@ -1,4 +1,5 @@
 # TODO:
+- Figure out how to pass ctor params (currently db host, port, etc) to BinLogConsumer(s)
 - Make binlog position saving (currently to file) modular
 - Create a tool that facilitates altering a MySQL table and pushes the
 	corresponding Avro schema to the repository.

@@ -6,7 +6,7 @@ import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition }
 import mypipe.pipe.Pipe
 
 import scala.collection.JavaConverters._
-import mypipe.api.{ Conf, HostPortUserPass }
+import mypipe.api.Conf
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 import org.slf4j.LoggerFactory
@@ -19,7 +19,7 @@ object PipeRunner extends App {
   protected val conf = ConfigFactory.load()
 
   lazy val producers: Map[String, Option[Class[Producer]]] = loadProducerClasses(conf, "mypipe.producers")
-  lazy val consumers: Seq[(String, HostPortUserPass, Option[Class[BinaryLogConsumer[_, _]]])] = loadConsumerConfigs(conf, "mypipe.consumers")
+  lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])] = loadConsumerConfigs(conf, "mypipe.consumers")
   lazy val pipes: Seq[Pipe[_, _]] = createPipes(conf, "mypipe.pipes", producers, consumers)
 
   if (pipes.isEmpty) {
@@ -46,23 +46,21 @@ object PipeRunnerUtil {
   def loadConsumerClasses(conf: Config, key: String): Map[String, Option[Class[BinaryLogConsumer[_, _]]]] =
     Conf.loadClassesForKey[BinaryLogConsumer[_, _]](key)
 
-  def loadConsumerConfigs(conf: Config, key: String): Seq[(String, HostPortUserPass, Option[Class[BinaryLogConsumer[_, _]]])] = {
+  def loadConsumerConfigs(conf: Config, key: String): Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])] = {
     val consumerClasses = loadConsumerClasses(conf, key)
     val consumers = conf.getObject(key).asScala
     consumers.map(kv ⇒ {
       val name = kv._1
       val consConf = conf.getConfig(s"$key.$name")
-      val source = consConf.getString("source")
       val clazz = consumerClasses.get(name).orElse(None)
-      val params = HostPortUserPass(source)
-      (name, params, clazz.getOrElse(None))
+      (name, consConf, clazz.getOrElse(None))
     }).toSeq
   }
 
   def createPipes(conf: Config,
                   key: String,
                   producerClasses: Map[String, Option[Class[Producer]]],
-                  consumerConfigs: Seq[(String, HostPortUserPass, Option[Class[BinaryLogConsumer[_, _]]])]): Seq[Pipe[_, _]] = {
+                  consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])]): Seq[Pipe[_, _]] = {
 
     val pipes = conf.getObject(key).asScala
 
@@ -73,7 +71,7 @@ object PipeRunnerUtil {
     }).filter(_ != null).toSeq
   }
 
-  def createPipe(name: String, pipeConf: Config, producerClasses: Map[String, Option[Class[Producer]]], consumerConfigs: Seq[(String, HostPortUserPass, Option[Class[BinaryLogConsumer[_, _]]])]): Pipe[_, _] = {
+  def createPipe(name: String, pipeConf: Config, producerClasses: Map[String, Option[Class[Producer]]], consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])]): Pipe[_, _] = {
 
     log.info(s"Loading configuration for $name pipe")
 
@@ -115,18 +113,23 @@ object PipeRunnerUtil {
     }
   }
 
-  protected def createConsumer(pipeName: String, params: (String, HostPortUserPass, Option[Class[BinaryLogConsumer[_, _]]])): BinaryLogConsumer[_, _] = {
+  protected def createConsumer(pipeName: String, params: (String, Config, Option[Class[BinaryLogConsumer[_, _]]])): BinaryLogConsumer[_, _] = {
     try {
       val consumer = params._3 match {
-        case None ⇒ MySQLBinaryLogConsumer(params._2.host, params._2.port, params._2.user, params._2.password)
+        case None ⇒ MySQLBinaryLogConsumer(params._2).asInstanceOf[BinaryLogConsumer[_, _]]
         case Some(clazz) ⇒
-          val ctor = clazz.getConstructor(classOf[String], classOf[String], classOf[String], classOf[Int])
+          val consumer = {
+            clazz.getConstructors.find(
+              _.getParameterTypes.headOption.exists(_.equals(classOf[Config])))
+              .map(_.newInstance(params._2))
+              .getOrElse(clazz.newInstance())
+          }
 
-          if (ctor == null) throw new NullPointerException(s"Could not load ctor for class $clazz, aborting.")
+          //if (ctor == null) throw new NullPointerException(s"Could not load ctor for class $clazz, aborting.")
 
           // TODO: this is done specifically for the SelectConsumer for now, other consumers will fail since there is nothing forcing this ctor
-          val consumer = ctor.newInstance(params._2.user, params._2.host, params._2.password, new Integer(params._2.port))
-          consumer
+          //val consumer = ctor.newInstance(params._2.user, params._2.host, params._2.password, new Integer(params._2.port))
+          consumer.asInstanceOf[BinaryLogConsumer[_, _]]
       }
 
       consumer

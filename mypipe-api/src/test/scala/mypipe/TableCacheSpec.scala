@@ -4,6 +4,7 @@ import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent }
 
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event.{ AlterEvent, TableMapEvent }
@@ -29,7 +30,14 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     super.beforeAll()
 
     @volatile var connected = false
-    consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
+
+    val conf = ConfigFactory.parseString(
+      s"""
+         |{
+         |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
+         |}
+         """.stripMargin)
+    consumer = MySQLBinaryLogConsumer(conf)
     tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
 
     consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {

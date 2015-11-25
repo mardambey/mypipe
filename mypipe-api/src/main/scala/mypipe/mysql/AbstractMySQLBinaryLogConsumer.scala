@@ -16,16 +16,11 @@ import scala.compat.Platform
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-abstract class AbstractMySQLBinaryLogConsumer(
-  protected val hostname: String,
-  protected val port: Int,
-  protected val username: String,
-  protected val password: String)
-    extends AbstractBinaryLogConsumer[MEvent, BinaryLogFilePosition] {
+abstract class AbstractMySQLBinaryLogConsumer
+    extends AbstractBinaryLogConsumer[MEvent, BinaryLogFilePosition]
+    with ConnectionSource {
 
-  protected val client = new BinaryLogClient(hostname, port, username, password)
-
-  client.setServerId(MySQLServerId.next)
+  protected lazy val client = new BinaryLogClient(hostname, port, username, password)
 
   def setBinaryLogPosition(binlogFileAndPos: BinaryLogFilePosition): Unit = {
     if (binlogFileAndPos != BinaryLogFilePosition.current) {
@@ -126,21 +121,24 @@ abstract class AbstractMySQLBinaryLogConsumer(
     Future {
       @volatile var connected = false
 
+      client.setServerId(MySQLServerId.next)
       client.registerEventListener(new EventListener() {
         override def onEvent(event: MEvent) = handleEvent(event)
       })
 
       client.registerLifecycleListener(new LifecycleListener {
         override def onDisconnect(client: BinaryLogClient) = handleDisconnect()
-        override def onConnect(client: BinaryLogClient) = connected = true; handleConnect()
+        override def onConnect(client: BinaryLogClient) = { connected = true; handleConnect() }
         override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
         override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
       })
 
+      log.info(s"Connecting client to $client.get:$hostname:$port:$username:$password")
+
       Future { client.connect() }
 
-      val curTime = Platform.currentTime
-      while (Platform.currentTime - curTime < 10000 && !connected) Thread.sleep(10)
+      val startTime = Platform.currentTime
+      while (Platform.currentTime - startTime < 10000 && !connected) Thread.sleep(10)
 
       connected
     }

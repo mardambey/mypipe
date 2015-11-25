@@ -1,11 +1,29 @@
 package mypipe.mysql
 
-import mypipe.api.Conf
+import com.typesafe.config.Config
+import mypipe.api.{ HostPortUserPass, Conf }
+
 import mypipe.api.consumer.{ BinaryLogConsumerTableFinder, BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event._
 import mypipe.util.Eval
 import org.slf4j.LoggerFactory
+
+trait ConnectionSource {
+  protected val hostname: String
+  protected val port: Int
+  protected val username: String
+  protected val password: String
+}
+
+trait ConfigBasedConnectionSource extends ConnectionSource {
+  protected val config: Config
+  protected val connectionInfo = HostPortUserPass(config.getString("source"))
+  override protected val hostname: String = connectionInfo.host
+  override protected val port: Int = connectionInfo.port
+  override protected val username: String = connectionInfo.user
+  override protected val password: String = connectionInfo.password
+}
 
 /** Used when no event skipping behaviour is desired.
  */
@@ -117,12 +135,7 @@ class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryL
   }
 }
 
-trait CacheableTableMapBehaviour extends BinaryLogConsumerTableFinder {
-
-  protected val hostname: String
-  protected val port: Int
-  protected val username: String
-  protected val password: String
+trait CacheableTableMapBehaviour extends BinaryLogConsumerTableFinder with ConnectionSource {
 
   protected var tableCache = new TableCache(hostname, port, username, password)
 
@@ -135,7 +148,6 @@ trait CacheableTableMapBehaviour extends BinaryLogConsumerTableFinder {
     tableCache.getTable(tableId)
 
   override protected def findTable(database: String, table: String): Option[Table] = {
-    println(s"behaviour, findTable($database, $table)")
     tableCache.refreshTable(database, table)
   }
 }

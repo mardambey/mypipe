@@ -1,5 +1,6 @@
 package mypipe.kafka
 
+import com.typesafe.config.ConfigFactory
 import mypipe.api.event.Mutation
 import mypipe.pipe.Pipe
 
@@ -23,7 +24,13 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
 
   val kafkaProducer = new KafkaMutationGenericAvroProducer(conf.getConfig("mypipe.test.kafka-generic-producer"))
 
-  val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
+  val c = ConfigFactory.parseString(
+    s"""
+         |{
+         |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
+         |}
+         """.stripMargin)
+  val binlogConsumer = MySQLBinaryLogConsumer(c)
   val pipe = new Pipe("test-pipe-kafka-generic", binlogConsumer, kafkaProducer)
 
   override def beforeAll() {
