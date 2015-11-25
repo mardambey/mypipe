@@ -1,6 +1,7 @@
 package mypipe.snapshotter
 
 import com.github.mauricio.async.db.{ Connection, QueryResult }
+import mypipe.mysql.BinaryLogFilePosition
 
 import scala.concurrent.{ ExecutionContext, Future }
 
@@ -20,7 +21,7 @@ object MySQLSnapshotter {
     runQueries(queries(tableQueries))
   }
 
-  def snapshotToSelects(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SelectEvent]]] = snapshot map {
+  def snapshotToEvents(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SnapshotterEvent]]] = snapshot map {
     results ⇒
       {
         results.map { result ⇒
@@ -37,6 +38,9 @@ object MySQLSnapshotter {
           if (firstDot == result._1.lastIndexOf('.') && firstDot > 0) {
             val Array(db, table) = result._1.split('.')
             Some(SelectEvent(db, table, colData.getOrElse(Seq.empty)))
+          } else if (result._1.equals("showMasterStatus")) {
+            colData.getOrElse(Seq.empty).headOption.map(c ⇒
+              ShowMasterStatusEvent(BinaryLogFilePosition(c(0).asInstanceOf[String], c(1).asInstanceOf[Long])))
           } else {
             None
           }

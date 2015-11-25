@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 
-case class SelectEvent(database: String, table: String, rows: Seq[Seq[Any]])
+trait SnapshotterEvent
+case class SelectEvent(database: String, table: String, rows: Seq[Seq[Any]]) extends SnapshotterEvent
+case class ShowMasterStatusEvent(filePosition: BinaryLogFilePosition) extends SnapshotterEvent
 
 class SelectConsumer(override val config: Config)
     extends BinaryLogConsumer[SelectEvent, Unit]
@@ -34,11 +36,12 @@ class SelectConsumer(override val config: Config)
   private implicit val timeout = Timeout(2.second)
   private val tables = scala.collection.mutable.HashMap[String, Table]()
 
-  def handleEvents(selects: Seq[Option[SelectEvent]]) = {
-    selects.foreach {
-      case Some(select) ⇒
+  def handleEvents(events: Seq[Option[SnapshotterEvent]]) = {
+    events.foreach {
+      case Some(select: SelectEvent) ⇒
         decodeEvent(select).foreach(s ⇒ listeners.foreach(_.onMutation(this, s.asInstanceOf[Mutation])))
-      case None ⇒
+      case Some(ShowMasterStatusEvent(binlogPos)) ⇒ log.info(s"Binary log position to resume from after snapshot: $binlogPos")
+      case _                                      ⇒
     }
   }
 
@@ -84,6 +87,8 @@ class SelectConsumer(override val config: Config)
 
   override protected def onStop(): Unit = Unit
   override protected def onStart(): Future[Boolean] = Future.successful(true)
+
+  override def toString() = id
 
   private def getTable(database: String, table: String): Option[Table] = {
     tables.get(s"$database.$table") match {

@@ -50,7 +50,7 @@ object Snapshotter extends App {
 
     log.info(s"Connected to ${db.hostname}:${db.port}.")
 
-    val selects = MySQLSnapshotter.snapshotToSelects(MySQLSnapshotter.snapshot(tables))
+    val events = MySQLSnapshotter.snapshotToEvents(MySQLSnapshotter.snapshot(tables))
 
     log.info("Fetched snapshot.")
 
@@ -78,7 +78,7 @@ object Snapshotter extends App {
     log.info("Consumer setup done.")
 
     pipe.connect()
-    pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(Await.result(selects, 10.seconds))
+    pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(Await.result(events, 10.seconds))
 
     log.info("All events handled, safe to shut down.")
   }
