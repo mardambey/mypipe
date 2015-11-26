@@ -13,11 +13,20 @@ object MySQLSnapshotter {
   val readLock = "FLUSH TABLES WITH READ LOCK;"
   val showMasterStatus = "SHOW MASTER STATUS;"
   val unlockTables = "UNLOCK TABLES;"
-  val selectFrom = { dbTable: String ⇒ s"SELECT * FROM $dbTable;" }
   val commit = "COMMIT;"
 
+  val selectFrom = { dbTable: String ⇒ s"SELECT * FROM $dbTable;" }
+  val useDatabase = { dbTable: String ⇒
+    val dbName = dbTable.splitAt(dbTable.indexOf('.'))._1
+    s"use $dbName;"
+  }
+
   def snapshot(tables: Seq[String])(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
-    val tableQueries = tables map (t ⇒ t -> selectFrom(t))
+    val tableQueries = tables
+      .map({ t ⇒ (t -> useDatabase(t), t -> selectFrom(t)) })
+      .foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
+        acc ++ List(v._1, v._2)
+      }
     runQueries(queries(tableQueries))
   }
 
@@ -61,12 +70,7 @@ object MySQLSnapshotter {
     queries.foldLeft[Future[Seq[(String, QueryResult)]]](Future.successful(Seq.empty)) { (future, query) ⇒
       future flatMap { queryResults ⇒
         if (!query._1.isEmpty) {
-          if (query._1.indexOf('.') > 0) {
-            val dbName = query._1.splitAt(query._1.indexOf('.'))._1
-            c.sendQuery(s"use $dbName;").flatMap { _ ⇒ c.sendQuery(query._2).map(r ⇒ queryResults :+ (query._1 -> r)) }
-          } else {
-            c.sendQuery(query._2).map(r ⇒ queryResults :+ (query._1 -> r))
-          }
+          c.sendQuery(query._2).map(r ⇒ queryResults :+ (query._1 -> r))
         } else {
           c.sendQuery(query._2).map(r ⇒ queryResults)
         }

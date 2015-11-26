@@ -49,7 +49,7 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
                 log.info(s"found show master status data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
                 rows.length == 1 &&
                   rows(0).length >= 2 // file and position at least
-              } else if (dbAndTable.startsWith("mypipe.")) {
+              } else if (dbAndTable.startsWith("mypipe.") && rows.length > 0) {
                 log.info(s"found select data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
                 rows.length == 2 &&
                   rows(0).toArray.deep.equals(Array(123, "username", "password", 0).deep) &&
