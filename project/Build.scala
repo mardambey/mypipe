@@ -11,7 +11,7 @@ object Dependencies {
   val jsqlParser = "com.github.jsqlparser" % "jsqlparser" % "0.9"
   val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
   val jug = "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.3"
-  val kafka = "org.apache.kafka" % "kafka_2.11" % "0.8.2-beta" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
+  val kafka = "org.apache.kafka" % "kafka_2.11" % "0.8.2.2" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")
   val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
   val mysqlAsync =  "com.github.mauricio" % "mysql-async_2.11" % "0.2.18"
   val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.2.4"

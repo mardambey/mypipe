@@ -52,6 +52,16 @@ package object event {
     override val txid: UUID = null)
       extends Mutation(table, txid)
 
+  object SingleValuedMutation {
+    def primaryKeyAsString(mutation: SingleValuedMutation, row: Row, delim: String = "."): Option[String] = {
+      mutation.table.primaryKey.map { pk ⇒
+        pk.columns.map { colMetaData ⇒
+          row.columns(colMetaData.name)
+        }
+      } map (_.mkString(delim))
+    }
+  }
+
   /** Represents an inserted row.
    *
    *  @param table which the mutation affects

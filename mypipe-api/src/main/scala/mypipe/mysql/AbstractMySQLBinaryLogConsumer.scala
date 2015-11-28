@@ -133,7 +133,7 @@ abstract class AbstractMySQLBinaryLogConsumer
         override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
       })
 
-      log.info(s"Connecting client to $client.get:$hostname:$port:$username:$password")
+      log.info(s"Connecting client to $client.get:$hostname:$port")
 
       Future { client.connect() }
 

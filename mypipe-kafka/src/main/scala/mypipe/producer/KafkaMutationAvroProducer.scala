@@ -3,7 +3,7 @@ package mypipe.producer
 import java.nio.ByteBuffer
 
 import mypipe.api._
-import mypipe.api.event.{ AlterEvent, Serializer, Mutation }
+import mypipe.api.event.{ SingleValuedMutation, AlterEvent, Serializer, Mutation }
 import mypipe.api.producer.Producer
 import mypipe.avro.Guid
 import mypipe.kafka.KafkaProducer
@@ -81,6 +81,43 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     }
   }
 
+  override def queueList(inputList: List[Mutation]): Boolean = {
+    inputList.dropWhile(queue).isEmpty
+  }
+
+  override def queue(input: Mutation): Boolean = {
+    try {
+      val schemaTopic = avroSchemaSubject(input)
+      val mutationType = magicByte(input)
+      val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
+      val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
+      val records = avroRecord(input, schema)
+
+      if (input.isInstanceOf[SingleValuedMutation]) {
+        val mut = input.asInstanceOf[SingleValuedMutation]
+        (records zip mut.rows) foreach {
+          case (record, row) ⇒
+            val bytes = serialize(record, schema, schemaId.get, mutationType)
+            val pKeyStr = SingleValuedMutation.primaryKeyAsString(mut, row)
+            producer.queue(getKafkaTopic(input), pKeyStr.getOrElse("").getBytes("utf-8"), bytes)
+        }
+      } else {
+        records foreach { record ⇒
+          val bytes = serialize(record, schema, schemaId.get, mutationType)
+          producer.queue(getKafkaTopic(input), bytes)
+        }
+      }
+
+      true
+    } catch {
+      case e: Exception ⇒ logger.error(s"failed to queue: ${e.getMessage}\n${e.getStackTraceString}"); false
+    }
+  }
+
+  override def toString(): String = {
+    s"kafka-avro-producer-$metadataBrokers"
+  }
+
   /** Adds a header into the given Record based on the Mutation's
    *  database, table, and tableId.
    *  @param record
@@ -127,46 +164,5 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
     enc.flush
     out.toByteArray
   }
-
-  override def queueList(inputList: List[Mutation]): Boolean = {
-    inputList.foreach(input ⇒ {
-      val schemaTopic = avroSchemaSubject(input)
-      val mutationType = magicByte(input)
-      val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
-      val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
-      val records = avroRecord(input, schema)
-
-      records foreach (record ⇒ {
-        val bytes = serialize(record, schema, schemaId.get, mutationType)
-        producer.send(getKafkaTopic(input), bytes)
-      })
-    })
-
-    true
-  }
-
-  override def queue(input: Mutation): Boolean = {
-    try {
-      val schemaTopic = avroSchemaSubject(input)
-      val mutationType = magicByte(input)
-      val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
-      val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
-      val records = avroRecord(input, schema)
-
-      records foreach (record ⇒ {
-        val bytes = serialize(record, schema, schemaId.get, mutationType)
-        producer.send(getKafkaTopic(input), bytes)
-      })
-
-      true
-    } catch {
-      case e: Exception ⇒ logger.error(s"failed to queue: ${e.getMessage}\n${e.getStackTraceString}"); false
-    }
-  }
-
-  override def toString(): String = {
-    s"kafka-avro-producer-$metadataBrokers"
-  }
-
 }
 

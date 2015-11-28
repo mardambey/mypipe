@@ -21,12 +21,12 @@ class KafkaProducer[MessageType](metadataBrokers: String) {
   val producer = new KProducer[Array[Byte], Array[Byte]](conf)
   val queue = new LinkedBlockingQueue[KeyedMessage[KeyType, MessageType]]()
 
-  def send(topic: String, message: MessageType) {
-    queue(topic, message)
-  }
-
   def queue(topic: String, bytes: MessageType) {
     queue.add(new KeyedMessage[KeyType, MessageType](topic, bytes))
+  }
+
+  def queue(topic: String, messageKey: Array[Byte], bytes: MessageType) {
+    queue.add(new KeyedMessage[KeyType, MessageType](topic, messageKey, bytes))
   }
 
   def flush: Boolean = {
