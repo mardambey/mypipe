@@ -21,13 +21,18 @@ object MySQLSnapshotter {
     s"use $dbName;"
   }
 
-  def snapshot(tables: Seq[String])(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
+  def snapshot(tables: Seq[String], withTransaction: Boolean = true)(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
     val tableQueries = tables
       .map({ t ⇒ (t -> useDatabase(t), t -> selectFrom(t)) })
       .foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
         acc ++ List(v._1, v._2)
       }
-    runQueries(queries(tableQueries))
+
+    val queries =
+      (if (withTransaction) queriesWithTxn _
+      else queriesWithoutTxn _) apply tableQueries
+
+    runQueries(queries)
   }
 
   def snapshotToEvents(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SnapshotterEvent]]] = snapshot map {
@@ -57,7 +62,10 @@ object MySQLSnapshotter {
       }
   }
 
-  private def queries(tableQueries: Seq[(String, String)]) = Seq(
+  private def queriesWithoutTxn(tableQueries: Seq[(String, String)]) = Seq(
+    "showMasterStatus" -> showMasterStatus) ++ tableQueries
+
+  private def queriesWithTxn(tableQueries: Seq[(String, String)]) = Seq(
     "" -> trxIsolationLevel,
     "" -> autoCommit,
     "" -> flushTables,

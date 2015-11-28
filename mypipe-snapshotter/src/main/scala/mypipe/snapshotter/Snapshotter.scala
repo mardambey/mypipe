@@ -1,7 +1,6 @@
 package mypipe.snapshotter
 
 import com.github.mauricio.async.db.mysql.MySQLConnection
-import mypipe.api.HostPortUserPass
 import mypipe.api.consumer.BinaryLogConsumer
 import mypipe.api.producer.Producer
 import mypipe.runner.PipeRunnerUtil
@@ -18,7 +17,7 @@ import scala.concurrent.Await
 
 object Snapshotter extends App {
 
-  private[Snapshotter] case class CmdLineOptions(tables: Seq[String] = Seq.empty)
+  private[Snapshotter] case class CmdLineOptions(tables: Seq[String] = Seq.empty, noTransaction: Boolean = false)
 
   val log = LoggerFactory.getLogger(getClass)
   val conf = ConfigFactory.load()
@@ -30,27 +29,29 @@ object Snapshotter extends App {
     opt[Seq[String]]('t', "tables") required () valueName "<db1.table1>,<db1.table2>,<db2.table1>..." action { (x, c) ⇒
       c.copy(tables = x)
     } text "tables to include, format is: database.table" validate (t ⇒ if (t.nonEmpty) success else failure("at least one table must be given"))
+    opt[Unit]('x', "no-transaction") optional () action { (_, c) ⇒
+      c.copy(noTransaction = true)
+    } text "do not perform the snapshot using a consistent read in a transaction"
   }
 
   val cmdLineOptions = parser.parse(args, CmdLineOptions())
 
   cmdLineOptions match {
     case Some(c) ⇒
-      val tables = c.tables
-      snapshot(tables)
+      snapshot(c.tables, c.noTransaction)
     case None ⇒
       log.debug(s"Could not parser parameters, aborting: ${args.mkString(" ")}")
   }
 
-  private def snapshot(tables: Seq[String]): Unit = {
+  private def snapshot(tables: Seq[String], noTransaction: Boolean): Unit = {
 
     db.connect()
 
     while (!db.connection.isConnected) Thread.sleep(10)
 
-    log.info(s"Connected to ${db.hostname}:${db.port}.")
+    log.info(s"Connected to ${db.hostname}:${db.port} (withTransaction=${!noTransaction})")
 
-    val events = MySQLSnapshotter.snapshotToEvents(MySQLSnapshotter.snapshot(tables))
+    val events = MySQLSnapshotter.snapshotToEvents(MySQLSnapshotter.snapshot(tables, !noTransaction))
 
     log.info("Fetched snapshot.")
 
