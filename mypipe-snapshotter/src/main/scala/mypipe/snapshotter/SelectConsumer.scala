@@ -23,8 +23,8 @@ case class SelectEvent(database: String, table: String, rows: Seq[Seq[Any]]) ext
 case class ShowMasterStatusEvent(filePosition: BinaryLogFilePosition) extends SnapshotterEvent
 
 class SelectConsumer(override val config: Config)
-    extends BinaryLogConsumer[SelectEvent, Unit]
-    with ConfigBasedErrorHandlingBehaviour[SelectEvent, Unit]
+    extends BinaryLogConsumer[SelectEvent, BinaryLogFilePosition]
+    with ConfigBasedErrorHandlingBehaviour[SelectEvent, BinaryLogFilePosition]
     with ConfigBasedEventSkippingBehaviour
     with CacheableTableMapBehaviour
     with ConfigLoader
@@ -35,13 +35,16 @@ class SelectConsumer(override val config: Config)
   private implicit val ec = system.dispatcher
   private implicit val timeout = Timeout(2.second)
   private val tables = scala.collection.mutable.HashMap[String, Table]()
+  private var binlogPos: Option[BinaryLogFilePosition] = None
 
   def handleEvents(events: Seq[Option[SnapshotterEvent]]) = {
     events.foreach {
       case Some(select: SelectEvent) ⇒
         decodeEvent(select).foreach(s ⇒ listeners.foreach(_.onMutation(this, s.asInstanceOf[Mutation])))
-      case Some(ShowMasterStatusEvent(binlogPos)) ⇒ log.info(s"Binary log position to resume from after snapshot: $binlogPos")
-      case _                                      ⇒
+      case Some(ShowMasterStatusEvent(pos)) ⇒
+        binlogPos = Some(pos)
+        log.info(s"Binary log position to resume from after snapshot: $binlogPos")
+      case _ ⇒
     }
   }
 
@@ -78,7 +81,7 @@ class SelectConsumer(override val config: Config)
   /** Gets the consumer's current position in the binary log.
    *  @return current BinLogPos
    */
-  override def getBinaryLogPosition: Option[Unit] = None
+  override def getBinaryLogPosition: Option[BinaryLogFilePosition] = binlogPos
 
   /** Gets this consumer's unique ID.
    *  @return Unique ID as a string.
