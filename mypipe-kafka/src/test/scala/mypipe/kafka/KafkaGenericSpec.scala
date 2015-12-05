@@ -62,7 +62,7 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
           assert(insertMutation.getTable.toString == Queries.TABLE.name)
           assert(insertMutation.getStrings.get(username).toString.equals(Queries.INSERT.username))
         } catch {
-          case e: Exception ⇒ log.error("Failed testing insert: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
+          case e: Exception ⇒ log.error(s"Failed testing insert: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
         }
 
         true
@@ -76,7 +76,7 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
           assert(updateMutation.getOldStrings.get(username).toString == Queries.INSERT.username)
           assert(updateMutation.getNewStrings.get(username).toString == Queries.UPDATE.username)
         } catch {
-          case e: Exception ⇒ log.error("Failed testing update: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
+          case e: Exception ⇒ log.error(s"Failed testing update: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
         }
 
         true
@@ -89,7 +89,7 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
           assert(deleteMutation.getTable.toString == Queries.TABLE.name)
           assert(deleteMutation.getStrings.get(username).toString == Queries.UPDATE.username)
         } catch {
-          case e: Exception ⇒ log.error("Failed testing delete: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
+          case e: Exception ⇒ log.error(s"Failed testing delete: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
         }
 
         done = true
@@ -115,7 +115,7 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
       kafkaConsumer.stop
       Await.result(future, 5.seconds)
     } catch {
-      case e: Exception ⇒ log.error("Failed stopping consumer: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
+      case e: Exception ⇒ log.error(s"Failed stopping consumer: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
     }
 
     if (!done) assert(false)

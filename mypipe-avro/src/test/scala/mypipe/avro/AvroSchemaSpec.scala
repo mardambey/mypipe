@@ -2,12 +2,13 @@ package mypipe.avro
 
 import mypipe.UnitSpec
 import java.util.Properties
-import org.apache.avro.repo.server.RepositoryServer
-import org.apache.avro.repo.InMemoryRepository
 import mypipe.avro.schema.{ GenericSchemaRepository, ShortSchemaId, AvroSchema }
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.scalatest.BeforeAndAfterAll
+import org.schemarepo.InMemoryRepository
+import org.schemarepo.config.Config
+import org.schemarepo.server.RepositoryServer
 
 class AvroSchemaSpec extends UnitSpec with BeforeAndAfterAll {
 
@@ -46,9 +47,9 @@ class AvroSchemaSpec extends UnitSpec with BeforeAndAfterAll {
   protected def createInMemoryRepo(host: String, port: Int): RepositoryServer = {
 
     val props = new Properties()
-    props.put("repo.class", classOf[InMemoryRepository].getName)
-    props.put("jetty.host", host)
-    props.put("jetty.port", port.toString)
+    props.put(Config.REPO_CLASS, classOf[InMemoryRepository].getName)
+    props.put(Config.JETTY_HOST, host)
+    props.put(Config.JETTY_PORT, port.toString)
 
     val server = new RepositoryServer(props)
     server.start()

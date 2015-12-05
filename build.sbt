@@ -51,14 +51,20 @@ lazy val avroDependencies = Seq(
   avro,
   guava,
   xinject,
+  jerseyServer,
+  jerseyServlet,
+  jerseyCore,
   jsr305,
+  rsApi,
   scalaTest,
-  scalaReflect
+  scalaReflect,
+  schemaRepoBundle
 )
 
 lazy val kafkaDependencies = Seq(
   kafka,
-  scalaTest
+  scalaTest,
+  schemaRepoBundle
 )
 
 lazy val root = (project in file(".")).
