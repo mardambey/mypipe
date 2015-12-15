@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-dark.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <title>Mypipe by mardambey</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Mypipe</h1>
+        <h2>MySQL binary log consumer with the ability to act on changed rows and publish changes to different systems with emphasis on Apache Kafka.</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/mardambey/mypipe/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/mardambey/mypipe/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/mardambey/mypipe" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>
+<a id="mypipe" class="anchor" href="#mypipe" aria-hidden="true"><span class="octicon octicon-link"></span></a>mypipe</h1>
+
+<p>mypipe latches onto a MySQL server with binary log replication enabled and
+allows for the creation of pipes that can consume the replication stream and
+act on the data (primarily integrated with Apache Kafka).</p>
+
+<h1>
+<a id="api" class="anchor" href="#api" aria-hidden="true"><span class="octicon octicon-link"></span></a>API</h1>
+
+<p>mypipe tries to provide enough information that usually is not part of the
+MySQL binary log stream so that the data is meaningful. mypipe requires a
+row based binary log format and provides <code>Insert</code>, <code>Update</code>, and <code>Delete</code>
+mutations representing changed rows. Each change is related back to it's
+table and the API provides metadata like column types, primary key
+information (composite, key order), and other such useful information.</p>
+
+<p>Look at <code>ColumnType.scala</code> and <code>Mutation.scala</code> for more details.</p>
+
+<h1>
+<a id="producers" class="anchor" href="#producers" aria-hidden="true"><span class="octicon octicon-link"></span></a>Producers</h1>
+
+<p>Producers receive MySQL binary log events and act on them. They can funnel
+down to another data store, send them to some service, or just print them
+out to the screen in the case of the stdout producer.</p>
+
+<h1>
+<a id="pipes" class="anchor" href="#pipes" aria-hidden="true"><span class="octicon octicon-link"></span></a>Pipes</h1>
+
+<p>Pipes tie one or more MySQL binary log consumers to a producer. Pipes can be
+used to create a system of fan-in data flow from several MySQL servers to
+other data sources such as Hadoop, Cassandra, Kafka, or other MySQL servers.
+They can also be used to update or flush caches.</p>
+
+<h1>
+<a id="kafka-integration" class="anchor" href="#kafka-integration" aria-hidden="true"><span class="octicon octicon-link"></span></a>Kafka integration</h1>
+
+<p>mypipe's main goal is to replicate a MySQL binlog stream into Apache Kafka.
+mypipe supports Avro encoding and can use a schema repository to figure out
+how to encode data. Data can either be encoded generically and stored in
+Avro maps by type (integers, strings, longs, etc.) or it can encode data
+more specifically if the schema repository can return specific schemas. The
+latter will allow the table's structure to be reflected in the Avro structure.</p>
+
+<h2>
+<a id="kafka-message-format" class="anchor" href="#kafka-message-format" aria-hidden="true"><span class="octicon octicon-link"></span></a>Kafka message format</h2>
+
+<p>Binary log events, specifically mutation events (insert, update, delete) are
+pushed into Kafka and are binary encoded. Every message has the following 
+format:</p>
+
+<pre><code> -----------------
+| MAGIC | 1 byte  |
+|-----------------|
+| MTYPE | 1 byte  |
+|-----------------|
+| SCMID | N bytes |
+|-----------------|
+| DATA  | N bytes |
+ -----------------
+</code></pre>
+
+<p>The above fields are:</p>
+
+<ul>
+<li>
+<code>MAGIC</code>: magic byte, used to figure out protocol version</li>
+<li>
+<code>MTYPE</code>: mutation type, a single byte indicating insert (<code>0x1</code>), update (<code>0x2</code>), or delete (<code>0x3</code>)</li>
+<li>
+<code>SCMID</code>: Avro schema ID, variable number of bytes</li>
+<li>
+<code>DATA</code>: the actual mutation data as bytes, variable size</li>
+</ul>
+
+<h2>
+<a id="mysql-to-generic-kafka-topics" class="anchor" href="#mysql-to-generic-kafka-topics" aria-hidden="true"><span class="octicon octicon-link"></span></a>MySQL to "generic" Kafka topics</h2>
+
+<p>If you do not have an Avro schema repository running that contains schemas 
+for each of your tables you can use generic Avro encoding. This will take 
+binary log mutations (insert, update, or delete) and encode them into the 
+following structure in the case of an insert (<code>InsertMutation.avsc</code>):</p>
+
+<pre><code>{
+  "namespace": "mypipe.avro",
+  "type": "record",
+  "name": "InsertMutation",
+  "fields": [
+        {
+            "name": "database",
+            "type": "string"
+        },
+        {
+            "name": "table",
+            "type": "string"
+        },
+        {
+            "name": "tableId",
+            "type": "long"
+        },
+        {
+            "name": "integers",
+            "type": {"type": "map", "values": "int"}
+        },
+        {
+            "name": "strings",
+            "type": {"type": "map", "values": "string"}
+        },
+        {
+            "name": "longs",
+            "type": {"type": "map", "values": "long"}
+        }
+    ]
+}
+</code></pre>
+
+<p>Updates will contain both the old row values and the new ones (see 
+<code>UpdateMutation.avsc</code>) and deletes are similar to inserts (<code>DeleteMutation.avsc</code>). 
+Once transformed into Avro data the mutations are pushed into Kafka topics 
+based on the following convention (this is configurable):</p>
+
+<pre><code>topicName = s"$db_$table_generic"
+</code></pre>
+
+<p>This ensures that all mutations destined to a specific database / table tuple are
+all added to a single topic with mutation ordering guarantees.</p>
+
+<h2>
+<a id="mysql-to-specific-kafka-topics" class="anchor" href="#mysql-to-specific-kafka-topics" aria-hidden="true"><span class="octicon octicon-link"></span></a>MySQL to "specific" Kafka topics</h2>
+
+<p>If you are running an Avro schema repository you can encode binary log events based on 
+the structures specified in that repository for the incoming database / table streams. </p>
+
+<p>In order to configure a specific producer you should add a <code>pipe</code> using a <code>mypipe.producer.KafkaMutationSpecificAvroProducer</code> 
+as it's producer. The producer needs some configuration values in order to find the Kafka brokers, 
+ZooKeeper ensemble, and the Avro schema repository. Here is a sample configuration:</p>
+
+<pre><code>kafka-specific {
+  enabled = true
+  consumers = ["localhost"]
+  producer {
+    kafka-specific {
+      schema-repo-client = "mypipe.avro.schema.SchemaRepo"
+      metadata-brokers = "localhost:9092"
+      zk-connect = "localhost:2181"
+    }
+  }
+}
+</code></pre>
+
+<p>Note that if you use <code>mypipe.avro.schema.SchemaRepo</code> as the schema repository client, you have to 
+provide the running JVM with the system property <code>avro.repo.server-url</code> in order for the client to 
+know where to reach the repository.</p>
+
+<h2>
+<a id="configuring-kafka-topic-names" class="anchor" href="#configuring-kafka-topic-names" aria-hidden="true"><span class="octicon octicon-link"></span></a>Configuring Kafka topic names</h2>
+
+<p>mypipe will push events into Kafka based on the <code>topic-format</code> configuration value. <code>reference.conf</code> 
+has the default values under <code>mypipe.kafka</code>, <code>specific-producer</code> and <code>generic-producer</code>.</p>
+
+<pre><code>specific-producer {
+  topic-format = "${db}_${table}_specific"
+}
+
+generic-producer {
+  topic-format = "${db}_${table}_generic"
+}
+</code></pre>
+
+<h2>
+<a id="alter-queries-and-generic-kafka-topics" class="anchor" href="#alter-queries-and-generic-kafka-topics" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>ALTER</code> queries and "generic" Kafka topics</h2>
+
+<p>mypipe handles <code>ALTER</code> table queries (as described below) allowing it to add 
+new columns or stop including removed ones into "generic" Avro records published 
+into Kafka. Since the "generic" Avro beans consist of typed maps (ints, strings, etc.) 
+mypipe can easily include or remove columns based on <code>ALTER</code> queries. Once a table's 
+metadata is refreshed (blocking operation) all subsequent mutations to the 
+table will use the new structure and publish that into Kafka.</p>
+
+<h2>
+<a id="consuming-from-generic-kafka-topics" class="anchor" href="#consuming-from-generic-kafka-topics" aria-hidden="true"><span class="octicon octicon-link"></span></a>Consuming from "generic" Kafka topics</h2>
+
+<p>In order to consume from generic Kafka topics the <code>KafkaGenericMutationAvroConsumer</code> 
+can be used. This consumer will allow you react to insert, update, and delete mutations. 
+The consumer needs an Avro schema repository as well as some helpers to be defined. A quick 
+(and incomplete) example follows:</p>
+
+<pre><code>val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
+  topic = KafkaUtil.genericTopic("databaseName", "tableName"),
+  zkConnect = "localhost:2181",
+  groupId = "someGroupId",
+  schemaIdSizeInBytes = 2)(
+
+  insertCallback = { insertMutation ⇒ ??? }
+  updateCallback = { updateMutation ⇒ ??? }
+  deleteCallback = { deleteMutation ⇒ ??? } 
+) {
+  protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
+}
+</code></pre>
+
+<p>For a more complete example take a look at <code>KafkaGenericSpec.scala</code>.</p>
+
+<p>Alternatively you can implement your own Kafka consumer given the binary structure 
+of the messages as shown above if the <code>KafkaGenericMutationAvroConsumer</code> does not 
+satisfy your needs.</p>
+
+<h1>
+<a id="mysql-event-processing-internals" class="anchor" href="#mysql-event-processing-internals" aria-hidden="true"><span class="octicon octicon-link"></span></a>MySQL Event Processing Internals</h1>
+
+<p>mypipe uses the <a href="https://github.com/shyiko/mysql-binlog-connector-java">mysql-binlog-connector-java</a> to tap 
+into the MySQL server's binary log stream and handles several types of events.</p>
+
+<h2>
+<a id="table_map" class="anchor" href="#table_map" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>TABLE_MAP</code>
+</h2>
+
+<p>This event causes mypipe to look up a table's metadata (primary key, column names and types, etc.).
+This is done by issuing the following query to the MySQL server to determine column information:</p>
+
+<pre><code>select COLUMN_NAME, DATA_TYPE, COLUMN_KEY 
+from COLUMNS 
+where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" 
+order by ORDINAL_POSITION
+</code></pre>
+
+<p>The following query is issued to the server also to determine the primary key:</p>
+
+<pre><code>select COLUMN_NAME
+from KEY_COLUMN_USAGE 
+where TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' and CONSTRAINT_NAME='PRIMARY' 
+order by ORDINAL_POSITION
+</code></pre>
+
+<p>While a <code>TABLE_MAP</code> event is being handled no other events will be handled concurrently.</p>
+
+<h2>
+<a id="query" class="anchor" href="#query" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>QUERY</code>
+</h2>
+
+<p>mypipe handles a few different types of raw queries (besides mutations) like:</p>
+
+<h3>
+<a id="begin" class="anchor" href="#begin" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>BEGIN</code>
+</h3>
+
+<p>If transaction event grouping is enabled mypipe will queue up all events that
+arrive after a <code>BEGIN</code> query has been encountered. While queuing is occuring 
+mypipe will not save it's binary log position as it receives events and will 
+only do so once the transaction is committed.</p>
+
+<h3>
+<a id="commit" class="anchor" href="#commit" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>COMMIT</code>
+</h3>
+
+<p>If transaction event grouping is enabled mypipe will hold wait for a <code>COMMIT</code> 
+query to arrive before "flushing" all queued events (mutations) at and then 
+saves it's binary log position to mark the processing of the entire transaction.</p>
+
+<h3>
+<a id="rollback" class="anchor" href="#rollback" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>ROLLBACK</code>
+</h3>
+
+<p>If transaction event grouping is enabled mypipe will clear and not flush the 
+queued up events (mutations) upon receiving a <code>ROLBACK</code>.</p>
+
+<h3>
+<a id="alter" class="anchor" href="#alter" aria-hidden="true"><span class="octicon octicon-link"></span></a><code>ALTER</code>
+</h3>
+
+<p>Upon receiving an <code>ALTER</code> query mypipe will attempt to reload the affected table's 
+metadata. This allows mypipe to detect dropped / added columns, changed keys, or 
+anything else that could affect the table. mypipe will perform a look up similar 
+to the one done when handling a <code>TABLE_MAP</code> event.</p>
+
+<h1>
+<a id="getting-started" class="anchor" href="#getting-started" aria-hidden="true"><span class="octicon octicon-link"></span></a>Getting Started</h1>
+
+<p>This section aims to guide you through setting up MySQL so that it can be used
+with mypipe. It then goes into setting up mypipe itself to push binary log events
+into Kafka. Finally, it explains how to consume these events from Kafka.</p>
+
+<h2>
+<a id="enabling-mysql-binary-logging" class="anchor" href="#enabling-mysql-binary-logging" aria-hidden="true"><span class="octicon octicon-link"></span></a>Enabling MySQL binary logging</h2>
+
+<p>The following snippet of configuration will enable MySQL to generate binary logs 
+the mypipe will be able to understand. Taken from <code>my.cnf</code>:</p>
+
+<pre><code>server-id         = 112233
+log_bin           = mysql-bin
+expire_logs_days  = 1
+binlog_format     = row
+</code></pre>
+
+<p>The binary log format is required to be set to <code>row</code> for mypipe to work since 
+we need to track individual changes to rows (insert, update, delete).</p>
+
+<h2>
+<a id="configuring-mypipe-to-ingest-mysql-binary-logs" class="anchor" href="#configuring-mypipe-to-ingest-mysql-binary-logs" aria-hidden="true"><span class="octicon octicon-link"></span></a>Configuring mypipe to ingest MySQL binary logs</h2>
+
+<p>Currently, mypipe does not offset a binary distribution that can be installed.
+In order use mypipe, start by cloning the git repository:</p>
+
+<pre><code>git clone https://github.com/mardambey/mypipe.git
+</code></pre>
+
+<p>Compile and package the code:</p>
+
+<pre><code>./sbt package
+</code></pre>
+
+<p>mypipe needs some configuration in order to point it to a MySQL server.
+The following configuration goes into <code>application.conf</code> in the <code>mypipe-runner</code>
+sub-project. Some other configuration entries can be added to other files
+as well; when indicated.</p>
+
+<p>A MySQL server can be defined in the configuration under the <code>consumers</code> 
+section. For example:</p>
+
+<pre><code># consumers represent sources for mysql binary logs
+consumers {
+
+database1  {
+    # database "host:port:user:pass" 
+    source = "localhost:3306:mypipe:mypipe"
+  }
+}
+</code></pre>
+
+<p>Multiple consumers (or sources of data) can be defined. Once mypipe
+latches onto a MySQL server, it will attempt to pick up where it last
+left of if an offset was previously saved for the given database host
+and database name combination. mypipe saves it's offsets in files for
+now. These files are stored in the location indicated by the config
+entry <code>data-dir</code> in the <code>mypipe-api</code> project's <code>reference.conf</code>.</p>
+
+<pre><code>data-dir = "/tmp/mypipe"
+</code></pre>
+
+<p>You can either override that config in <code>application.conf</code> of <code>mypipe-runner</code>
+or edit it in <code>mypipe-api</code> directly.</p>
+
+<p>The simplest way to observe the replication stream that mypipe is 
+ingesting is to configure the <code>stdout</code> producer. This producer will
+simply print to standard out the mutation events that mypipe is 
+consuming.</p>
+
+<p>The following snippet goes into the configuration file in order to
+do so:</p>
+
+<pre><code>producers {
+  stdout {
+     class = "mypipe.producer.stdout.StdoutProducer"
+  }
+}
+</code></pre>
+
+<p>In order to instruct mypipe to connect the consumer called <code>database1</code>
+and the <code>stdout</code> producer they must be joined by a <code>pipe</code>.</p>
+
+<p>The following configuration entry creates such a pipe:</p>
+
+<pre><code>pipes {
+
+  # prints queries to standard out
+  stdout {
+    consumers = ["database1"]
+    producer {
+      stdout {}
+    }
+  }
+}
+</code></pre>
+
+<p>At this point, this configuration can be tested out. The
+<code>mypipe-runner</code> project can run mypipe and use these configuration
+entries.</p>
+
+<pre><code>./sbt "project runner" "runMain mypipe.runner.PipeRunner"
+</code></pre>
+
+<p>As soon as mypipe starts, it will latch onto the binary log
+stream and the <code>stdout</code> producer will print out mutations to the
+console.</p>
+
+<h2>
+<a id="configuring-mypipe-to-produce-events-into-kafka" class="anchor" href="#configuring-mypipe-to-produce-events-into-kafka" aria-hidden="true"><span class="octicon octicon-link"></span></a>Configuring mypipe to produce events into Kafka</h2>
+
+<p>mypipe can produce mutations into Kafka either generically or more
+specifically. See the above sections for more explanation on what
+this means.</p>
+
+<h3>
+<a id="generic-kafka-topics" class="anchor" href="#generic-kafka-topics" aria-hidden="true"><span class="octicon octicon-link"></span></a>Generic Kafka topics</h3>
+
+<p>In order to set up mypipe to produce events to Kafka generically, a
+producer must be added to the <code>producers</code> section of the configuration.
+This is similar to the <code>stdout</code> producer added earlier.</p>
+
+<pre><code>producers {
+    kafka-generic {
+        class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+    }
+}
+</code></pre>
+
+<p>This producer must then be joined with a data consumer using a pipe.
+The configuration of the Kafka brokers will also be passed to the
+producer.</p>
+
+<pre><code>pipes {
+    kafka-generic {
+        enabled = true
+        consumers = ["database1"]
+        producer {
+          kafka-generic {
+             metadata-brokers = "localhost:9092"
+          }
+        }
+    }
+}
+</code></pre>
+
+<p>This pipe connects <code>database1</code> with the Kafka cluster defined by
+the values in the <code>meta-brokers</code> key, brokers must be comma separated.
+As mentioned before, once this pipe is active it will produce events
+into Kafka topics based on the database and table the mutations are
+coming from. Topics are named as such:</p>
+
+<pre><code>$database_$table_generic
+</code></pre>
+
+<p>Each of these topics contain ordered mutations for the database / table
+tuple.</p>
+
+<p>For a more complete configuration file, take a look at the sample
+configuration shown later in this document.</p>
+
+<h3>
+<a id="consuming-mutations-pushed-into-kafka-via-console-generically" class="anchor" href="#consuming-mutations-pushed-into-kafka-via-console-generically" aria-hidden="true"><span class="octicon octicon-link"></span></a>Consuming mutations pushed into Kafka via console (generically)</h3>
+
+<p>In order to generically consume and display the mutations pushed into
+Kafka, the provided generic console consumer will help. It can be
+used by invoking the following command:</p>
+
+<pre><code>./sbt "project runner" \
+"runMain mypipe.runner.KafkaGenericConsoleConsumer $database_$table_generic zkHost:2181 groupId"
+</code></pre>
+
+<p>This will consume messages for the given <code>$database</code> / <code>$table</code> tuple from
+the Kafka cluster specified by the given ZooKeeper ensemble connection
+string and the consumer group ID to use.</p>
+
+<h1>
+<a id="error-handling" class="anchor" href="#error-handling" aria-hidden="true"><span class="octicon octicon-link"></span></a>Error Handling</h1>
+
+<p>If the default configuration based error handler is used:</p>
+
+<pre><code>mypipe.error-handler { default { class = "mypipe.mysql.ConfigBasedErrorHandler" } }
+</code></pre>
+
+<p>then user can decide to abort and stop processing using the following flags:</p>
+
+<ul>
+<li>
+<code>quit-on-event-handler-failure</code>: an event handler failed (commit)</li>
+<li>
+<code>quit-on-event-decode-failure</code>: mypipe could not decode the event</li>
+<li>
+<code>quit-on-listener-failure</code>: a specified listener could not process the event</li>
+<li>
+<code>quit-on-empty-mutation-commit-failure</code>: quit upon encountering an empty transaction</li>
+</ul>
+
+<p>Errors are handled as such:</p>
+
+<ul>
+<li>The first handler deals with event decoding errors (ie: mypipe can not determine the event type and decode it).</li>
+<li>The second layer of error handlers deals with specific event errors, for example: mutation, alter, table map, commit.</li>
+<li>The third and final layer is the global error handler.</li>
+</ul>
+
+<p>Error handler invocation:</p>
+
+<ul>
+<li>If the first layer or second layer are invoked and they return true, the next event will be consumed and the global error handler is not called.</li>
+<li>If the first layer or second layer are invoked and they return false, then the third layer (global error handler) is invoked, otherwise, processing of the next event continues</li>
+</ul>
+
+<p>A custom error handler can also be provided if available in the classpath.</p>
+
+<h1>
+<a id="event-filtering" class="anchor" href="#event-filtering" aria-hidden="true"><span class="octicon octicon-link"></span></a>Event Filtering</h1>
+
+<p>If not all events are to be processed, they can be filtered by setting <code>include-event-condition</code>.
+This allows for controlling what dbs and tables will be consumed. Effectively, this is treated as Scala code and is compiled at runtime. Setting this value to blank ignores it.
+Example:</p>
+
+<pre><code>include-event-condition = """ db == "mypipe" &amp;&amp; table =="user" """
+</code></pre>
+
+<p>The above will only process events originating from the database named "mypipe" and the table named "user".</p>
+
+<h1>
+<a id="tests" class="anchor" href="#tests" aria-hidden="true"><span class="octicon octicon-link"></span></a>Tests</h1>
+
+<p>In order to run the tests you need to configure <code>test.conf</code> with proper MySQL
+values. You should also make sure there you have a database called <code>mypipe</code> with
+the following credentials:</p>
+
+<pre><code>GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'mypipe'@'%' IDENTIFIED BY 'mypipe'
+GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
+</code></pre>
+
+<p>The database must also have binary logging enabled in <code>row</code> format.</p>
+
+<h1>
+<a id="sample-applicationconf" class="anchor" href="#sample-applicationconf" aria-hidden="true"><span class="octicon octicon-link"></span></a>Sample application.conf</h1>
+
+<pre><code>mypipe {
+
+  # Avro schema repository client class name
+  schema-repo-client = "mypipe.avro.schema.SchemaRepo"
+
+  # consumers represent sources for mysql binary logs
+  consumers {
+
+  database1  {
+      # database "host:port:user:pass" array
+      source = "localhost:3306:mypipe:mypipe"
+    }
+  }
+
+  # data producers export data out (stdout, other stores, external services, etc.)
+  producers {
+
+    stdout {
+       class = "mypipe.producer.stdout.StdoutProducer"
+    }
+
+      kafka-generic {
+        class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+      }
+  }
+
+  # pipes join consumers and producers
+  pipes {
+
+    # prints queries to standard out
+    stdout {
+      consumers = ["database1"]
+      producer {
+        stdout {}
+      }
+    }
+
+    # push events into kafka topics
+    # where each database-table tuple
+    # get their own topic
+    kafka-generic {
+      enabled = true
+      consumers = ["database1"]
+      producer {
+        kafka-generic {
+          metadata-brokers = "localhost:9092"
+        }
+      }
+    }
+  }
+}
+</code></pre>
+      </section>
+    </div>
+
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-71411370-1");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  </body>
+</html>
