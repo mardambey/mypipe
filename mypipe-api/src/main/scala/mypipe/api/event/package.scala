@@ -4,7 +4,7 @@ import java.util.UUID
 
 import mypipe.api.data.{ Row, Table }
 
-package object event {
+package event {
 
   sealed abstract class Event
 

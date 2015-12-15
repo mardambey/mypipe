@@ -2,7 +2,7 @@ package mypipe.api
 
 import java.lang.{ Long ⇒ JLong }
 
-package object data {
+package data {
   case class PrimaryKey(columns: List[ColumnMetadata])
 
   case class ColumnMetadata(name: String, colType: ColumnType.EnumVal, isPrimaryKey: Boolean)
