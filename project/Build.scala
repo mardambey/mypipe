@@ -10,7 +10,6 @@ object Dependencies {
   val jsqlParser = "com.github.jsqlparser" % "jsqlparser" % "0.9"
   val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
   val jug = "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.3"
-  val jerseyServer = "com.sun.jersey" % "jersey-server" % "1.15"
   val jerseyServlet = "com.sun.jersey" % "jersey-servlet" % "1.15"
   val jerseyCore = "com.sun.jersey" % "jersey-core" % "1.15"
   val kafka = "org.apache.kafka" % "kafka_2.11" % "0.8.2.2" exclude("javax.jms", "jms") exclude("com.sun.jdmk", "jmxtools") exclude("com.sun.jmx", "jmxri")

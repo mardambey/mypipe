@@ -51,7 +51,6 @@ lazy val avroDependencies = Seq(
   avro,
   guava,
   xinject,
-  jerseyServer,
   jerseyServlet,
   jerseyCore,
   jsr305,
