@@ -20,5 +20,5 @@ case class Column(metadata: ColumnMetadata, value: java.io.Serializable = null) 
     }
   }
 
-  def valueOption[T]: Option[T] = Option(value.asInstanceOf[T])
+  def valueOption[T]: Option[T] = Option(value[T])
 }
