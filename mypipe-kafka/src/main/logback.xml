@@ -7,10 +7,10 @@
     </layout>
   </appender>
   
-  <logger name="mypipe" level="info"/>
+  <logger name="mypipe" level="warn"/>
   
 
-  <root level="info">
+  <root level="warn">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>
