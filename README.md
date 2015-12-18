@@ -472,3 +472,5 @@ The database must also have binary logging enabled in `row` format.
     }
 
 
+# mailing list
+https://groups.google.com/d/forum/mypipe
