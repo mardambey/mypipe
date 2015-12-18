@@ -3,6 +3,7 @@ package mypipe.api
 import java.io.{ File, PrintWriter }
 
 import com.typesafe.config.{ Config, ConfigFactory }
+import mypipe.api.consumer.BinaryLogConsumer
 import mypipe.mysql.BinaryLogFilePosition
 import org.slf4j.LoggerFactory
 
@@ -73,17 +74,21 @@ object Conf {
     }
   }
 
-  def binlogSaveFilePosition(consumerId: String, filePos: BinaryLogFilePosition, pipe: String): Boolean = {
+  def binlogSaveFilePositionToFile(consumer: BinaryLogConsumer[_], fileName: String): Boolean = {
+
+    val consumerId = consumer.id
+    val filePos = consumer.getBinaryLogPosition.getOrElse({
+      log.warn(s"Tried saving non-existent binary log position for consumer $consumerId, saving ${BinaryLogFilePosition.current} instead.")
+      BinaryLogFilePosition.current
+    })
 
     try {
-      val fileName = binlogGetStatusFilename(consumerId, pipe)
 
       if (!lastBinlogFilePos.getOrElse(fileName, "").equals(filePos)) {
 
         val file = new File(fileName)
         val writer = new PrintWriter(file)
 
-        log.info(s"Saving binlog position for pipe $pipe/$consumerId -> $filePos")
         writer.write(s"${filePos.filename}:${filePos.pos}")
         writer.close()
 
@@ -93,7 +98,7 @@ object Conf {
       true
     } catch {
       case e: Exception ⇒
-        log.error(s"Failed saving binary log position $filePos for consumer $consumerId and pipe $pipe: ${e.getMessage}\n${e.getStackTraceString}")
+        log.error(s"Failed saving binary log position $filePos for consumer $consumerId to file $fileName: ${e.getMessage}\n${e.getStackTraceString}")
         false
     }
   }

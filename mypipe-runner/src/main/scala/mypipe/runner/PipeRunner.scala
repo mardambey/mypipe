@@ -19,8 +19,8 @@ object PipeRunner extends App {
   protected val conf = ConfigFactory.load()
 
   lazy val producers: Map[String, Option[Class[Producer]]] = loadProducerClasses(conf, "mypipe.producers")
-  lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])] = loadConsumerConfigs(conf, "mypipe.consumers")
-  lazy val pipes: Seq[Pipe[_, _]] = createPipes(conf, "mypipe.pipes", producers, consumers)
+  lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])] = loadConsumerConfigs(conf, "mypipe.consumers")
+  lazy val pipes: Seq[Pipe[_]] = createPipes(conf, "mypipe.pipes", producers, consumers)
 
   if (pipes.isEmpty) {
     log.info("No pipes defined, exiting.")
@@ -43,10 +43,10 @@ object PipeRunnerUtil {
   def loadProducerClasses(conf: Config, key: String): Map[String, Option[Class[Producer]]] =
     Conf.loadClassesForKey[Producer](key)
 
-  def loadConsumerClasses(conf: Config, key: String): Map[String, Option[Class[BinaryLogConsumer[_, _]]]] =
-    Conf.loadClassesForKey[BinaryLogConsumer[_, _]](key)
+  def loadConsumerClasses(conf: Config, key: String): Map[String, Option[Class[BinaryLogConsumer[_]]]] =
+    Conf.loadClassesForKey[BinaryLogConsumer[_]](key)
 
-  def loadConsumerConfigs(conf: Config, key: String): Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])] = {
+  def loadConsumerConfigs(conf: Config, key: String): Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])] = {
     val consumerClasses = loadConsumerClasses(conf, key)
     val consumers = conf.getObject(key).asScala
     consumers.map(kv ⇒ {
@@ -60,7 +60,7 @@ object PipeRunnerUtil {
   def createPipes(conf: Config,
                   key: String,
                   producerClasses: Map[String, Option[Class[Producer]]],
-                  consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])]): Seq[Pipe[_, _]] = {
+                  consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])]): Seq[Pipe[_]] = {
 
     val pipes = conf.getObject(key).asScala
 
@@ -71,7 +71,7 @@ object PipeRunnerUtil {
     }).filter(_ != null).toSeq
   }
 
-  def createPipe(name: String, pipeConf: Config, producerClasses: Map[String, Option[Class[Producer]]], consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])]): Pipe[_, _] = {
+  def createPipe(name: String, pipeConf: Config, producerClasses: Map[String, Option[Class[Producer]]], consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])]): Pipe[_] = {
 
     log.info(s"Loading configuration for $name pipe")
 
@@ -113,10 +113,10 @@ object PipeRunnerUtil {
     }
   }
 
-  protected def createConsumer(pipeName: String, params: (String, Config, Option[Class[BinaryLogConsumer[_, _]]])): BinaryLogConsumer[_, _] = {
+  protected def createConsumer(pipeName: String, params: (String, Config, Option[Class[BinaryLogConsumer[_]]])): BinaryLogConsumer[_] = {
     try {
       val consumer = params._3 match {
-        case None ⇒ MySQLBinaryLogConsumer(params._2).asInstanceOf[BinaryLogConsumer[_, _]]
+        case None ⇒ MySQLBinaryLogConsumer(params._2).asInstanceOf[BinaryLogConsumer[_]]
         case Some(clazz) ⇒
           val consumer = {
             clazz.getConstructors.find(
@@ -129,7 +129,7 @@ object PipeRunnerUtil {
 
           // TODO: this is done specifically for the SelectConsumer for now, other consumers will fail since there is nothing forcing this ctor
           //val consumer = ctor.newInstance(params._2.user, params._2.host, params._2.password, new Integer(params._2.port))
-          consumer.asInstanceOf[BinaryLogConsumer[_, _]]
+          consumer.asInstanceOf[BinaryLogConsumer[_]]
       }
 
       consumer

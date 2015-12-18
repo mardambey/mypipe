@@ -56,8 +56,8 @@ object Snapshotter extends App {
     log.info("Fetched snapshot.")
 
     lazy val producers: Map[String, Option[Class[Producer]]] = PipeRunnerUtil.loadProducerClasses(conf, "mypipe.snapshotter.producers")
-    lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_, _]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
-    lazy val pipes: Seq[Pipe[_, _]] = PipeRunnerUtil.createPipes(conf, "mypipe.snapshotter.pipes", producers, consumers)
+    lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
+    lazy val pipes: Seq[Pipe[_]] = PipeRunnerUtil.createPipes(conf, "mypipe.snapshotter.pipes", producers, consumers)
 
     if (pipes.length != 1) {
       throw new Exception("Exactly 1 pipe should be configured configured for snapshotter.")

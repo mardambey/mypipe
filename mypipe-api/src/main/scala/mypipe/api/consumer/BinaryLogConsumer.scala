@@ -3,11 +3,12 @@ package mypipe.api.consumer
 import com.typesafe.config.Config
 import mypipe.api.data.Table
 import mypipe.api.event._
+import mypipe.mysql.BinaryLogFilePosition
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-trait BinaryLog[BinaryLogEvent, BinaryLogPosition]
+trait BinaryLog[BinaryLogEvent]
 
 /** Handle BinaryLogConsumer errors. Errors are handled as such:
  *  The first handler deals with event decoding errors.
@@ -21,14 +22,13 @@ trait BinaryLog[BinaryLogEvent, BinaryLogPosition]
  *  is invoked, otherwise, processing of the next event continues.
  *
  *  @tparam BinaryLogEvent binary log event type
- *  @tparam BinaryLogPosition binary log position type
  */
-trait BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryLog[BinaryLogPosition, BinaryLogEvent] {
+trait BinaryLogConsumerErrorHandler[BinaryLogEvent] extends BinaryLog[BinaryLogEvent] {
   def handleEventError(event: Option[Event], binaryLogEvent: BinaryLogEvent): Boolean
-  def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean
-  def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutations: Seq[Mutation]): Boolean
-  def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean
-  def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: AlterEvent): Boolean
+  def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(mutation: Mutation): Boolean
+  def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(mutations: Seq[Mutation]): Boolean
+  def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(table: Table, event: TableMapEvent): Boolean
+  def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(table: Table, event: AlterEvent): Boolean
   def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean
   def handleEmptyCommitError(queryList: List[QueryEvent]): Boolean
   def handleEventDecodeError(binaryLogEvent: BinaryLogEvent): Boolean
@@ -64,13 +64,13 @@ trait ConfigLoader {
 
 /** Defines what a log consumer should support for mypipe to use it.
  */
-trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] with BinaryLogConsumerTableFinder {
+trait BinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsumerErrorHandler[BinaryLogEvent] with BinaryLogConsumerTableFinder {
 
   protected val log = LoggerFactory.getLogger(getClass)
 
   /** Set of listeners receiving events from this consumer.
    */
-  protected val listeners = collection.mutable.Set[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]]()
+  protected val listeners = collection.mutable.Set[BinaryLogConsumerListener[BinaryLogEvent]]()
 
   /** Given a third-party BinLogEvent, this method decodes it to an
    *  mypipe specific Event type if it recognizes it.
@@ -99,14 +99,14 @@ trait BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogCons
   /** Registers a listener for this consumer's events.
    *  @param listener the BinaryLogConsumerListener to register
    */
-  def registerListener(listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]) {
+  def registerListener(listener: BinaryLogConsumerListener[BinaryLogEvent]) {
     listeners += listener
   }
 
   /** Gets the consumer's current position in the binary log.
    *  @return current BinLogPos
    */
-  def getBinaryLogPosition: Option[BinaryLogPosition]
+  def getBinaryLogPosition: Option[BinaryLogFilePosition]
 
   /** Gets this consumer's unique ID.
    *  @return Unique ID as a string.

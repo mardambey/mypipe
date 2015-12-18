@@ -76,18 +76,18 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
          """.stripMargin)
       val consumer = MySQLBinaryLogConsumer(conf)
 
-      consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
-        override def onMutation(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutation: Mutation): Boolean = {
+      consumer.registerListener(new BinaryLogConsumerListener[MEvent]() {
+        override def onMutation(c: BinaryLogConsumer[MEvent], mutation: Mutation): Boolean = {
           queueProducer.queue(mutation)
           true
         }
 
-        override def onMutation(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], mutations: Seq[Mutation]): Boolean = {
+        override def onMutation(c: BinaryLogConsumer[MEvent], mutations: Seq[Mutation]): Boolean = {
           queueProducer.queueList(mutations.toList)
           true
         }
 
-        override def onStart(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]) { connected = true }
+        override def onStart(c: BinaryLogConsumer[MEvent]) { connected = true }
       })
 
       val f = Future { consumer.start() }

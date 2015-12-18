@@ -7,8 +7,9 @@ import com.fasterxml.uuid.{ EthernetAddress, Generators }
 
 import mypipe.api.data.{ UnknownTable, Table }
 import mypipe.api.event._
+import mypipe.mysql.BinaryLogFilePosition
 
-abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] {
+abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsumer[BinaryLogEvent] {
 
   private val groupEventsByTx = Conf.GROUP_EVENTS_BY_TX
   private val groupMutationsByTx = Conf.GROUP_MUTATIONS_BY_TX
@@ -18,7 +19,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private var curTxid: Option[UUID] = None
   private var transactionInProgress = false
-  private var binLogPos: Option[BinaryLogPosition] = None
+  // TODO: this doesn't belong in here
+  private var binLogPos: Option[BinaryLogFilePosition] = None
 
   protected def handleEvent(binaryLogEvent: BinaryLogEvent): Unit = {
     val event = decodeEvent(binaryLogEvent)
@@ -80,7 +82,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
 
   private def _handleMutation(mutation: Mutation): Boolean = {
 
-    processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
+    processList[BinaryLogConsumerListener[BinaryLogEvent]](
       list = listeners.toList,
       listOp = _.onMutation(this, mutation),
       onError = handleMutationError(_, _)(mutation))
@@ -89,7 +91,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
   private def handleTableMap(event: TableMapEvent): Boolean = {
 
     val success = findTable(event).exists(table ⇒ {
-      processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
+      processList[BinaryLogConsumerListener[BinaryLogEvent]](
         list = listeners.toList,
         listOp = _.onTableMap(this, table),
         onError = handleTableMapError(_, _)(table, event))
@@ -106,7 +108,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
         log.warn(s"Encountered an alter event but could not find a corresponding Table for it, ignoring and continuing: $event")
         true
       case table: Table ⇒
-        processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
+        processList[BinaryLogConsumerListener[BinaryLogEvent]](
           list = listeners.toList,
           listOp = _.onTableAlter(this, event),
           onError = handleAlterError(_, _)(table, event))
@@ -148,7 +150,7 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
       val success =
         if (groupMutationsByTx) {
           val mutations = txQueue.toList
-          processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
+          processList[BinaryLogConsumerListener[BinaryLogEvent]](
             list = listeners.toList,
             listOp = _.onMutation(this, mutations),
             onError = handleMutationsError(_, _)(mutations))
@@ -201,5 +203,5 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     updateBinaryLogPosition()
   }
 
-  def position: Option[BinaryLogPosition] = binLogPos
+  def position: Option[BinaryLogFilePosition] = binLogPos
 }

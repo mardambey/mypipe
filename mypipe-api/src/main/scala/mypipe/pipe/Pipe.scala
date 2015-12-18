@@ -5,14 +5,13 @@ import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.event.{ AlterEvent, Mutation }
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
-import mypipe.mysql._
 import mypipe.util.Enum
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-case class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], producer: Producer) {
+case class Pipe[BinaryLogEvent](id: String, consumer: BinaryLogConsumer[BinaryLogEvent], producer: Producer) {
 
   object State extends Enum {
 
@@ -43,9 +42,9 @@ case class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumer: BinaryL
 
   @volatile protected var _connected: Boolean = false
   protected var flusher: Option[Cancellable] = None
-  protected val listener = new BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]() {
+  protected val listener = new BinaryLogConsumerListener[BinaryLogEvent]() {
 
-    override def onStart(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
+    override def onStart(consumer: BinaryLogConsumer[BinaryLogEvent]) {
       log.info(s"Pipe $id connected!")
 
       state = State.STARTED
@@ -55,11 +54,10 @@ case class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumer: BinaryL
         Conf.FLUSH_INTERVAL_SECS.seconds)(saveBinaryLogPosition(consumer)))
     }
 
-    private def saveBinaryLogPosition(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
+    private def saveBinaryLogPosition(consumer: BinaryLogConsumer[BinaryLogEvent]) {
       val binlogPos = consumer.getBinaryLogPosition
-      // TODO: we should be able to generically save the binary log position
-      if (producer.flush() && binlogPos.isDefined && binlogPos.get.isInstanceOf[BinaryLogFilePosition]) {
-        Conf.binlogSaveFilePosition(consumer.id, binlogPos.get.asInstanceOf[BinaryLogFilePosition], id)
+      if (producer.flush() && binlogPos.isDefined) {
+        binlogSaveFilePosition(consumer, id)
       } else {
         if (binlogPos.isDefined)
           log.error(s"Producer ($producer) failed to flush, not saving binary log position: $binlogPos for consumer $consumer.")
@@ -68,7 +66,13 @@ case class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumer: BinaryL
       }
     }
 
-    override def onStop(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition]) {
+    private def binlogSaveFilePosition(consumer: BinaryLogConsumer[_], pipe: String): Boolean = {
+      val fileName = Conf.binlogGetStatusFilename(consumer.id, pipe)
+      log.info(s"Saving binlog position for pipe $pipe/${consumer.id} -> ${consumer.getBinaryLogPosition}")
+      Conf.binlogSaveFilePositionToFile(consumer, fileName)
+    }
+
+    override def onStop(consumer: BinaryLogConsumer[BinaryLogEvent]) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
@@ -76,15 +80,15 @@ case class Pipe[BinaryLogEvent, BinaryLogPosition](id: String, consumer: BinaryL
       state = State.STOPPED
     }
 
-    override def onMutation(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], mutation: Mutation): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer[BinaryLogEvent], mutation: Mutation): Boolean = {
       producer.queue(mutation)
     }
 
-    override def onMutation(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], mutations: Seq[Mutation]): Boolean = {
+    override def onMutation(consumer: BinaryLogConsumer[BinaryLogEvent], mutations: Seq[Mutation]): Boolean = {
       producer.queueList(mutations.toList)
     }
 
-    override def onTableAlter(consumer: BinaryLogConsumer[BinaryLogEvent, BinaryLogPosition], event: AlterEvent): Boolean = {
+    override def onTableAlter(consumer: BinaryLogConsumer[BinaryLogEvent], event: AlterEvent): Boolean = {
       producer.handleAlter(event)
     }
   }

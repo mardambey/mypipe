@@ -17,7 +17,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 abstract class AbstractMySQLBinaryLogConsumer
-    extends AbstractBinaryLogConsumer[MEvent, BinaryLogFilePosition]
+    extends AbstractBinaryLogConsumer[MEvent]
     with ConnectionSource {
 
   protected lazy val client = new BinaryLogClient(hostname, port, username, password)

@@ -13,8 +13,6 @@ import mypipe.api.data._
 import mypipe.api.event._
 import mypipe.mysql._
 
-import org.slf4j.LoggerFactory
-
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 
@@ -23,8 +21,8 @@ case class SelectEvent(database: String, table: String, rows: Seq[Seq[Any]]) ext
 case class ShowMasterStatusEvent(filePosition: BinaryLogFilePosition) extends SnapshotterEvent
 
 class SelectConsumer(override val config: Config)
-    extends BinaryLogConsumer[SelectEvent, BinaryLogFilePosition]
-    with ConfigBasedErrorHandlingBehaviour[SelectEvent, BinaryLogFilePosition]
+    extends BinaryLogConsumer[SelectEvent]
+    with ConfigBasedErrorHandlingBehaviour[SelectEvent]
     with ConfigBasedEventSkippingBehaviour
     with CacheableTableMapBehaviour
     with ConfigLoader

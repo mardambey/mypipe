@@ -40,12 +40,12 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     consumer = MySQLBinaryLogConsumer(conf)
     tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
 
-    consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
-      override def onStart(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]): Unit = connected = true
-      override def onTableMap(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], table: Table): Boolean = {
+    consumer.registerListener(new BinaryLogConsumerListener[MEvent]() {
+      override def onStart(c: BinaryLogConsumer[MEvent]): Unit = connected = true
+      override def onTableMap(c: BinaryLogConsumer[MEvent], table: Table): Boolean = {
         queueTableMap.add(table)
       }
-      override def onTableAlter(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], event: AlterEvent): Boolean = {
+      override def onTableAlter(c: BinaryLogConsumer[MEvent], event: AlterEvent): Boolean = {
         val table = tableCache.refreshTable(event.database, event.table.name)
         queueTableAlter.add(table.get)
         true
