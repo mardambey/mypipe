@@ -26,6 +26,12 @@ object Conf {
     } else {
       None
     }
+
+    def getOptionalConfig(path: String): Option[Config] = if (underlying.hasPath(path)) {
+      Some(underlying.getConfig(path))
+    } else {
+      None
+    }
   }
 
   val log = LoggerFactory.getLogger(getClass)
@@ -58,14 +64,14 @@ object Conf {
     case e: Exception ⇒ println(s"Error while creating data and log dir $DATADIR, $LOGDIR: ${e.getMessage}")
   }
 
-  def binlogGetStatusFilename(consumerId: String, pipe: String): String = {
-    s"$DATADIR/$pipe-$consumerId.pos"
+  def binlogGetStatusFilename(consumerId: String, fileNamePrefix: String): String = {
+    s"$DATADIR/$fileNamePrefix-$consumerId.pos"
   }
 
-  def binlogLoadFilePosition(consumerId: String, pipeName: String): Option[BinaryLogFilePosition] = {
+  def binlogLoadFilePosition(consumerId: String, fileNamePrefix: String): Option[BinaryLogFilePosition] = {
     try {
 
-      val statusFile = binlogGetStatusFilename(consumerId, pipeName)
+      val statusFile = binlogGetStatusFilename(consumerId, fileNamePrefix)
       val filePos = scala.io.Source.fromFile(statusFile).getLines().mkString.split(":")
       Some(BinaryLogFilePosition(filePos(0), filePos(1).toLong))
 

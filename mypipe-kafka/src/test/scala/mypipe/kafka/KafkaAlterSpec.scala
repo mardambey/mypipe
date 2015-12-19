@@ -3,8 +3,10 @@ package mypipe.kafka
 import com.typesafe.config.ConfigFactory
 import mypipe.Queries
 import mypipe._
+import mypipe.api.Conf
 
 import mypipe.api.event.Mutation
+import mypipe.api.repo.FileBasedBinaryLogPositionRepository
 import mypipe.avro.AvroVersionedRecordDeserializer
 import mypipe.avro.schema.AvroSchemaUtils
 import mypipe.mysql.MySQLBinaryLogConsumer
@@ -32,7 +34,8 @@ class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
          |}
          """.stripMargin)
   val binlogConsumer = MySQLBinaryLogConsumer(c)
-  val pipe = new Pipe("test-pipe-kafka-alter", binlogConsumer, kafkaProducer)
+  val binlogPosRepo = new FileBasedBinaryLogPositionRepository(filePrefix = "test-pipe-kafka-alter", dataDir = Conf.DATADIR)
+  val pipe = new Pipe("test-pipe-kafka-alter", binlogConsumer, kafkaProducer, binlogPosRepo)
 
   override def beforeAll() {
     pipe.connect()

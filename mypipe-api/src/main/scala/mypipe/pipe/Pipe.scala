@@ -5,13 +5,16 @@ import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.event.{ AlterEvent, Mutation }
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
+import mypipe.api.repo.BinaryLogPositionRepository
 import mypipe.util.Enum
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-case class Pipe[BinaryLogEvent](id: String, consumer: BinaryLogConsumer[BinaryLogEvent], producer: Producer) {
+case class Pipe[BinaryLogEvent](id: String, consumer: BinaryLogConsumer[BinaryLogEvent], producer: Producer, binlogPosRepo: BinaryLogPositionRepository) {
+
+  protected val filePrefix = id
 
   object State extends Enum {
 
@@ -51,13 +54,13 @@ case class Pipe[BinaryLogEvent](id: String, consumer: BinaryLogConsumer[BinaryLo
       _connected = true
 
       flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS.seconds,
-        Conf.FLUSH_INTERVAL_SECS.seconds)(saveBinaryLogPosition(consumer)))
+        Conf.FLUSH_INTERVAL_SECS.seconds)(flushAndsaveBinaryLogPosition(consumer)))
     }
 
-    private def saveBinaryLogPosition(consumer: BinaryLogConsumer[BinaryLogEvent]) {
+    private def flushAndsaveBinaryLogPosition(consumer: BinaryLogConsumer[BinaryLogEvent]) {
       val binlogPos = consumer.getBinaryLogPosition
       if (producer.flush() && binlogPos.isDefined) {
-        binlogSaveFilePosition(consumer, id)
+        binlogPosRepo.saveBinaryLogPosition(consumer)
       } else {
         if (binlogPos.isDefined)
           log.error(s"Producer ($producer) failed to flush, not saving binary log position: $binlogPos for consumer $consumer.")
@@ -66,17 +69,11 @@ case class Pipe[BinaryLogEvent](id: String, consumer: BinaryLogConsumer[BinaryLo
       }
     }
 
-    private def binlogSaveFilePosition(consumer: BinaryLogConsumer[_], pipe: String): Boolean = {
-      val fileName = Conf.binlogGetStatusFilename(consumer.id, pipe)
-      log.info(s"Saving binlog position for pipe $pipe/${consumer.id} -> ${consumer.getBinaryLogPosition}")
-      Conf.binlogSaveFilePositionToFile(consumer, fileName)
-    }
-
     override def onStop(consumer: BinaryLogConsumer[BinaryLogEvent]) {
       log.info(s"Pipe $id disconnected!")
       _connected = false
       flusher.foreach(_.cancel())
-      saveBinaryLogPosition(consumer)
+      flushAndsaveBinaryLogPosition(consumer)
       state = State.STOPPED
     }
 

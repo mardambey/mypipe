@@ -2,11 +2,13 @@ package mypipe.runner
 
 import mypipe.api.consumer.BinaryLogConsumer
 import mypipe.api.producer.Producer
+import mypipe.api.repo.{ FileBasedBinaryLogPositionRepository, BinaryLogPositionRepositoryFromConfiguration, ConfigurableBinaryLogPositionRepository }
 import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition }
-import mypipe.pipe.Pipe
+import mypipe.pipe._
 
 import scala.collection.JavaConverters._
 import mypipe.api.Conf
+import mypipe.api.Conf.RichConfig
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 import org.slf4j.LoggerFactory
@@ -79,6 +81,11 @@ object PipeRunnerUtil {
 
     if (enabled) {
 
+      val binlogPosRepoConfig = pipeConf.getOptionalConfig("binlog-position-repo")
+      val binlogPosRepo = binlogPosRepoConfig.map(createBinaryLogPositionRepository).orElse {
+        Some(new FileBasedBinaryLogPositionRepository(filePrefix = name, dataDir = Conf.DATADIR))
+      }.get
+
       val consumersConf = pipeConf.getStringList("consumers").asScala
 
       // config allows for multiple consumers, we only take the first one
@@ -88,7 +95,7 @@ object PipeRunnerUtil {
 
         // TODO: this is an ugly hack, make it generic
         if (consumer.isInstanceOf[MySQLBinaryLogConsumer]) {
-          val binlogFileAndPos = Conf.binlogLoadFilePosition(consumer.id, pipeName = name).getOrElse(BinaryLogFilePosition.current)
+          val binlogFileAndPos = binlogPosRepo.loadBinaryLogPosition(consumer).getOrElse(BinaryLogFilePosition.current)
           consumer.asInstanceOf[MySQLBinaryLogConsumer].setBinaryLogPosition(binlogFileAndPos)
         }
 
@@ -105,12 +112,16 @@ object PipeRunnerUtil {
       // TODO: handle None
       val producerInstance = createProducer(producerName, producerConfig, producerClasses(producerName).get)
 
-      new Pipe(name, consumerInstance, producerInstance)
+      new Pipe(name, consumerInstance, producerInstance, binlogPosRepo)
 
     } else {
       // disabled
       null
     }
+  }
+
+  protected def createBinaryLogPositionRepository(config: Config): ConfigurableBinaryLogPositionRepository = {
+    new BinaryLogPositionRepositoryFromConfiguration(config)
   }
 
   protected def createConsumer(pipeName: String, params: (String, Config, Option[Class[BinaryLogConsumer[_]]])): BinaryLogConsumer[_] = {

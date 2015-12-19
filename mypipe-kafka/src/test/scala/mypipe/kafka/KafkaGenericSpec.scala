@@ -1,7 +1,9 @@
 package mypipe.kafka
 
 import com.typesafe.config.ConfigFactory
+import mypipe.api.Conf
 import mypipe.api.event.Mutation
+import mypipe.api.repo.FileBasedBinaryLogPositionRepository
 import mypipe.pipe.Pipe
 
 import scala.concurrent.duration._
@@ -31,7 +33,8 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
          |}
          """.stripMargin)
   val binlogConsumer = MySQLBinaryLogConsumer(c)
-  val pipe = new Pipe("test-pipe-kafka-generic", binlogConsumer, kafkaProducer)
+  val binlogPosRepo = new FileBasedBinaryLogPositionRepository(filePrefix = "test-pipe-kafka-generic", dataDir = Conf.DATADIR)
+  val pipe = new Pipe("test-pipe-kafka-generic", binlogConsumer, kafkaProducer, binlogPosRepo)
 
   override def beforeAll() {
     pipe.connect()

@@ -1,7 +1,9 @@
 package mypipe
 
 import com.typesafe.config.ConfigFactory
+import mypipe.api.Conf
 import mypipe.api.event.{ DeleteMutation, Mutation, UpdateMutation, InsertMutation }
+import mypipe.api.repo.FileBasedBinaryLogPositionRepository
 import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
 import scala.concurrent.Await
@@ -23,7 +25,8 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
        |}
          """.stripMargin)
   val consumer = MySQLBinaryLogConsumer(c)
-  val pipe = new Pipe("test-pipe", consumer, queueProducer)
+  val binlogPosRepo = new FileBasedBinaryLogPositionRepository(filePrefix = "test-pipe", dataDir = Conf.DATADIR)
+  val pipe = new Pipe("test-pipe", consumer, queueProducer, binlogPosRepo)
 
   override def beforeAll() {
     super.beforeAll()
