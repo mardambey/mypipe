@@ -3,8 +3,10 @@ package mypipe.api.repo
 import java.io.{ File, PrintWriter }
 
 import com.typesafe.config.Config
+import mypipe.api.Conf
 import mypipe.api.consumer.BinaryLogConsumer
 import mypipe.mysql.BinaryLogFilePosition
+import mypipe.api.Conf.RichConfig
 import org.slf4j.LoggerFactory
 
 class FileBasedBinaryLogPositionRepository(filePrefix: String, dataDir: String) extends BinaryLogPositionRepository {
@@ -71,6 +73,6 @@ class FileBasedBinaryLogPositionRepository(filePrefix: String, dataDir: String) 
 class ConfigurableFileBasedBinaryLogPositionRepository(override val config: Config)
   extends FileBasedBinaryLogPositionRepository(
     config.getString("file-prefix"),
-    config.getString("data-dir"))
+    config.getOptionalNoneEmptyString("data-dir").getOrElse(Conf.DATADIR))
   with ConfigurableBinaryLogPositionRepository
 

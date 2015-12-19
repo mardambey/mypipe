@@ -1,9 +1,8 @@
 package mypipe.api
 
-import java.io.{ File, PrintWriter }
+import java.io.File
 
 import com.typesafe.config.{ Config, ConfigFactory }
-import mypipe.api.consumer.BinaryLogConsumer
 import mypipe.mysql.BinaryLogFilePosition
 import org.slf4j.LoggerFactory
 
@@ -55,58 +54,11 @@ object Conf {
 
   val MYSQL_SERVER_ID_PREFIX = conf.getInt("mypipe.mysql-server-id-prefix")
 
-  private val lastBinlogFilePos = scala.collection.concurrent.TrieMap[String, BinaryLogFilePosition]()
-
   try {
     new File(DATADIR).mkdirs()
     new File(LOGDIR).mkdirs()
   } catch {
     case e: Exception ⇒ println(s"Error while creating data and log dir $DATADIR, $LOGDIR: ${e.getMessage}")
-  }
-
-  def binlogGetStatusFilename(consumerId: String, fileNamePrefix: String): String = {
-    s"$DATADIR/$fileNamePrefix-$consumerId.pos"
-  }
-
-  def binlogLoadFilePosition(consumerId: String, fileNamePrefix: String): Option[BinaryLogFilePosition] = {
-    try {
-
-      val statusFile = binlogGetStatusFilename(consumerId, fileNamePrefix)
-      val filePos = scala.io.Source.fromFile(statusFile).getLines().mkString.split(":")
-      Some(BinaryLogFilePosition(filePos(0), filePos(1).toLong))
-
-    } catch {
-      case e: Exception ⇒ None
-    }
-  }
-
-  def binlogSaveFilePositionToFile(consumer: BinaryLogConsumer[_], fileName: String): Boolean = {
-
-    val consumerId = consumer.id
-    val filePos = consumer.getBinaryLogPosition.getOrElse({
-      log.warn(s"Tried saving non-existent binary log position for consumer $consumerId, saving ${BinaryLogFilePosition.current} instead.")
-      BinaryLogFilePosition.current
-    })
-
-    try {
-
-      if (!lastBinlogFilePos.getOrElse(fileName, "").equals(filePos)) {
-
-        val file = new File(fileName)
-        val writer = new PrintWriter(file)
-
-        writer.write(s"${filePos.filename}:${filePos.pos}")
-        writer.close()
-
-        lastBinlogFilePos(fileName) = filePos
-      }
-
-      true
-    } catch {
-      case e: Exception ⇒
-        log.error(s"Failed saving binary log position $filePos for consumer $consumerId to file $fileName: ${e.getMessage}\n${e.getStackTraceString}")
-        false
-    }
   }
 
   def loadClassesForKey[T](key: String): Map[String, Option[Class[T]]] = {
