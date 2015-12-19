@@ -3,7 +3,6 @@ package mypipe.api
 import java.io.File
 
 import com.typesafe.config.{ Config, ConfigFactory }
-import mypipe.mysql.BinaryLogFilePosition
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
