@@ -3,6 +3,18 @@ mypipe latches onto a MySQL server with binary log replication enabled and
 allows for the creation of pipes that can consume the replication stream and
 act on the data (primarily integrated with Apache Kafka).
 
+# Features
+* streams binary logs remotely, emulating a slave
+* writes binlog events into Kafka using a generic or specific Avro schema
+* supports saving / loading binary log positions in a modular fashion (files, MySQL, or custom Java/Scala code to do so) 
+* handles `ALTER TABLE` events and can refresh Avro schema being used
+* built in a modular way allowing binlog events to be published into any system, not just Kafka
+* can preload an entire MySQL table into Kafka, then resume from binary logs (useful with Kafka compaction, infinite retention, can be used to bootstrap downstream systems with the entire data for a table)
+* configurable Kafka topic names based on the database and table
+* whitelist / blacklist support for what to process or what not to process in a binary log (based on database and table)
+* configurable error handling with the ability to specify custom handlers written in Java or Scala
+* Kafka generic console consumer that interfaces with an in memory Avro schema repo for quick and easy data exploration in Kafka
+
 # API
 mypipe tries to provide enough information that usually is not part of the
 MySQL binary log stream so that the data is meaningful. mypipe requires a
