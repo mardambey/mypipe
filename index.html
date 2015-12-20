@@ -3,37 +3,53 @@
   <head>
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
-    <link rel="stylesheet" type="text/css" href="stylesheets/github-dark.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
 
     <title>Mypipe by mardambey</title>
   </head>
 
   <body>
-
     <header>
-      <div class="container">
+      <div class="inner">
         <h1>Mypipe</h1>
         <h2>MySQL binary log consumer with the ability to act on changed rows and publish changes to different systems with emphasis on Apache Kafka.</h2>
-
-        <section id="downloads">
-          <a href="https://github.com/mardambey/mypipe/zipball/master" class="btn">Download as .zip</a>
-          <a href="https://github.com/mardambey/mypipe/tarball/master" class="btn">Download as .tar.gz</a>
-          <a href="https://github.com/mardambey/mypipe" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
-        </section>
+        <a href="https://github.com/mardambey/mypipe" class="button"><small>View project on</small> GitHub</a>
       </div>
     </header>
 
-    <div class="container">
-      <section id="main_content">
-        <h1>
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h1>
 <a id="mypipe" class="anchor" href="#mypipe" aria-hidden="true"><span class="octicon octicon-link"></span></a>mypipe</h1>
 
 <p>mypipe latches onto a MySQL server with binary log replication enabled and
 allows for the creation of pipes that can consume the replication stream and
 act on the data (primarily integrated with Apache Kafka).</p>
+
+<h1>
+<a id="features" class="anchor" href="#features" aria-hidden="true"><span class="octicon octicon-link"></span></a>Features</h1>
+
+<ul>
+<li>streams binary logs remotely, emulating a slave</li>
+<li>writes binlog events into Kafka using a generic or specific Avro schema</li>
+<li>supports saving / loading binary log positions in a modular fashion (files, MySQL, or custom Java/Scala code to do so) </li>
+<li>handles <code>ALTER TABLE</code> events and can refresh Avro schema being used</li>
+<li>built in a modular way allowing binlog events to be published into any system, not just Kafka</li>
+<li>can preload an entire MySQL table into Kafka, then resume from binary logs (useful with Kafka compaction, infinite retention, can be used to bootstrap downstream systems with the entire data for a table)</li>
+<li>configurable Kafka topic names based on the database and table</li>
+<li>whitelist / blacklist support for what to process or what not to process in a binary log (based on database and table)</li>
+<li>configurable error handling with the ability to specify custom handlers written in Java or Scala</li>
+<li>Kafka generic console consumer that interfaces with an in memory Avro schema repo for quick and easy data exploration in Kafka</li>
+</ul>
 
 <h1>
 <a id="api" class="anchor" href="#api" aria-hidden="true"><span class="octicon octicon-link"></span></a>API</h1>
@@ -555,7 +571,7 @@ GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
   # consumers represent sources for mysql binary logs
   consumers {
 
-  database1  {
+    localhost {
       # database "host:port:user:pass" array
       source = "localhost:3306:mypipe:mypipe"
     }
@@ -565,44 +581,88 @@ GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
   producers {
 
     stdout {
-       class = "mypipe.producer.stdout.StdoutProducer"
+      class = "mypipe.producer.stdout.StdoutProducer"
     }
 
-      kafka-generic {
-        class = "mypipe.producer.KafkaMutationGenericAvroProducer"
-      }
+    kafka-generic {
+      class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+    }
   }
 
   # pipes join consumers and producers
   pipes {
 
-    # prints queries to standard out
     stdout {
-      consumers = ["database1"]
+      consumers = ["localhost"]
       producer {
         stdout {}
       }
+      # how to save and load binary log positions
+      binlog-position-repo {
+        # saved to a file, this is the default if unspecified
+        class = "mypipe.api.repo.ConfigurableFileBasedBinaryLogPositionRepository"
+        config {
+          file-prefix = "stdout-00"     # required if binlog-position-repo is specifiec
+          data-dir = "/tmp/mypipe/data" # defaults to mypipe.data-dir if not present
+        }
+      }
     }
 
-    # push events into kafka topics
-    # where each database-table tuple
-    # get their own topic
     kafka-generic {
       enabled = true
-      consumers = ["database1"]
+      consumers = ["localhost"]
       producer {
         kafka-generic {
           metadata-brokers = "localhost:9092"
+        }
+      }
+      binlog-position-repo {
+        # saves to a MySQL database, make sure you use the following as well to prevent reacting on
+        # inserts / updates made in the same DB being listenened on for changes
+        # mypipe {
+        #   include-event-condition = """ table != "binlogpos" """
+        #   error {
+        #     quit-on-empty-mutation-commit-failure = false
+        #   }
+        # }
+        class = "mypipe.api.repo.ConfigurableMySQLBasedBinaryLogPositionRepository"
+        config {
+          # database "host:port:user:pass" array
+          source = "localhost:3306:mypipe:mypipe"
+          database = "mypipe"
+          table = "binlogpos"
+          id = "kafka-generic" # used to find the row in the table for this pipe
         }
       }
     }
   }
 }
 </code></pre>
-      </section>
+
+<h1>
+<a id="mailing-list" class="anchor" href="#mailing-list" aria-hidden="true"><span class="octicon octicon-link"></span></a>mailing list</h1>
+
+<p><a href="https://groups.google.com/d/forum/mypipe">https://groups.google.com/d/forum/mypipe</a></p>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/mardambey/mypipe/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/mardambey/mypipe/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/mardambey/mypipe"></a> is maintained by <a href="https://github.com/mardambey">mardambey</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
     </div>
 
-              <script type="text/javascript">
+            <script type="text/javascript">
             var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
             document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
           </script>
