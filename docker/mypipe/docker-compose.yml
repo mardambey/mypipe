@@ -9,4 +9,17 @@ mysql:
     - ./:/etc/mysql/conf.d
   ports:
     - "3306:3306"
-
+zookeeper:
+  image: jplock/zookeeper:3.4.6
+  ports:
+    - "2181:2181"
+kafka:
+  image: ches/kafka
+  hostname: localhost
+  ports:
+    - "9092:9092"
+  links:
+    - zookeeper
+  environment:
+    - KAFKA_ADVERTISED_HOST_NAME=127.0.0.1
+    - ZOOKEEPER_IP=127.0.0.1

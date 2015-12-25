@@ -60,7 +60,7 @@ object Snapshotter extends App {
     lazy val pipes: Seq[Pipe[_]] = PipeRunnerUtil.createPipes(conf, "mypipe.snapshotter.pipes", producers, consumers)
 
     if (pipes.length != 1) {
-      throw new Exception("Exactly 1 pipe should be configured configured for snapshotter.")
+      throw new Exception("Exactly 1 pipe should be configured for the snapshotter.")
     }
 
     if (!pipes.head.consumer.isInstanceOf[SelectConsumer]) {
