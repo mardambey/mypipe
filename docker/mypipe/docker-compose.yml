@@ -1,0 +1,12 @@
+mysql:
+  image: mysql:5.5
+  environment:
+    - MYSQL_ROOT_PASSWORD=foobar
+    - MYSQL_USER=mypipe
+    - MYSQL_PASSWORD=mypipe
+    - MYSQL_DATABASE=mypipe
+  volumes:
+    - ./:/etc/mysql/conf.d
+  ports:
+    - "3306:3306"
+

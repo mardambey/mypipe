@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+docker exec -it mypipe_mysql_1 mysql -uroot -pfoobar -hlocalhost -e "GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'mypipe'@'%' IDENTIFIED BY 'mypipe'"
+docker exec -it mypipe_mysql_1 mysql -uroot -pfoobar -hlocalhost -e "GRANT ALL PRIVILEGES ON mypipe.* TO 'mypipe'@'%'"
+

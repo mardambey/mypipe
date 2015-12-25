@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+docker exec -it mypipe_mysql_1 mysql -uroot -pfoobar -hlocalhost
+

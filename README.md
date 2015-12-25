@@ -425,7 +425,7 @@ values. You should also make sure there you have a database called `mypipe` with
 the following credentials:
 
     GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'mypipe'@'%' IDENTIFIED BY 'mypipe'
-    GRANT ALL PRIVILEGES ON `mypipe`.* TO 'mypipe'@'%'
+    GRANT ALL PRIVILEGES ON mypipe.* TO 'mypipe'@'%'
 
 The database must also have binary logging enabled in `row` format.
 
