@@ -4,7 +4,7 @@
 # Author: Paul Phillips <paulp@typesafe.com>
 
 # todo - make this dynamic
-declare -r sbt_release_version=0.13.8
+declare -r sbt_release_version=0.13.9
 
 declare sbt_jar sbt_dir sbt_create sbt_launch_dir
 declare scala_version java_home sbt_explicit_version
@@ -101,7 +101,8 @@ make_url () {
   category="$2"
   version="$3"
 
-  echo "http://typesafe.artifactoryonline.com/typesafe/ivy-$category/$groupid/sbt-launch/$version/sbt-launch.jar"
+	echo "https://repo.typesafe.com/typesafe/ivy-$category/$groupid/sbt-launch/$version/sbt-launch.jar"
+  # echo "http://typesafe.artifactoryonline.com/typesafe/ivy-$category/$groupid/sbt-launch/$version/sbt-launch.jar"
 }
 
 readarr () {
@@ -233,7 +234,7 @@ download_url () {
 
   mkdir -p $(dirname "$jar") && {
 	  if [ -x "$(which curl)" ]; then
-      curl --fail --silent "$url" --output "$jar"
+      curl --location --fail --silent "$url" --output "$jar"
 		elif [ -x "$(which wget)" ]; then
       wget --quiet -O "$jar" "$url"
     fi
