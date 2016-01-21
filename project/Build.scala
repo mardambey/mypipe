@@ -21,6 +21,7 @@ object Dependencies {
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
   val xinject = "javax.inject" % "javax.inject" % "1"
   val redisclient = "net.debasishg" %% "redisclient" % "3.0"
+  val sqsclient = "com.github.seratch" %% "awscala" % "0.5.+"
 }
 
 object AvroCompiler {
