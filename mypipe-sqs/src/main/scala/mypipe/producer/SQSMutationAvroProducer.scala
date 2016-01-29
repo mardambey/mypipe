@@ -30,7 +30,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
   protected val serializer: Serializer[InputRecord, OutputType]
 
   protected val sqsQueue = config.getString("sqs-queue")
-  protected val producer = new SQSProducer[OutputType](sqsQueue)
+  protected val producer = new SQSProducer(sqsQueue)
 
   protected val logger = LoggerFactory.getLogger(getClass)
   protected val encoderFactory = EncoderFactory.get()
@@ -136,7 +136,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
 
       records foreach (record ⇒ {
         val jsonString = serialize(record, schema, schemaId.get, mutationType)
-        producer.send(getSQSTopic(input), jsonString)
+        producer.send(jsonString)
       })
     })
 
@@ -153,7 +153,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
 
       records foreach (record ⇒ {
         val jsonString = serialize(record, schema, schemaId.get, mutationType)
-        producer.send(getSQSTopic(input), jsonString)
+        producer.send(jsonString)
       })
 
       true

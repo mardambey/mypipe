@@ -18,8 +18,7 @@ object SQSMutationGenericAvroProducer {
 /** An implementation of the base SQSMutationAvroProducer class that uses a
  *  GenericInMemorySchemaRepo in order to encode mutations as Avro beans.
  *  Three beans are encoded: mypipe.avro.InsertMutation, UpdateMutation, and
- *  DeleteMutation. The SQS event names are calculated as:
- *  dbName_tableName_(insert|update|delete)
+ *  DeleteMutation.
  *
  *  @param config configuration must have "sqs-queue"
  */
