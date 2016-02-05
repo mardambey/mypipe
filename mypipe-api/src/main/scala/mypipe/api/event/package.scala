@@ -34,11 +34,12 @@ package object event {
    *
    *  @param table that the row belongs to
    */
-  sealed abstract class Mutation(override val table: Table, val txid: UUID) extends TableContainingEvent {
+  sealed abstract class Mutation(override val table: Table, val txid: UUID, val txQueryCount: Int) extends TableContainingEvent {
     // TODO: populate this field
     val sql = ""
     val database = table.db
     def txAware(txid: UUID): Mutation
+    def txQueryCount(txQueryCount: Int): Mutation
   }
 
   /** Represents a Mutation that holds a single set of values for each row (Insert or Delete, not Update)
@@ -49,8 +50,9 @@ package object event {
   abstract class SingleValuedMutation(
     override val table: Table,
     val rows: List[Row],
-    override val txid: UUID = null)
-      extends Mutation(table, txid)
+    override val txid: UUID = null,
+    override val txQueryCount: Int = 0)
+      extends Mutation(table, txid, txQueryCount)
 
   /** Represents an inserted row.
    *
@@ -60,11 +62,16 @@ package object event {
   case class InsertMutation(
     override val table: Table,
     override val rows: List[Row],
-    override val txid: UUID = null)
-      extends SingleValuedMutation(table, rows, txid) {
+    override val txid: UUID = null,
+    override val txQueryCount: Int = 0)
+      extends SingleValuedMutation(table, rows, txid, txQueryCount) {
 
     override def txAware(txid: UUID = null): Mutation = {
       InsertMutation(table, rows, txid)
+    }
+
+    override def txQueryCount(txQueryCount: Int = 0): Mutation = {
+      InsertMutation(table, rows, txid, txQueryCount)
     }
   }
 
@@ -75,11 +82,16 @@ package object event {
   case class UpdateMutation(
     override val table: Table,
     rows: List[(Row, Row)],
-    override val txid: UUID = null)
-      extends Mutation(table, txid) {
+    override val txid: UUID = null,
+    override val txQueryCount: Int = 0)
+      extends Mutation(table, txid, txQueryCount) {
 
     override def txAware(txid: UUID = null): Mutation = {
       UpdateMutation(table, rows, txid)
+    }
+
+    override def txQueryCount(txQueryCount: Int = 0): Mutation = {
+      UpdateMutation(table, rows, txid, txQueryCount)
     }
   }
 
@@ -91,11 +103,16 @@ package object event {
   case class DeleteMutation(
     override val table: Table,
     override val rows: List[Row],
-    override val txid: UUID = null)
-      extends SingleValuedMutation(table, rows, txid) {
+    override val txid: UUID = null,
+    override val txQueryCount: Int = 0)
+      extends SingleValuedMutation(table, rows, txid, txQueryCount) {
 
     override def txAware(txid: UUID = null): Mutation = {
       DeleteMutation(table, rows, txid)
+    }
+
+    override def txQueryCount(txQueryCount: Int = 0): Mutation = {
+      DeleteMutation(table, rows, txid, txQueryCount)
     }
   }
 

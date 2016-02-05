@@ -236,7 +236,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent, BinaryLogPosition] exte
     if (txQueue.nonEmpty) {
       val success =
         if (groupMutationsByTx) {
-          val mutations = txQueue.toList
+          val mutations = txQueue.toList.map(_.txQueryCount(txQueue.length))
+
           processList[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]](
             list = listeners.toList,
             listOp = _.onMutation(this, mutations),

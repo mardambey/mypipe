@@ -29,6 +29,10 @@
     		    "default": "null"
     		},
     		{
+    			"name": "txQueryCount",
+    			"type": "int"
+    		},
+    		{
     			"name": "integers",
     			"type": {"type": "map", "values": "int"}
     		},
@@ -64,6 +68,10 @@
     		    "name": "txid",
     		    "type": ["null", "Guid"],
     		    "default": "null"
+    		},
+    		{
+    			"name": "txQueryCount",
+    			"type": "int"
     		},
     		{
     			"name": "old_integers",
@@ -115,6 +123,10 @@
     		    "name": "txid",
     		    "type": ["null", "Guid"],
     		    "default": "null"
+    		},
+    		{
+    			"name": "txQueryCount",
+    			"type": "int"
     		},
     		{
     			"name": "integers",

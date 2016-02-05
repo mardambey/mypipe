@@ -97,6 +97,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
       uuidBytes.putLong(mutation.txid.getMostSignificantBits)
       uuidBytes.putLong(mutation.txid.getLeastSignificantBits)
       record.put("txid", new GenericData.Fixed(Guid.getClassSchema, uuidBytes.array))
+      record.put("txQueryCount", mutation.txQueryCount)
     }
   }
 
