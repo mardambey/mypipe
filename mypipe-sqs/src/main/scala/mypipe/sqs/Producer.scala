@@ -6,6 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util
 import java.util.logging.Logger
 import scala.collection.JavaConversions._
+import scala.util.control.NonFatal
 
 class SQSProducer(sqsQueueName: String) {
   //TODO add error logging/handling
@@ -19,10 +20,21 @@ class SQSProducer(sqsQueueName: String) {
 
   def flush: Boolean = {
     val events = new util.ArrayList[String]()
-    queue.drainTo(events)
+    queue.drainTo(events, 10)
 
-    if (events.length > 0) {
-      sqsQueue.addAll(events)
+    while (events.length > 0) {
+      try {
+        sqsQueue.addAll(events)
+        events.clear()
+        queue.drainTo(events, 10)
+        println("yes")
+      } catch {
+        case NonFatal(e) ⇒ {
+          queue.addAll(events)
+          events.clear()
+          println("no")
+        }
+      }
     }
 
     true
