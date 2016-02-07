@@ -11,4 +11,5 @@ case class BinaryLogFilePosition(filename: String, pos: Long) {
 
 object BinaryLogFilePosition {
   val current = BinaryLogFilePosition("", 0L)
+  val none = BinaryLogFilePosition("none", -1L)
 }

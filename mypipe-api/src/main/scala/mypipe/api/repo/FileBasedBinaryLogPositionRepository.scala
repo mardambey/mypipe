@@ -20,7 +20,7 @@ class FileBasedBinaryLogPositionRepository(filePrefix: String, dataDir: String) 
 
   override def saveBinaryLogPosition(consumer: BinaryLogConsumer[_]): Unit = {
     val fileName = binlogGetStatusFilename(consumer.id, filePrefix)
-    log.info(s"Saving binlog position for pipe $filePrefix/${consumer.id} -> ${consumer.getBinaryLogPosition}")
+    log.info(s"Saving binlog position for pipe $filePrefix/${consumer.id} -> ${consumer.getBinaryLogPosition.getOrElse(BinaryLogFilePosition.none)}")
     binlogSaveFilePositionToFile(consumer, fileName)
   }
 
