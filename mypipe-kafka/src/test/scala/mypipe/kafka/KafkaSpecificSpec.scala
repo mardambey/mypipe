@@ -56,6 +56,8 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
     val TABLE = Queries.TABLE.name
     val USERNAME = Queries.INSERT.username
     val USERNAME2 = Queries.UPDATE.username
+    val BIO = Queries.INSERT.bio
+    val BIO2 = Queries.UPDATE.bio
     val LOGIN_COUNT = 5
     val zkConnect = conf.getString("mypipe.test.kafka-specific-producer.zk-connect")
 
@@ -72,6 +74,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
           assert(insertMutation.getTable.toString == TABLE)
           assert(insertMutation.getUsername.toString == USERNAME)
           assert(insertMutation.getLoginCount == LOGIN_COUNT)
+          assert(new String(insertMutation.getBio.array) == BIO)
         } catch {
           case e: Exception ⇒ log.error(s"Failed testing insert: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
         }
@@ -86,6 +89,8 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
           assert(updateMutation.getTable.toString == TABLE)
           assert(updateMutation.getOldUsername.toString == USERNAME)
           assert(updateMutation.getNewUsername.toString == USERNAME2)
+          assert(new String(updateMutation.getOldBio.array) == BIO)
+          assert(new String(updateMutation.getNewBio.array) == BIO2)
           assert(updateMutation.getOldLoginCount == LOGIN_COUNT)
           assert(updateMutation.getNewLoginCount == LOGIN_COUNT + 1)
         } catch {

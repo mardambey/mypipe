@@ -1,6 +1,9 @@
 package mypipe.producer
 
+import java.nio.ByteBuffer
+
 import com.typesafe.config.Config
+import mypipe.api.data.{ ColumnType, Column }
 import mypipe.api.event.{ AlterEvent, UpdateMutation, SingleValuedMutation, Mutation }
 import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
 import mypipe.avro.AvroVersionedRecordSerializer
@@ -59,7 +62,9 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
     mutation.rows.map(row ⇒ {
       val record = new GenericData.Record(schema)
-      row.columns.foreach(col ⇒ Option(schema.getField(col._1)).foreach(f ⇒ record.put(f.name(), col._2.value)))
+      row.columns.foreach(col ⇒
+        Option(schema.getField(col._1))
+          .foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
       header(record, mutation)
       record
     })
@@ -69,10 +74,17 @@ class KafkaMutationSpecificAvroProducer(config: Config)
 
     mutation.rows.map(row ⇒ {
       val record = new GenericData.Record(schema)
-      row._1.columns.foreach(col ⇒ Option(schema.getField("old_" + col._1)).foreach(f ⇒ record.put(f.name(), col._2.value)))
-      row._2.columns.foreach(col ⇒ Option(schema.getField("new_" + col._1)).foreach(f ⇒ record.put(f.name(), col._2.value)))
+      row._1.columns.foreach(col ⇒ Option(schema.getField("old_" + col._1)).foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
+      row._2.columns.foreach(col ⇒ Option(schema.getField("new_" + col._1)).foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
       header(record, mutation)
       record
     })
+  }
+
+  private def value2Avro(column: Column): Object = {
+    column.metadata.colType match {
+      case ColumnType.VAR_STRING | ColumnType.STRING ⇒ ByteBuffer.wrap(column.valueOption[Array[Byte]].getOrElse(Array.empty))
+      case _                                         ⇒ column.value[Object]
+    }
   }
 }
