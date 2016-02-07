@@ -112,7 +112,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
 
         true
       } else {
-        logger.error(s"Could not find schema for at schemaTopic: $schemaTopic and mutation: $input")
+        logger.error(s"Could not find schema for schemaTopic: $schemaTopic and mutation: $input")
         false
       }
     } catch {
