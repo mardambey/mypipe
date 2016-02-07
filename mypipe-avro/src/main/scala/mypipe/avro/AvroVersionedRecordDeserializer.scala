@@ -1,13 +1,10 @@
 package mypipe.avro
 
-import mypipe.api._
 import mypipe.api.event.Deserializer
 import org.apache.avro.io.{ DatumReader, BinaryDecoder, DecoderFactory }
 import org.apache.avro.Schema
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.TypeTag
 import org.apache.avro.specific.{ SpecificDatumReader, SpecificRecord }
 import java.util.logging.Logger
 
