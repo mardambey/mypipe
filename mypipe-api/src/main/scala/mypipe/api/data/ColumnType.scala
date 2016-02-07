@@ -5,6 +5,7 @@ import mypipe.util.Enum
 object ColumnType extends Enum {
   sealed trait EnumVal extends Value {
     val str: String // All ColumnType values also contain a string form
+    override def toString: String = s"$str/$value"
   }
 
   val DECIMAL = new EnumVal { val value = 0; val str = "decimal" }
