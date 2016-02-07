@@ -77,31 +77,40 @@ following structure in the case of an insert (`InsertMutation.avsc`):
       "type": "record",
       "name": "InsertMutation",
       "fields": [
-    	    {
-    			"name": "database",
-    			"type": "string"
-    		},
-    		{
-    			"name": "table",
-    			"type": "string"
-    		},
-    		{
-    			"name": "tableId",
-    			"type": "long"
-    		},
-    		{
-    			"name": "integers",
-    			"type": {"type": "map", "values": "int"}
-    		},
-    		{
-    			"name": "strings",
-    			"type": {"type": "map", "values": "string"}
-    		},
-    		{
-    			"name": "longs",
-    			"type": {"type": "map", "values": "long"}
-    		}
-    	]
+        {
+          "name": "database",
+          "type": "string"
+        },
+        {
+          "name": "table",
+          "type": "string"
+        },
+        {
+          "name": "tableId",
+          "type": "long"
+        },
+        {
+          "name": "txid",
+          "type": ["null", "Guid"],
+          "default": "null"
+        },
+        {
+          "name": "bytes",
+          "type": {"type": "map", "values": "bytes"}
+        },
+        {
+          "name": "integers",
+          "type": {"type": "map", "values": "int"}
+        },
+        {
+          "name": "strings",
+          "type": {"type": "map", "values": "string"}
+        },
+        {
+          "name": "longs",
+          "type": {"type": "map", "values": "long"}
+        }
+      ]
     }
 
 Updates will contain both the old row values and the new ones (see 
@@ -485,6 +494,7 @@ The database must also have binary logging enabled in `row` format.
             }
           }
           binlog-position-repo {
+
             # saves to a MySQL database, make sure you use the following as well to prevent reacting on
             # inserts / updates made in the same DB being listenened on for changes
             # mypipe {
@@ -493,6 +503,7 @@ The database must also have binary logging enabled in `row` format.
             #     quit-on-empty-mutation-commit-failure = false
             #   }
             # }
+
             class = "mypipe.api.repo.ConfigurableMySQLBasedBinaryLogPositionRepository"
             config {
               # database "host:port:user:pass" array

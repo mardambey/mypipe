@@ -29,6 +29,10 @@
     		    "default": "null"
     		},
     		{
+    			"name": "bytes",
+    			"type": {"type": "map", "values": "bytes"}
+    		},
+    		{
     			"name": "integers",
     			"type": {"type": "map", "values": "int"}
     		},
@@ -66,6 +70,10 @@
     		    "default": "null"
     		},
     		{
+    			"name": "old_bytes",
+    			"type": {"type": "map", "values": "bytes"}
+    		},
+    		{
     			"name": "old_integers",
     			"type": {"type": "map", "values": "int"}
     		},
@@ -77,6 +85,10 @@
 
     			"name": "old_longs",
     			"type": {"type": "map", "values": "long"}
+    		},
+    		{
+    			"name": "new_bytes",
+    			"type": {"type": "map", "values": "bytes"}
     		},
     		{
     			"name": "new_integers",
@@ -115,6 +127,10 @@
     		    "name": "txid",
     		    "type": ["null", "Guid"],
     		    "default": "null"
+    		},
+    		{
+    			"name": "bytes",
+    			"type": {"type": "map", "values": "bytes"}
     		},
     		{
     			"name": "integers",

@@ -1,6 +1,7 @@
 package mypipe.producer.stdout
 
 import mypipe.api.event._
+import mypipe.api.data.ColumnType.ColumnValueString
 import mypipe.api.producer.Producer
 import org.slf4j.LoggerFactory
 import com.typesafe.config.Config
@@ -34,7 +35,7 @@ class StdoutProducer(config: Config) extends Producer(config) {
     mutation match {
 
       case i: InsertMutation ⇒
-        mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}) VALUES ${i.rows.map("(" + _.columns.values.map(_.value).mkString(", ") + ")").mkString(",")}"
+        mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}) VALUES ${i.rows.map("(" + _.columns.values.map(_.valueString).mkString(", ") + ")").mkString(",")}"
 
       case u: UpdateMutation ⇒
         u.rows.foreach(rr ⇒ {
@@ -49,14 +50,14 @@ class StdoutProducer(config: Config) extends Producer(config) {
             cols.head
           })
 
-          val pKeyVals = p.map(_._2.value.toString)
+          val pKeyVals = p.map(_._2.valueString)
           val where = pKeyColNames
             .map(_.zip(pKeyVals)
               .map(kv ⇒ kv._1 + "=" + kv._2))
             .map(_.mkString(", "))
             .map(w ⇒ s"WHERE ($w)").getOrElse("")
 
-          val curValues = cur.columns.values.map(_.value)
+          val curValues = cur.columns.values.map(_.valueString)
           val colNames = u.table.columns.map(_.name)
           val updates = colNames.zip(curValues).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")
           mutations += s"UPDATE ${u.table.db}.${u.table.name} SET ($updates) $where"
@@ -73,7 +74,7 @@ class StdoutProducer(config: Config) extends Producer(config) {
             cols.head
           })
 
-          val pKeyVals = p.map(_._2.value.toString)
+          val pKeyVals = p.map(_._2.valueString)
           val where = pKeyColNames.zip(pKeyVals).map(kv ⇒ kv._1 + "=" + kv._2).mkString(", ")
           mutations += s"DELETE FROM ${d.table.db}.${d.table.name} WHERE ($where)"
 

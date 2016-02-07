@@ -45,5 +45,15 @@ object ColumnType extends Enum {
 
   def typeByCode(code: Int): Option[ColumnType.EnumVal] = values.find(_.value == code)
   def typeByString(str: String): Option[ColumnType.EnumVal] = values.find(_.str == str)
+
+  implicit class ColumnValueString(column: Column) {
+
+    def valueString: String = {
+      column.metadata.colType match {
+        case VAR_STRING | STRING ⇒ new String(column.valueOption[Array[Byte]].getOrElse(Array.empty))
+        case _                   ⇒ column.valueOption[Object].map(_.toString).getOrElse("")
+      }
+    }
+  }
 }
 

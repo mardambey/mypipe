@@ -1,5 +1,7 @@
 package mypipe.producer
 
+import java.nio.ByteBuffer
+
 import com.typesafe.config.Config
 import mypipe.api.data.{ Column, ColumnType }
 import mypipe.api.event._
@@ -32,6 +34,7 @@ class KafkaMutationGenericAvroProducer(config: Config)
   override def handleAlter(event: AlterEvent): Boolean = true // no special support for alters needed, "generic" schema
 
   /** Given a short, returns a byte array.
+   *
    *  @param s schema id
    *  @return
    */
@@ -44,28 +47,28 @@ class KafkaMutationGenericAvroProducer(config: Config)
     Mutation.getMagicByte(mutation) match {
 
       case Mutation.InsertByte ⇒ mutation.asInstanceOf[InsertMutation].rows.map(row ⇒ {
-        val (integers, strings, longs) = columnsToMaps(row.columns)
+        val (byteArrays, integers, strings, longs) = columnsToMaps(row.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
-        body(record, mutation, integers, strings, longs)
+        body(record, mutation, byteArrays, integers, strings, longs)
         record
       })
 
       case Mutation.DeleteByte ⇒ mutation.asInstanceOf[DeleteMutation].rows.map(row ⇒ {
-        val (integers, strings, longs) = columnsToMaps(row.columns)
+        val (byteArrays, integers, strings, longs) = columnsToMaps(row.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
-        body(record, mutation, integers, strings, longs)
+        body(record, mutation, byteArrays, integers, strings, longs)
         record
       })
 
       case Mutation.UpdateByte ⇒ mutation.asInstanceOf[UpdateMutation].rows.map(row ⇒ {
-        val (integersOld, stringsOld, longsOld) = columnsToMaps(row._1.columns)
-        val (integersNew, stringsNew, longsNew) = columnsToMaps(row._2.columns)
+        val (byteArraysOld, integersOld, stringsOld, longsOld) = columnsToMaps(row._1.columns)
+        val (byteArraysNew, integersNew, stringsNew, longsNew) = columnsToMaps(row._2.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
-        body(record, mutation, integersOld, stringsOld, longsOld) { s ⇒ "old_" + s }
-        body(record, mutation, integersNew, stringsNew, longsNew) { s ⇒ "new_" + s }
+        body(record, mutation, byteArraysOld, integersOld, stringsOld, longsOld) { s ⇒ "old_" + s }
+        body(record, mutation, byteArraysNew, integersNew, stringsNew, longsNew) { s ⇒ "new_" + s }
         record
       })
 
@@ -77,19 +80,22 @@ class KafkaMutationGenericAvroProducer(config: Config)
 
   protected def body(record: GenericData.Record,
                      mutation: Mutation,
+                     byteArrays: JMap[CharSequence, ByteBuffer],
                      integers: JMap[CharSequence, Integer],
                      strings: JMap[CharSequence, CharSequence],
                      longs: JMap[CharSequence, JLong])(implicit keyOp: String ⇒ String = s ⇒ s) {
+    record.put(keyOp("bytes"), byteArrays)
     record.put(keyOp("integers"), integers)
     record.put(keyOp("strings"), strings)
     record.put(keyOp("longs"), longs)
   }
 
-  protected def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {
+  protected def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, ByteBuffer], JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {
 
     val cols = columns.values.groupBy(_.metadata.colType)
 
     // ugliness follows... we'll clean it up some day.
+    val byteArrays = new java.util.HashMap[CharSequence, ByteBuffer]()
     val integers = new java.util.HashMap[CharSequence, Integer]()
     val strings = new java.util.HashMap[CharSequence, CharSequence]()
     val longs = new java.util.HashMap[CharSequence, java.lang.Long]()
@@ -120,14 +126,21 @@ class KafkaMutationGenericAvroProducer(config: Config)
           if (v != null) longs.put(c.metadata.name, v)
         })
 
+      case (ColumnType.VAR_STRING, colz) ⇒
+        colz.foreach(c ⇒ {
+          val v = c.valueOption[Array[Byte]].map(ByteBuffer.wrap)
+          if (v.isDefined) byteArrays.put(c.metadata.name, v.get)
+        })
+
       case _ ⇒ // unsupported
     })
 
-    (integers, strings, longs)
+    (byteArrays, integers, strings, longs)
   }
 
   /** Given a mutation, returns the "subject" that this mutation's
    *  Schema is registered under in the Avro schema repository.
+   *
    *  @param mutation mutation to get subject for
    *  @return
    */
