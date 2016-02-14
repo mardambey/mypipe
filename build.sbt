@@ -27,6 +27,7 @@ lazy val apiDependencies = Seq(
   scalaCompiler,
   scalaReflect,
   scalaTest,
+  slf4jApi,
   typesafeConfig
 )
 
