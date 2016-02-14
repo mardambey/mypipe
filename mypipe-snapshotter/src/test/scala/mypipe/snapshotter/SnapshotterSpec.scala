@@ -52,8 +52,8 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
               } else if (dbAndTable.startsWith("mypipe.") && rows.length > 0) {
                 log.info(s"found select data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
                 rows.length == 2 &&
-                  rows(0).toArray.deep.equals(Array(123, "username", "password", 0).deep) &&
-                  rows(1).toArray.deep.equals(Array(124, "username", "password", 0).deep)
+                  rows(0).toArray.deep.equals(Array(123, "username", "password", 0, "bio").deep) &&
+                  rows(1).toArray.deep.equals(Array(124, "username", "password", 0, "bio").deep)
               } else {
                 true
               }
