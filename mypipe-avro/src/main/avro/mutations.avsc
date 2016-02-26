@@ -1,13 +1,6 @@
 [
     {
       "namespace": "mypipe.avro",
-      "name":"Guid",
-      "type":"fixed",
-      "size":16
-    },
-
-    {
-      "namespace": "mypipe.avro",
       "type": "record",
       "name": "InsertMutation",
       "fields": [
@@ -25,8 +18,7 @@
     		},
     		{
     		    "name": "txid",
-    		    "type": ["null", "Guid"],
-    		    "default": "null"
+    		    "type": "string"
     		},
     		{
     			"name": "txQueryCount",
@@ -66,8 +58,7 @@
     		},
     		{
     		    "name": "txid",
-    		    "type": ["null", "Guid"],
-    		    "default": "null"
+    		    "type": "string"
     		},
     		{
     			"name": "txQueryCount",
@@ -121,8 +112,7 @@
     		},
     		{
     		    "name": "txid",
-    		    "type": ["null", "Guid"],
-    		    "default": "null"
+    		    "type": "string"
     		},
     		{
     			"name": "txQueryCount",

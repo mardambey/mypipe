@@ -1,11 +1,5 @@
 [
   {
-    "namespace": "mypipe.avro",
-    "name":"Guid",
-    "type":"fixed",
-    "size":16
-  },
-  {
     "namespace": "mypipe.redis",
     "type": "record",
     "name": "UserInsert",
@@ -24,8 +18,7 @@
   		},
   		{
     	    "name": "txid",
-            "type": ["null", "mypipe.avro.Guid"],
-            "default": "null"
+            "type": "string"
     	},
   		{
   			"name": "id",
@@ -64,8 +57,7 @@
   		},
   		{
     	    "name": "txid",
-            "type": ["null", "mypipe.avro.Guid"],
-            "default": "null"
+            "type": "string"
     	},
   		{
   			"name": "id",
@@ -108,8 +100,7 @@
   		},
   		{
     	    "name": "txid",
-            "type": ["null", "mypipe.avro.Guid"],
-            "default": "null"
+            "type": "string"
     	},
   		{
   			"name": "id",
@@ -148,8 +139,7 @@
   		},
   		{
     	    "name": "txid",
-            "type": ["null", "mypipe.avro.Guid"],
-            "default": "null"
+            "type": "string"
     	},
   		{
   			"name": "old_id",

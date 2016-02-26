@@ -5,7 +5,6 @@ import java.nio.ByteBuffer
 import mypipe.api._
 import mypipe.api.event.{ AlterEvent, Serializer, Mutation }
 import mypipe.api.producer.Producer
-import mypipe.avro.Guid
 import mypipe.kafka.KafkaProducer
 import com.typesafe.config.Config
 import mypipe.avro.schema.{ GenericSchemaRepository }
@@ -96,7 +95,10 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
       val uuidBytes = ByteBuffer.wrap(new Array[Byte](16))
       uuidBytes.putLong(mutation.txid.getMostSignificantBits)
       uuidBytes.putLong(mutation.txid.getLeastSignificantBits)
-      record.put("txid", new GenericData.Fixed(Guid.getClassSchema, uuidBytes.array))
+
+      val uuidString = uuidBytes.array.map { b ⇒ String.format("%02x", new java.lang.Integer(b & 0xff)) }.mkString.replaceFirst("(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)", "$1-$2-$3-$4-$5")
+
+      record.put("txid", uuidString)
       record.put("txQueryCount", mutation.txQueryCount)
     }
   }

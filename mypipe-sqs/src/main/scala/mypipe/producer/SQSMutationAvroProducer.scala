@@ -5,7 +5,6 @@ import java.nio.ByteBuffer
 import mypipe.api._
 import mypipe.api.event.{ AlterEvent, Serializer, Mutation }
 import mypipe.api.producer.Producer
-import mypipe.avro.Guid
 import mypipe.sqs.SQSProducer
 import com.typesafe.config.Config
 import mypipe.avro.schema.{ GenericSchemaRepository }
@@ -46,6 +45,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
 
   /** Given a mutation, returns the "subject" that this mutation's
    *  Schema is registered under in the Avro schema repository.
+   *
    *  @param mutation
    *  @return
    */
@@ -81,6 +81,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
 
   /** Adds a header into the given Record based on the Mutation's
    *  database, table, and tableId.
+   *
    *  @param record
    *  @param mutation
    */
@@ -94,12 +95,16 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
       val uuidBytes = ByteBuffer.wrap(new Array[Byte](16))
       uuidBytes.putLong(mutation.txid.getMostSignificantBits)
       uuidBytes.putLong(mutation.txid.getLeastSignificantBits)
-      record.put("txid", new GenericData.Fixed(Guid.getClassSchema, uuidBytes.array))
+
+      val uuidString = uuidBytes.array.map { b ⇒ String.format("%02x", new java.lang.Integer(b & 0xff)) }.mkString.replaceFirst("(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)", "$1-$2-$3-$4-$5")
+
+      record.put("txid", uuidString)
       record.put("txQueryCount", mutation.txQueryCount)
     }
   }
 
   /** Given a mutation, returns a string (for example: insert, update, delete).
+   *
    *  @param mutation
    *  @return
    */
@@ -107,6 +112,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
 
   /** Given an Avro generic record, schema, and schemaId, serialized
    *  them into an array of bytes.
+   *
    *  @param record
    *  @param schema
    *  @param schemaId
