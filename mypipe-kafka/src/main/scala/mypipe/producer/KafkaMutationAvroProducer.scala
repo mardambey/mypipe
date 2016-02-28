@@ -2,7 +2,8 @@ package mypipe.producer
 
 import java.nio.ByteBuffer
 
-import mypipe.api.event.{ SingleValuedMutation, Serializer, Mutation }
+import mypipe.api.data.Row
+import mypipe.api.event.{ UpdateMutation, SingleValuedMutation, Serializer, Mutation }
 import mypipe.api.producer.Producer
 import mypipe.avro.Guid
 import mypipe.kafka.KafkaProducer
@@ -60,14 +61,26 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    */
   protected def schemaIdToByteArray(schemaId: SchemaId): Array[Byte]
 
-  /** Given a Mutation, this method must convert it into a(n) Avro record(s)
-   *  for the given Avro schema.
-   *
-   *  @param mutation mutation
-   *  @param schema Avro schema
-   *  @return the Avro generic record(s)
-   */
-  protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record]
+  protected def body(record: GenericData.Record, row: Row, schema: Schema)(implicit keyOp: String ⇒ String = s ⇒ s)
+
+  protected def insertOrDeleteMutationToAvro(mutation: SingleValuedMutation, schema: Schema): List[GenericData.Record] = {
+    mutation.rows.map(row ⇒ {
+      val record = new GenericData.Record(schema)
+      addHeader(record, mutation)
+      body(record, row, schema)
+      record
+    })
+  }
+
+  protected def updateMutationToAvro(mutation: UpdateMutation, schema: Schema): List[GenericData.Record] = {
+    mutation.rows.map(row ⇒ {
+      val record = new GenericData.Record(schema)
+      addHeader(record, mutation)
+      body(record, row._1, schema) { s ⇒ "old_" + s }
+      body(record, row._2, schema) { s ⇒ "new_" + s }
+      record
+    })
+  }
 
   override def flush(): Boolean = {
     try {
@@ -132,7 +145,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    *  @param record Avro generic record
    *  @param mutation mutation
    */
-  protected def header(record: GenericData.Record, mutation: Mutation) {
+  protected def addHeader(record: GenericData.Record, mutation: Mutation) {
     record.put("database", mutation.table.db)
     record.put("table", mutation.table.name)
     record.put("tableId", mutation.table.id)
@@ -154,7 +167,26 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    */
   protected def magicByte(mutation: Mutation): Byte = Mutation.getMagicByte(mutation)
 
-  /** Given an Avro generic record, schema, and schemaId, serialized
+  /** Given a Mutation, this method must convert it into a(n) Avro record(s)
+   *  for the given Avro schema.
+   *
+   *  @param mutation mutation
+   *  @param schema Avro schema
+   *  @return the Avro generic record(s)
+   */
+  private def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record] = {
+
+    Mutation.getMagicByte(mutation) match {
+      case Mutation.InsertByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], schema)
+      case Mutation.DeleteByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], schema)
+      case Mutation.UpdateByte ⇒ updateMutationToAvro(mutation.asInstanceOf[UpdateMutation], schema)
+      case _ ⇒
+        logger.error(s"Unexpected mutation type ${mutation.getClass} encountered; retuning empty Avro GenericData.Record(schema=$schema")
+        List(new GenericData.Record(schema))
+    }
+  }
+
+  /** Given an Avro generic record, schema, and schemaId, serialize
    *  them into an array of bytes.
    *
    *  @param record Avro generic record
@@ -162,7 +194,7 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
    *  @param schemaId schema id
    *  @return
    */
-  protected def serialize(record: GenericData.Record, schema: Schema, schemaId: SchemaId, mutationType: Byte): Array[Byte] = {
+  private def serialize(record: GenericData.Record, schema: Schema, schemaId: SchemaId, mutationType: Byte): Array[Byte] = {
     val encoderFactory = EncoderFactory.get()
     val writer = new GenericDatumWriter[GenericRecord]()
     writer.setSchema(schema)

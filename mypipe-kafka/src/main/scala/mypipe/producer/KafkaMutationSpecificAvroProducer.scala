@@ -3,7 +3,7 @@ package mypipe.producer
 import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
-import mypipe.api.data.{ ColumnType, Column }
+import mypipe.api.data.{ Row, ColumnType, Column }
 import mypipe.api.event.{ AlterEvent, UpdateMutation, SingleValuedMutation, Mutation }
 import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
 import mypipe.avro.AvroVersionedRecordSerializer
@@ -34,21 +34,23 @@ class KafkaMutationSpecificAvroProducer(config: Config)
     }).getOrElse(false)
   }
 
-  override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
+  /** Given a schema ID of type SchemaId, converts it to a byte array.
+   *
+   *  @param s schema id
+   *  @return
+   */
+  override protected def schemaIdToByteArray(s: Short) =
+    Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
-  override protected def getKafkaTopic(mutation: Mutation): String = KafkaUtil.specificTopic(mutation)
-
-  override protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record] = {
-
-    Mutation.getMagicByte(mutation) match {
-      case Mutation.InsertByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], schema)
-      case Mutation.UpdateByte ⇒ updateMutationToAvro(mutation.asInstanceOf[UpdateMutation], schema)
-      case Mutation.DeleteByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], schema)
-      case _ ⇒
-        logger.error(s"Unexpected mutation type ${mutation.getClass} encountered; retuning empty Avro GenericData.Record(schema=$schema")
-        List(new GenericData.Record(schema))
-    }
-  }
+  /** Builds the Kafka topic using the mutation's database, table name, and
+   *  the mutation type (insert, update, delete) concatenating them with "_"
+   *  as a delimeter.
+   *
+   *  @param mutation mutation
+   *  @return the topic name
+   */
+  override protected def getKafkaTopic(mutation: Mutation): String =
+    KafkaUtil.specificTopic(mutation)
 
   /** Given a mutation, returns the Avro subject that this mutation's
    *  Schema is registered under in the Avro schema repository.
@@ -58,27 +60,8 @@ class KafkaMutationSpecificAvroProducer(config: Config)
    */
   override protected def avroSchemaSubject(mutation: Mutation): String = AvroSchemaUtils.specificSubject(mutation)
 
-  protected def insertOrDeleteMutationToAvro(mutation: SingleValuedMutation, schema: Schema): List[GenericData.Record] = {
-
-    mutation.rows.map(row ⇒ {
-      val record = new GenericData.Record(schema)
-      row.columns.foreach(col ⇒
-        Option(schema.getField(col._1))
-          .foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
-      header(record, mutation)
-      record
-    })
-  }
-
-  protected def updateMutationToAvro(mutation: UpdateMutation, schema: Schema): List[GenericData.Record] = {
-
-    mutation.rows.map(row ⇒ {
-      val record = new GenericData.Record(schema)
-      row._1.columns.foreach(col ⇒ Option(schema.getField("old_" + col._1)).foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
-      row._2.columns.foreach(col ⇒ Option(schema.getField("new_" + col._1)).foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
-      header(record, mutation)
-      record
-    })
+  override protected def body(record: GenericData.Record, row: Row, schema: Schema)(implicit keyOp: String ⇒ String = s ⇒ s) {
+    row.columns.foreach(col ⇒ Option(schema.getField(keyOp(col._1))).foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
   }
 
   private def value2Avro(column: Column): Object = {
