@@ -38,6 +38,7 @@ object Conf {
 
   val GROUP_EVENTS_BY_TX = conf.getBoolean("mypipe.group-events-by-tx")
   val GROUP_MUTATIONS_BY_TX = conf.getBoolean("mypipe.group-mutations-by-tx")
+  val INCLUDE_ROW_DATA = conf.getBoolean("mypipe.include-row-data")
 
   val QUIT_ON_LISTENER_FAILURE = conf.getBoolean("mypipe.error.quit-on-listener-failure")
   val QUIT_ON_EVENT_DECODE_FAILURE = conf.getBoolean("mypipe.error.quit-on-event-decode-failure")
