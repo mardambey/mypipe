@@ -42,6 +42,34 @@
     {
       "namespace": "mypipe.avro",
       "type": "record",
+      "name": "InsertMutationWithoutData",
+      "fields": [
+    	    {
+    			"name": "database",
+    			"type": "string"
+    		},
+    		{
+    			"name": "table",
+    			"type": "string"
+    		},
+    		{
+    			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    		    "name": "txid",
+    		    "type": "string"
+    		},
+    		{
+    			"name": "txQueryCount",
+    			"type": "int"
+    		}
+    	]
+    },
+
+    {
+      "namespace": "mypipe.avro",
+      "type": "record",
       "name": "UpdateMutation",
       "fields": [
     	    {
@@ -96,6 +124,34 @@
     {
       "namespace": "mypipe.avro",
       "type": "record",
+      "name": "UpdateMutationWithoutData",
+      "fields": [
+    	    {
+    			"name": "database",
+    			"type": "string"
+    		},
+    		{
+    			"name": "table",
+    			"type": "string"
+    		},
+    		{
+    			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    		    "name": "txid",
+    		    "type": "string"
+    		},
+    		{
+    			"name": "txQueryCount",
+    			"type": "int"
+    		}
+    	]
+    },
+
+    {
+      "namespace": "mypipe.avro",
+      "type": "record",
       "name": "DeleteMutation",
       "fields": [
     	    {
@@ -131,5 +187,33 @@
     			"type": {"type": "map", "values": "long"}
     		}
     	]
+    },
+
+    {
+      "namespace": "mypipe.avro",
+      "type": "record",
+      "name": "DeleteMutationWithoutData",
+      "fields": [
+            {
+                "name": "database",
+                "type": "string"
+            },
+            {
+                "name": "table",
+                "type": "string"
+            },
+            {
+                "name": "tableId",
+                "type": "long"
+            },
+            {
+                "name": "txid",
+                "type": "string"
+            },
+            {
+                "name": "txQueryCount",
+                "type": "int"
+            }
+        ]
     }
 ]

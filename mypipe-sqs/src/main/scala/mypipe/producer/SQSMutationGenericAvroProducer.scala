@@ -1,6 +1,7 @@
 package mypipe.producer
 
 import com.typesafe.config.Config
+import mypipe.api.Conf
 import mypipe.api.data.{ Column, ColumnType }
 import mypipe.api.event._
 import mypipe.avro.schema.AvroSchemaUtils
@@ -31,6 +32,7 @@ class SQSMutationGenericAvroProducer(config: Config)
   override def handleAlter(event: AlterEvent): Boolean = true // no special support for alters needed, "generic" schema
 
   /** Given a short, returns a byte array.
+   *
    *  @param s schema id
    *  @return
    */
@@ -43,28 +45,40 @@ class SQSMutationGenericAvroProducer(config: Config)
     Mutation.getMagicByte(mutation) match {
 
       case Mutation.InsertByte ⇒ mutation.asInstanceOf[InsertMutation].rows.map(row ⇒ {
-        val (integers, strings, longs) = columnsToMaps(row.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
-        body(record, mutation, integers, strings, longs)
+
+        if (Conf.INCLUDE_ROW_DATA) {
+          val (integers, strings, longs) = columnsToMaps(row.columns)
+          body(record, mutation, integers, strings, longs)
+        }
+
         record
       })
 
       case Mutation.DeleteByte ⇒ mutation.asInstanceOf[DeleteMutation].rows.map(row ⇒ {
-        val (integers, strings, longs) = columnsToMaps(row.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
-        body(record, mutation, integers, strings, longs)
+
+        if (Conf.INCLUDE_ROW_DATA) {
+          val (integers, strings, longs) = columnsToMaps(row.columns)
+          body(record, mutation, integers, strings, longs)
+        }
+
         record
       })
 
       case Mutation.UpdateByte ⇒ mutation.asInstanceOf[UpdateMutation].rows.map(row ⇒ {
-        val (integersOld, stringsOld, longsOld) = columnsToMaps(row._1.columns)
-        val (integersNew, stringsNew, longsNew) = columnsToMaps(row._2.columns)
         val record = new GenericData.Record(schema)
         header(record, mutation)
-        body(record, mutation, integersOld, stringsOld, longsOld) { s ⇒ "old_" + s }
-        body(record, mutation, integersNew, stringsNew, longsNew) { s ⇒ "new_" + s }
+
+        if (Conf.INCLUDE_ROW_DATA) {
+          val (integersOld, stringsOld, longsOld) = columnsToMaps(row._1.columns)
+          val (integersNew, stringsNew, longsNew) = columnsToMaps(row._2.columns)
+          body(record, mutation, integersOld, stringsOld, longsOld) { s ⇒ "old_" + s }
+          body(record, mutation, integersNew, stringsNew, longsNew) { s ⇒ "new_" + s }
+        }
+
         record
       })
 
@@ -127,6 +141,7 @@ class SQSMutationGenericAvroProducer(config: Config)
 
   /** Given a mutation, returns the "subject" that this mutation's
    *  Schema is registered under in the Avro schema repository.
+   *
    *  @param mutation mutation to get subject for
    *  @return
    */

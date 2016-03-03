@@ -120,21 +120,6 @@ abstract class RedisMutationAvroProducer[SchemaId](config: Config)
     writer.setSchema(schema)
     val out = new ByteArrayOutputStream()
 
-    if (!Conf.INCLUDE_ROW_DATA) {
-      if (mutationType == "update") {
-        record.put("old_integers", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-        record.put("old_longs", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-        record.put("old_strings", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-        record.put("new_integers", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-        record.put("new_longs", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-        record.put("new_strings", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-      } else {
-        record.put("integers", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-        record.put("longs", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-        record.put("strings", java.util.Map < java.lang.CharSequence, java.lang.CharSequence>);
-      }
-    }
-
     val enc = encoderFactory.jsonEncoder(schema, out)
     writer.write(record, enc)
     enc.flush
