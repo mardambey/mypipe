@@ -89,6 +89,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
     record.put("database", mutation.table.db)
     record.put("table", mutation.table.name)
     record.put("tableId", mutation.table.id)
+    record.put("mutation", mutationTypeString(mutation))
 
     // TODO: avoid null check
     if (mutation.txid != null && record.getSchema().getField("txid") != null) {
@@ -118,7 +119,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
    *  @param schemaId
    *  @return
    */
-  protected def serialize(record: GenericData.Record, schema: Schema, schemaId: SchemaId, mutationType: String): String = {
+  protected def serialize(record: GenericData.Record, schema: Schema, schemaId: SchemaId): String = {
     val encoderFactory = EncoderFactory.get()
     val writer = new GenericDatumWriter[GenericRecord]()
     writer.setSchema(schema)
@@ -128,21 +129,18 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
     writer.write(record, enc)
     enc.flush
 
-    // Dirty hack to work around Avro schema objects' apparent lack of support for schema modification
-    val preMutationJson = out.toString
-    preMutationJson.substring(0, preMutationJson.length - 1) + ",\"mutation\":\"" + mutationType + "\"}"
+    out.toString
   }
 
   override def queueList(inputList: List[Mutation]): Boolean = {
     inputList.foreach(input ⇒ {
       val schemaTopic = avroSchemaSubject(input)
-      val mutationType = mutationTypeString(input)
       val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
       val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
       val records = avroRecord(input, schema)
 
       records foreach (record ⇒ {
-        val jsonString = serialize(record, schema, schemaId.get, mutationType)
+        val jsonString = serialize(record, schema, schemaId.get)
         producer.send(jsonString)
       })
     })
@@ -153,13 +151,12 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
   override def queue(input: Mutation): Boolean = {
     try {
       val schemaTopic = avroSchemaSubject(input)
-      val mutationType = mutationTypeString(input)
       val schema = schemaRepoClient.getLatestSchema(schemaTopic).get
       val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema)
       val records = avroRecord(input, schema)
 
       records foreach (record ⇒ {
-        val jsonString = serialize(record, schema, schemaId.get, mutationType)
+        val jsonString = serialize(record, schema, schemaId.get)
         producer.send(jsonString)
       })
 

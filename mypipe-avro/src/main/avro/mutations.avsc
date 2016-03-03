@@ -16,6 +16,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+            {
+                "name": "mutation",
+                "type": "string"
+            },
     		{
     		    "name": "txid",
     		    "type": "string"
@@ -56,6 +60,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+            {
+                "name": "mutation",
+                "type": "string"
+            },
     		{
     		    "name": "txid",
     		    "type": "string"
@@ -84,6 +92,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+            {
+                "name": "mutation",
+                "type": "string"
+            },
     		{
     		    "name": "txid",
     		    "type": "string"
@@ -138,6 +150,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+            {
+                "name": "mutation",
+                "type": "string"
+            },
     		{
     		    "name": "txid",
     		    "type": "string"
@@ -166,6 +182,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+            {
+                "name": "mutation",
+                "type": "string"
+            },
     		{
     		    "name": "txid",
     		    "type": "string"
@@ -205,6 +225,10 @@
             {
                 "name": "tableId",
                 "type": "long"
+            },
+            {
+                "name": "mutation",
+                "type": "string"
             },
             {
                 "name": "txid",
