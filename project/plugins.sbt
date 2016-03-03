@@ -2,7 +2,7 @@ resolvers ++= Seq(
   "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
   "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases/",
   "jgit-repo" at "http://download.eclipse.org/jgit/maven",
-  "sbt-plugin-releases" at "http://repo.scala-sbt.org/scalasbt/sbt-plugin-releases"
+  "SBT Plugin Releases" at "http://repo.scala-sbt.org/scalasbt/sbt-plugin-releases"
 )
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-scalariform" % "1.3.0")

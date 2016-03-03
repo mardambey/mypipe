@@ -1,6 +1,6 @@
 import sbt._
 import Keys._
-
+ 
 object Dependencies {
 
   val guava = "com.google.guava" % "guava" % "14.0.1"
@@ -15,8 +15,8 @@ object Dependencies {
   val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
   val mysqlAsync =  "com.github.mauricio" % "mysql-async_2.11" % "0.2.15"
   val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.2.2"
-  val scalaCompiler = "org.scala-lang" % "scala-compiler" % "2.11.2"
-  val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.11.2"
+  val scalaCompiler = "org.scala-lang" % "scala-compiler" % "2.11.7"
+  val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.11.7"
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
   val xinject = "javax.inject" % "javax.inject" % "1"
