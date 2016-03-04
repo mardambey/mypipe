@@ -39,15 +39,10 @@ lazy val runnerDependencies = Seq(
   play
 )
 
-lazy val root = (project in file(".")).
-  settings(commonSettings: _*).
-  settings(name := "mypipe").
-  aggregate(api, runner)
-
-lazy val runner = (project in file("mypipe-runner")).
+lazy val mypipe = (project in file(".")).
   settings(commonSettings: _*).
   settings(
-    name := "runner",
+    name := "mypipe",
     fork in run := false,
     libraryDependencies ++= runnerDependencies,
     parallelExecution in Test := false).
