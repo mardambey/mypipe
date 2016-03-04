@@ -31,10 +31,6 @@ lazy val apiDependencies = Seq(
 )
 
 lazy val runnerDependencies = Seq(
-  typesafeConfig
-)
-
-lazy val producersDependencies = Seq(
   akkaActor,
   typesafeConfig,
   redisclient,
@@ -46,22 +42,14 @@ lazy val producersDependencies = Seq(
 lazy val root = (project in file(".")).
   settings(commonSettings: _*).
   settings(name := "mypipe").
-  aggregate(api, producers, runner)
+  aggregate(api, runner)
 
 lazy val runner = (project in file("mypipe-runner")).
   settings(commonSettings: _*).
   settings(
     name := "runner",
     fork in run := false,
-    libraryDependencies ++= runnerDependencies).
-  settings(Format.settings) dependsOn(api, producers)
-
-lazy val producers = (project in file("mypipe-producers")).
-  settings(commonSettings: _*).
-  settings(
-    name := "producers",
-    fork in run := false,
-    libraryDependencies ++= producersDependencies,
+    libraryDependencies ++= runnerDependencies,
     parallelExecution in Test := false).
   settings(Format.settings) dependsOn(api % "compile->compile;test->test")
 
