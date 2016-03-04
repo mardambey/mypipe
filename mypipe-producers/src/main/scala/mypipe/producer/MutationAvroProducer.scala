@@ -1,26 +1,31 @@
 package mypipe.producer
 
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
-import mypipe.api._
-import mypipe.api.event.{ AlterEvent, Serializer, Mutation }
-import mypipe.api.producer.Producer
-import mypipe.api.data.{ Column, Row }
-import mypipe.sqs.SQSProducer
 import com.typesafe.config.Config
-import mypipe.avro.schema.{ GenericSchemaRepository }
-import org.apache.avro.specific.SpecificRecord
+import mypipe.api.data.{ Column, Row }
+import mypipe.api.event.{ Mutation, Serializer }
+import mypipe.api.producer.Producer
+import mypipe.avro.schema.GenericSchemaRepository
+import mypipe.redis.RedisProducer
+import mypipe.sqs.SQSProducer
 import org.apache.avro.Schema
-import org.apache.avro.generic.{ GenericRecord, GenericDatumWriter, GenericData }
+import org.apache.avro.generic.{ GenericData, GenericDatumWriter, GenericRecord }
 import org.apache.avro.io.EncoderFactory
-import java.io.ByteArrayOutputStream
+import org.apache.avro.specific.SpecificRecord
 import org.slf4j.LoggerFactory
 
+abstract class MutationProducer {
+  def flush(): Boolean
+  def send(topic: String, jsonString: String)
+}
+
 /** The base class for a Mypipe producer that encodes Mutation instances
- *  as Avro records and publishes them into SQS.
+ *  as Avro records and publishes them into Redis or SQS.
  *
  */
-abstract class SQSMutationAvroProducer[SchemaId](config: Config)
+abstract class MutationAvroProducer[SchemaId](config: Config)
     extends Producer(config = config) {
 
   type InputRecord = SpecificRecord
@@ -29,20 +34,30 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
   protected val schemaRepoClient: GenericSchemaRepository[SchemaId, Schema]
   protected val serializer: Serializer[InputRecord, OutputType]
 
-  protected val sqsQueue = config.getString("sqs-queue")
-  protected val producer = new SQSProducer(sqsQueue)
+  protected val queueProvider = config.getString("queue-provider")
+  protected val producer = getProducerFor(queueProvider, config)
 
   protected val logger = LoggerFactory.getLogger(getClass)
   protected val encoderFactory = EncoderFactory.get()
 
-  /** Builds the SQS topic using the mutation's database, table name, and
+  protected def getProducerFor(provider: String, config: Config): MutationProducer = {
+    if (provider == "sqs") {
+      val sqsQueue = config.getString("sqs-queue")
+      return new SQSProducer(sqsQueue)
+    } else {
+      val redisConnect = config.getString("redis-connect")
+      return new RedisProducer(redisConnect)
+    }
+  }
+
+  /** Builds the Redis topic using the mutation's database, table name, and
    *  the mutation type (insert, update, delete) concatenating them with "_"
    *  as a delimeter.
    *
    *  @param mutation
    *  @return the topic name
    */
-  protected def getSQSTopic(mutation: Mutation): String
+  protected def getTopic(mutation: Mutation): String
 
   /** Given a mutation, returns the "subject" that this mutation's
    *  Schema is registered under in the Avro schema repository.
@@ -145,7 +160,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
 
       records foreach (record ⇒ {
         val jsonString = serialize(record, schema, schemaId.get)
-        producer.send(jsonString)
+        producer.send(getTopic(input), jsonString)
       })
     })
 
@@ -161,7 +176,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
 
       records foreach (record ⇒ {
         val jsonString = serialize(record, schema, schemaId.get)
-        producer.send(jsonString)
+        producer.send(getTopic(input), jsonString)
       })
 
       true
@@ -171,7 +186,7 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
   }
 
   override def toString(): String = {
-    s"sqs-avro-producer-$sqsQueue"
+    s"redis-avro-producer-${producer.toString}"
   }
 
 }

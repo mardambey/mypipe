@@ -6,25 +6,25 @@ import mypipe.api.data.{ Column, ColumnType }
 import mypipe.api.event._
 import mypipe.avro.schema.AvroSchemaUtils
 import mypipe.avro.{ AvroVersionedRecordSerializer, GenericInMemorySchemaRepo }
-import mypipe.sqs.SQSUtil
 import org.apache.avro.Schema
 import java.lang.{ Long ⇒ JLong }
 import java.util.{ HashMap ⇒ JMap }
 import org.apache.avro.generic.GenericData
 
-object SQSMutationGenericAvroProducer {
-  def apply(config: Config) = new SQSMutationGenericAvroProducer(config)
+object MutationGenericAvroProducer {
+  def apply(config: Config) = new MutationGenericAvroProducer(config)
 }
 
-/** An implementation of the base SQSMutationAvroProducer class that uses a
+/** An implementation of the base RedisMutationAvroProducer class that uses a
  *  GenericInMemorySchemaRepo in order to encode mutations as Avro beans.
  *  Three beans are encoded: mypipe.avro.InsertMutation, UpdateMutation, and
- *  DeleteMutation.
+ *  DeleteMutation. The Redis event names are calculated as:
+ *  dbName_tableName_(insert|update|delete)
  *
- *  @param config configuration must have "sqs-queue"
+ *  @param config configuration must have "redis-connect"
  */
-class SQSMutationGenericAvroProducer(config: Config)
-    extends SQSMutationAvroProducer[Short](config) {
+class MutationGenericAvroProducer(config: Config)
+    extends MutationAvroProducer[Short](config) {
 
   override protected val schemaRepoClient = GenericInMemorySchemaRepo
   override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
@@ -38,7 +38,7 @@ class SQSMutationGenericAvroProducer(config: Config)
    */
   override protected def schemaIdToByteArray(s: Short) = Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
-  override protected def getSQSTopic(mutation: Mutation): String = SQSUtil.topic(mutation)
+  override protected def getTopic(mutation: Mutation): String = TopicUtil.topic(mutation)
 
   override protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record] = {
 

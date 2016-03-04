@@ -5,7 +5,7 @@ import mypipe.pipe.Pipe
 
 import scala.concurrent.duration._
 import mypipe._
-import mypipe.producer.RedisMutationGenericAvroProducer
+import mypipe.producer.{TopicUtil, MutationGenericAvroProducer}
 import scala.concurrent.{ Future, Await }
 import mypipe.mysql.MySQLBinaryLogConsumer
 import org.scalatest.BeforeAndAfterAll
@@ -21,7 +21,7 @@ class RedisGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
 
   @volatile var done = false
 
-  val redisProducer = new RedisMutationGenericAvroProducer(conf.getConfig("mypipe.test.redis-generic-producer"))
+  val redisProducer = new MutationGenericAvroProducer(conf.getConfig("mypipe.test.redis-generic-producer"))
 
   val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
   val pipe = new Pipe("test-pipe-redis-generic", List(binlogConsumer), redisProducer)
@@ -44,7 +44,7 @@ class RedisGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     val redisConnect = conf.getString("mypipe.test.redis-generic-producer.redis-connect")
 
     val redisConsumer = new RedisGenericMutationAvroConsumer[Short](
-      topic = RedisUtil.topic(Queries.DATABASE.name, Queries.TABLE.name),
+      topic = TopicUtil.topic(Queries.DATABASE.name, Queries.TABLE.name),
       redisConnect = redisConnect,
       groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}",
       schemaIdSizeInBytes = 2)(

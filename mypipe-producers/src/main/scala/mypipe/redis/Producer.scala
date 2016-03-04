@@ -1,23 +1,20 @@
 package mypipe.redis
 
-import java.util.Properties
 import com.redis.RedisClient
 import java.util.concurrent.LinkedBlockingQueue
 import java.util
 import java.util.logging.Logger
+import mypipe.producer.MutationProducer
+
 import scala.collection.JavaConversions._
 
-class RedisProducer[MessageType](redisConnect: String) {
+class RedisProducer(redisConnect: String) extends MutationProducer {
   //TODO add error logging/handling
   val log = Logger.getLogger(getClass.getName)
 
   val client = new RedisClient(redisConnect, 6379)
 
   val queue = new LinkedBlockingQueue[(String, String)]()
-
-  def queue(topic: String, jsonString: String) {
-    queue.add((topic, jsonString))
-  }
 
   def flush: Boolean = {
     val events = new util.ArrayList[(String, String)]()
@@ -28,7 +25,7 @@ class RedisProducer[MessageType](redisConnect: String) {
   }
 
   def send(topic: String, jsonString: String) {
-    queue(topic, jsonString)
+    queue.add((topic, jsonString))
   }
 
   override def toString: String = {

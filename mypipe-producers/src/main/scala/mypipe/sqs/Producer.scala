@@ -1,14 +1,15 @@
 package mypipe.sqs
 
-import java.util.Properties
 import awscala._, sqs._
 import java.util.concurrent.LinkedBlockingQueue
 import java.util
 import java.util.logging.Logger
+import mypipe.producer.MutationProducer
+
 import scala.collection.JavaConversions._
 import scala.util.control.NonFatal
 
-class SQSProducer(sqsQueueName: String) {
+class SQSProducer(sqsQueueName: String) extends MutationProducer {
   //TODO add error logging/handling
   val log = Logger.getLogger(getClass.getName)
 
@@ -40,7 +41,7 @@ class SQSProducer(sqsQueueName: String) {
     true
   }
 
-  def send(jsonString: String) {
+  def send(topic: String, jsonString: String) {
     queue.add(jsonString)
   }
 

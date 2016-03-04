@@ -8,7 +8,7 @@ import mypipe.avro.AvroVersionedRecordDeserializer
 import mypipe.avro.schema.AvroSchemaUtils
 import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
-import mypipe.producer.RedisMutationSpecificAvroProducer
+import mypipe.producer.{TopicUtil}
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 import scala.concurrent.duration._
