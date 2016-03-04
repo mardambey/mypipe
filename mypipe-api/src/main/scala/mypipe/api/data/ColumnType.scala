@@ -5,6 +5,7 @@ import mypipe.util.Enum
 object ColumnType extends Enum {
   sealed trait EnumVal extends Value {
     val str: String // All ColumnType values also contain a string form
+    override def toString: String = s"$str/$value"
   }
 
   val DECIMAL = new EnumVal { val value = 0; val str = "decimal" }
@@ -44,5 +45,15 @@ object ColumnType extends Enum {
 
   def typeByCode(code: Int): Option[ColumnType.EnumVal] = values.find(_.value == code)
   def typeByString(str: String): Option[ColumnType.EnumVal] = values.find(_.str == str)
+
+  implicit class ColumnValueString(column: Column) {
+
+    def valueString: String = {
+      column.metadata.colType match {
+        case VAR_STRING | STRING ⇒ new String(column.valueOption[Array[Byte]].getOrElse(Array.empty))
+        case _                   ⇒ column.valueOption[Object].map(_.toString).getOrElse("")
+      }
+    }
+  }
 }
 

@@ -34,7 +34,8 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
   protected val dbTableCols = scala.collection.mutable.HashMap[String, (List[ColumnMetadata], Option[PrimaryKey])]()
 
   def receive = {
-    case GetColumns(db, table, flushCache) ⇒ sender ! getTableColumns(db, table, flushCache)
+    case GetColumns(db, table, flushCache) ⇒
+      sender ! getTableColumns(db, table, flushCache)
   }
 
   protected def disconnectAll(): Unit = {

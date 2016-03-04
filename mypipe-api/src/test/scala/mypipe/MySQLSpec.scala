@@ -1,13 +1,15 @@
 package mypipe
 
+import com.typesafe.config.ConfigFactory
+import mypipe.api.Conf
 import mypipe.api.event.{ DeleteMutation, Mutation, UpdateMutation, InsertMutation }
-import mypipe.mysql.{ BinaryLogFilePosition, MySQLBinaryLogConsumer }
+import mypipe.api.repo.FileBasedBinaryLogPositionRepository
+import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import mypipe.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
-import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 
 class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
@@ -16,8 +18,15 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   val queue = new LinkedBlockingQueue[Mutation]()
   val queueProducer = new QueueProducer(queue)
-  val consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
-  val pipe = new Pipe("test-pipe", List(consumer), queueProducer)
+  val c = ConfigFactory.parseString(
+    s"""
+       |{
+       |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
+       |}
+         """.stripMargin)
+  val consumer = MySQLBinaryLogConsumer(c)
+  val binlogPosRepo = new FileBasedBinaryLogPositionRepository(filePrefix = "test-pipe", dataDir = Conf.DATADIR)
+  val pipe = new Pipe("test-pipe", consumer, queueProducer, binlogPosRepo)
 
   override def beforeAll() {
     super.beforeAll()

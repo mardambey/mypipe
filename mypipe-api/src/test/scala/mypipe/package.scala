@@ -97,25 +97,27 @@ package object mypipe {
 
     object TABLE {
       val name = "user"
-      val fields = List("id", "username", "password", "login_count")
+      val fields = List("id", "username", "password", "login_count", "bio")
     }
 
     object INSERT {
       val username = "username"
       val password = "password"
       val loginCount = 0
+      val bio = "bio"
 
       def statement: String = statement()
-      def statement(id: String = "NULL", username: String = this.username, password: String = this.password, loginCount: Int = this.loginCount, email: Option[String] = None): String = {
+      def statement(id: String = "NULL", username: String = this.username, password: String = this.password, loginCount: Int = this.loginCount, bio: String = this.bio, email: Option[String] = None): String = {
         val eml = email.map(e ⇒ s", '${e}'").getOrElse("")
-        s"""INSERT INTO mypipe.user values ($id, "$username", "$password", $loginCount $eml)"""
+        s"""INSERT INTO mypipe.user values ($id, "$username", "$password", $loginCount, "$bio" $eml)"""
       }
     }
 
     object UPDATE {
       val username = "username2"
       val password = "password2"
-      lazy val statement = s"""UPDATE mypipe.user set username = "$username", password = "$password", login_count = login_count + 1"""
+      val bio = "bio2"
+      lazy val statement = s"""UPDATE mypipe.user set username = "$username", password = "$password", login_count = login_count + 1, bio = "$bio" """
     }
 
     object TRUNCATE {

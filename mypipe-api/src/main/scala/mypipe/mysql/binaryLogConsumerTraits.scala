@@ -1,16 +1,34 @@
 package mypipe.mysql
 
-import mypipe.api.Conf
-import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
+import com.typesafe.config.Config
+import mypipe.api.{ HostPortUserPass, Conf }
+
+import mypipe.api.consumer.{ BinaryLogConsumerTableFinder, BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event._
 import mypipe.util.Eval
 import org.slf4j.LoggerFactory
 
+trait ConnectionSource {
+  protected val hostname: String
+  protected val port: Int
+  protected val username: String
+  protected val password: String
+}
+
+trait ConfigBasedConnectionSource extends ConnectionSource {
+  protected val config: Config
+  protected val connectionInfo = HostPortUserPass(config.getString("source"))
+  override protected val hostname: String = connectionInfo.host
+  override protected val port: Int = connectionInfo.port
+  override protected val username: String = connectionInfo.user
+  override protected val password: String = connectionInfo.password
+}
+
 /** Used when no event skipping behaviour is desired.
  */
 trait NoEventSkippingBehaviour {
-  this: BinaryLogConsumer[_, _] ⇒
+  this: BinaryLogConsumer[_] ⇒
 
   protected def skipEvent(e: TableContainingEvent): Boolean = false
 }
@@ -20,7 +38,7 @@ trait NoEventSkippingBehaviour {
  */
 // TODO: write a test for this functionality
 trait ConfigBasedEventSkippingBehaviour {
-  this: BinaryLogConsumer[_, _] ⇒
+  this: BinaryLogConsumer[_] ⇒
 
   val includeEventCond = Conf.INCLUDE_EVENT_CONDITION
 
@@ -35,25 +53,26 @@ trait ConfigBasedEventSkippingBehaviour {
   }
 }
 
-trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] {
+trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent] extends BinaryLogConsumerErrorHandler[BinaryLogEvent] {
 
-  val handler = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition]]("mypipe.error.handler")
+  val handler = Conf.loadClassesForKey[BinaryLogConsumerErrorHandler[BinaryLogEvent]]("mypipe.error.handler")
     .headOption
-    .map(_._2.newInstance())
+    .map(_._2.map(_.newInstance()))
+    .getOrElse(None)
 
   def handleEventError(event: Option[Event], binaryLogEvent: BinaryLogEvent): Boolean =
     handler.exists(_.handleEventError(event, binaryLogEvent))
 
-  def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean =
+  def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(mutation: Mutation): Boolean =
     handler.exists(_.handleMutationError(listeners, listener)(mutation))
 
-  def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutations: Seq[Mutation]): Boolean =
+  def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(mutations: Seq[Mutation]): Boolean =
     handler.exists(_.handleMutationsError(listeners, listener)(mutations))
 
-  def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean =
+  def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(table: Table, event: TableMapEvent): Boolean =
     handler.exists(_.handleTableMapError(listeners, listener)(table, event))
 
-  def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: AlterEvent): Boolean =
+  def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(table: Table, event: AlterEvent): Boolean =
     handler.exists(_.handleAlterError(listeners, listener)(table, event))
 
   def handleCommitError(mutationList: List[Mutation], faultyMutation: Mutation): Boolean =
@@ -66,7 +85,7 @@ trait ConfigBasedErrorHandlingBehaviour[BinaryLogEvent, BinaryLogPosition] exten
     handler.exists(_.handleEmptyCommitError(queryList))
 }
 
-class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryLogConsumerErrorHandler[BinaryLogEvent, BinaryLogPosition] {
+class ConfigBasedErrorHandler[BinaryLogEvent] extends BinaryLogConsumerErrorHandler[BinaryLogEvent] {
   private val log = LoggerFactory.getLogger(getClass)
 
   private val quitOnEventHandlerFailure = Conf.QUIT_ON_EVENT_HANDLER_FAILURE
@@ -79,22 +98,22 @@ class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryL
     !quitOnEventHandlerFailure
   }
 
-  override def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutation: Mutation): Boolean = {
+  override def handleMutationError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(mutation: Mutation): Boolean = {
     log.error("Could not handle mutation {} from listener {}", mutation.asInstanceOf[Any], listener)
     !quitOnEventListenerFailure
   }
 
-  override def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(mutations: Seq[Mutation]): Boolean = {
+  override def handleMutationsError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(mutations: Seq[Mutation]): Boolean = {
     log.error("Could not handle {} mutation(s) from listener {}", mutations.length, listener)
     !quitOnEventListenerFailure
   }
 
-  override def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: TableMapEvent): Boolean = {
+  override def handleTableMapError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(table: Table, event: TableMapEvent): Boolean = {
     log.error("Could not handle table map event {} for table from listener {}", table, event, listener)
     !quitOnEventListenerFailure
   }
 
-  override def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition]], listener: BinaryLogConsumerListener[BinaryLogEvent, BinaryLogPosition])(table: Table, event: AlterEvent): Boolean = {
+  override def handleAlterError(listeners: List[BinaryLogConsumerListener[BinaryLogEvent]], listener: BinaryLogConsumerListener[BinaryLogEvent])(table: Table, event: AlterEvent): Boolean = {
     log.error("Could not handle alter event {} for table {} from listener {}", table, event, listener)
     !quitOnEventListenerFailure
   }
@@ -116,7 +135,7 @@ class ConfigBasedErrorHandler[BinaryLogEvent, BinaryLogPosition] extends BinaryL
   }
 }
 
-trait CacheableTableMapBehaviour extends AbstractMySQLBinaryLogConsumer {
+trait CacheableTableMapBehaviour extends BinaryLogConsumerTableFinder with ConnectionSource {
 
   protected var tableCache = new TableCache(hostname, port, username, password)
 

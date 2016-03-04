@@ -4,6 +4,7 @@ import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent }
 
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
 import mypipe.api.data.Table
 import mypipe.api.event.{ AlterEvent, TableMapEvent }
@@ -29,27 +30,44 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     super.beforeAll()
 
     @volatile var connected = false
-    consumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
+
+    val conf = ConfigFactory.parseString(
+      s"""
+         |{
+         |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
+         |}
+         """.stripMargin)
+    consumer = MySQLBinaryLogConsumer(conf)
     tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
 
-    consumer.registerListener(new BinaryLogConsumerListener[MEvent, BinaryLogFilePosition]() {
-      override def onConnect(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition]): Unit = connected = true
-      override def onTableMap(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], table: Table): Boolean = {
+    consumer.registerListener(new BinaryLogConsumerListener[MEvent]() {
+      override def onStart(c: BinaryLogConsumer[MEvent]): Unit = connected = true
+      override def onTableMap(c: BinaryLogConsumer[MEvent], table: Table): Boolean = {
         queueTableMap.add(table)
       }
-      override def onTableAlter(c: BinaryLogConsumer[MEvent, BinaryLogFilePosition], event: AlterEvent): Boolean = {
+      override def onTableAlter(c: BinaryLogConsumer[MEvent], event: AlterEvent): Boolean = {
         val table = tableCache.refreshTable(event.database, event.table.name)
         queueTableAlter.add(table.get)
         true
       }
     })
 
-    Future { consumer.connect() }
+    log.info(s"starting consumer $consumer")
+
+    val f = consumer.start()
+    val started = Await.result(f, 10.seconds)
+
+    if (!started) throw new Exception(s"Could not start consumer $consumer}")
+
+    log.info(s"started consumer $consumer, waiting to connect")
+
     while (!connected) Thread.sleep(1)
+
+    log.info(s"connected!")
   }
 
   override def afterAll(): Unit = {
-    consumer.disconnect()
+    consumer.stop()
     super.afterAll()
   }
 
@@ -113,3 +131,4 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     }
   }
 }
+

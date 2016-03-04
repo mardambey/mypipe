@@ -407,6 +407,40 @@ Example:
 
 The above will only process events originating from the database named "mypipe" and the table named "user".
 
+# Error Handling
+If the default configuration based error handler is used:
+
+    mypipe.error-handler { default { class = "mypipe.mysql.ConfigBasedErrorHandler" } }
+
+then user can decide to abort and stop processing using the following flags:
+
+* `quit-on-event-handler-failure`: an event handler failed (commit)
+* `quit-on-event-decode-failure`: mypipe could not decode the event
+* `quit-on-listener-failure`: a specified listener could not process the event
+* `quit-on-empty-mutation-commit-failure`: quit upon encountering an empty transaction
+
+Errors are handled as such:
+
+* The first handler deals with event decoding errors (ie: mypipe can not determine the event type and decode it).
+* The second layer of error handlers deals with specific event errors, for example: mutation, alter, table map, commit.
+* The third and final layer is the global error handler.
+
+Error handler invocation:
+
+* If the first layer or second layer are invoked and they return true, the next event will be consumed and the global error handler is not called.
+* If the first layer or second layer are invoked and they return false, then the third layer (global error handler) is invoked, otherwise, processing of the next event continues
+
+A custom error handler can also be provided if available in the classpath.
+
+# Event Filtering
+If not all events are to be processed, they can be filtered by setting `include-event-condition`.
+This allows for controlling what dbs and tables will be consumed. Effectively, this is treated as Scala code and is compiled at runtime. Setting this value to blank ignores it.
+Example:
+
+    include-event-condition = """ db == "mypipe" && table =="user" """
+
+The above will only process events originating from the database named "mypipe" and the table named "user".
+
 # Tests
 In order to run the tests you need to configure `test.conf` with proper MySQL
 values. You should also make sure there you have a database called `mypipe` with
