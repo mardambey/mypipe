@@ -3,13 +3,10 @@ import Keys._
  
 object Dependencies {
 
-  val guava = "com.google.guava" % "guava" % "14.0.1"
   val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.5"
   val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.3.5"
-  val avro = "org.apache.avro" % "avro" % "1.7.5"
   val commonsLang = "commons-lang" % "commons-lang" % "2.6"
   val jsqlParser = "com.github.jsqlparser" % "jsqlparser" % "0.9"
-  val jsr305 = "com.google.code.findbugs" % "jsr305" % "1.3.+"
   val jug = "com.fasterxml.uuid" % "java-uuid-generator" % "3.1.3"
   val logback = "ch.qos.logback" % "logback-classic" % "1.1.1"
   val mysqlAsync =  "com.github.mauricio" % "mysql-async_2.11" % "0.2.15"
@@ -18,22 +15,9 @@ object Dependencies {
   val scalaReflect = "org.scala-lang" % "scala-reflect" % "2.11.7"
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.1" % "test"
   val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
-  val xinject = "javax.inject" % "javax.inject" % "1"
   val redisclient = "net.debasishg" %% "redisclient" % "3.0"
   val sqsclient = "com.github.seratch" %% "awscala" % "0.5.+"
-}
-
-object AvroCompiler {
-  import sbtavro.SbtAvro._
-
-  lazy val settingsTest = avroSettings ++ Seq(
-    sourceDirectory in avroConfig <<= (sourceDirectory in Test)(_ / "avro"),
-    version in avroConfig := "1.7.5"
-  )
-
-  lazy val settingsCompile = avroSettings ++ Seq(
-    version in avroConfig := "1.7.5"
-  )
+  val play = "com.typesafe.play" %% "play" % "2.4.6"
 }
 
 object Format {

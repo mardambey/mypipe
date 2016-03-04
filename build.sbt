@@ -39,22 +39,14 @@ lazy val producersDependencies = Seq(
   typesafeConfig,
   redisclient,
   sqsclient,
-  scalaTest
-)
-
-lazy val avroDependencies = Seq(
-  avro,
-  guava,
-  xinject,
-  jsr305,
   scalaTest,
-  scalaReflect
+  play
 )
 
 lazy val root = (project in file(".")).
   settings(commonSettings: _*).
   settings(name := "mypipe").
-  aggregate(api, producers, runner, myavro)
+  aggregate(api, producers, runner)
 
 lazy val runner = (project in file("mypipe-runner")).
   settings(commonSettings: _*).
@@ -62,7 +54,7 @@ lazy val runner = (project in file("mypipe-runner")).
     name := "runner",
     fork in run := false,
     libraryDependencies ++= runnerDependencies).
-  settings(Format.settings) dependsOn(api, producers, myavro)
+  settings(Format.settings) dependsOn(api, producers)
 
 lazy val producers = (project in file("mypipe-producers")).
   settings(commonSettings: _*).
@@ -71,8 +63,7 @@ lazy val producers = (project in file("mypipe-producers")).
     fork in run := false,
     libraryDependencies ++= producersDependencies,
     parallelExecution in Test := false).
-  settings(AvroCompiler.settingsTest).
-  settings(Format.settings) dependsOn(api % "compile->compile;test->test", myavro)
+  settings(Format.settings) dependsOn(api % "compile->compile;test->test")
 
 lazy val api = (project in file("mypipe-api")).
   settings(commonSettings: _*).
@@ -82,13 +73,3 @@ lazy val api = (project in file("mypipe-api")).
     libraryDependencies ++= apiDependencies,
     parallelExecution in Test := false).
   settings(Format.settings)
-
-lazy val myavro = (project in file("mypipe-avro")).
-  settings(commonSettings: _*).
-  settings(
-    name := "myavro",
-    fork in run := false,
-    libraryDependencies ++= avroDependencies,
-    parallelExecution in Test := false).
-  settings(AvroCompiler.settingsCompile).
-  settings(Format.settings) dependsOn(api % "compile->compile;test->test")

@@ -11,7 +11,6 @@ addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.6.0")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.6.2")
 
-addSbtPlugin("com.cavorite" % "sbt-avro" % "0.3.2")
-
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.1.6")
 
+addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.4.6")
