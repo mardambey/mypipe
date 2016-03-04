@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import mypipe.api._
 import mypipe.api.event.{ AlterEvent, Serializer, Mutation }
 import mypipe.api.producer.Producer
+import mypipe.api.data.{ Column, Row }
 import mypipe.sqs.SQSProducer
 import com.typesafe.config.Config
 import mypipe.avro.schema.{ GenericSchemaRepository }
@@ -67,6 +68,8 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
    */
   protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record]
 
+  protected def getRowId(columns: Map[String, Column]): java.lang.Long
+
   override def flush(): Boolean = {
     try {
       producer.flush
@@ -85,10 +88,11 @@ abstract class SQSMutationAvroProducer[SchemaId](config: Config)
    *  @param record
    *  @param mutation
    */
-  protected def header(record: GenericData.Record, mutation: Mutation) {
+  protected def header(record: GenericData.Record, mutation: Mutation, row: Row) {
     record.put("database", mutation.table.db)
     record.put("table", mutation.table.name)
     record.put("tableId", mutation.table.id)
+    record.put("rowId", getRowId(row.columns))
     record.put("mutation", mutationTypeString(mutation))
 
     // TODO: avoid null check

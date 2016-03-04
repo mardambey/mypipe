@@ -3,6 +3,7 @@ package mypipe.producer
 import java.nio.ByteBuffer
 
 import mypipe.api._
+import mypipe.api.data.{ Column, Row }
 import mypipe.api.event.{ AlterEvent, Serializer, Mutation }
 import mypipe.api.producer.Producer
 import mypipe.redis.RedisProducer
@@ -45,6 +46,7 @@ abstract class RedisMutationAvroProducer[SchemaId](config: Config)
 
   /** Given a mutation, returns the "subject" that this mutation's
    *  Schema is registered under in the Avro schema repository.
+   *
    *  @param mutation
    *  @return
    */
@@ -66,6 +68,8 @@ abstract class RedisMutationAvroProducer[SchemaId](config: Config)
    */
   protected def avroRecord(mutation: Mutation, schema: Schema): List[GenericData.Record]
 
+  protected def getRowId(columns: Map[String, Column]): java.lang.Long
+
   override def flush(): Boolean = {
     try {
       producer.flush
@@ -80,13 +84,15 @@ abstract class RedisMutationAvroProducer[SchemaId](config: Config)
 
   /** Adds a header into the given Record based on the Mutation's
    *  database, table, and tableId.
+   *
    *  @param record
    *  @param mutation
    */
-  protected def header(record: GenericData.Record, mutation: Mutation) {
+  protected def header(record: GenericData.Record, mutation: Mutation, row: Row) {
     record.put("database", mutation.table.db)
     record.put("table", mutation.table.name)
     record.put("tableId", mutation.table.id)
+    record.put("rowId", getRowId(row.columns))
     record.put("mutation", mutationTypeString(mutation))
 
     // TODO: avoid null check
@@ -103,6 +109,7 @@ abstract class RedisMutationAvroProducer[SchemaId](config: Config)
   }
 
   /** Given a mutation, returns a string (for example: insert, update, delete).
+   *
    *  @param mutation
    *  @return
    */
@@ -110,6 +117,7 @@ abstract class RedisMutationAvroProducer[SchemaId](config: Config)
 
   /** Given an Avro generic record, schema, and schemaId, serialized
    *  them into an array of bytes.
+   *
    *  @param record
    *  @param schema
    *  @param schemaId

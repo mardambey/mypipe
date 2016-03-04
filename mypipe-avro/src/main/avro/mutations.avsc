@@ -16,6 +16,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+    		{
+    			"name": "rowId",
+    			"type": "long"
+    		},
             {
                 "name": "mutation",
                 "type": "string"
@@ -60,6 +64,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+    		{
+    			"name": "rowId",
+    			"type": "long"
+    		},
             {
                 "name": "mutation",
                 "type": "string"
@@ -90,6 +98,10 @@
     		},
     		{
     			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    			"name": "rowId",
     			"type": "long"
     		},
             {
@@ -150,6 +162,10 @@
     			"name": "tableId",
     			"type": "long"
     		},
+    		{
+    			"name": "rowId",
+    			"type": "long"
+    		},
             {
                 "name": "mutation",
                 "type": "string"
@@ -180,6 +196,10 @@
     		},
     		{
     			"name": "tableId",
+    			"type": "long"
+    		},
+    		{
+    			"name": "rowId",
     			"type": "long"
     		},
             {
@@ -226,6 +246,10 @@
                 "name": "tableId",
                 "type": "long"
             },
+    		{
+    			"name": "rowId",
+    			"type": "long"
+    		},
             {
                 "name": "mutation",
                 "type": "string"

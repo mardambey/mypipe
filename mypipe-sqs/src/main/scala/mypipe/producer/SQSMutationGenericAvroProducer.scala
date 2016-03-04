@@ -46,7 +46,7 @@ class SQSMutationGenericAvroProducer(config: Config)
 
       case Mutation.InsertByte ⇒ mutation.asInstanceOf[InsertMutation].rows.map(row ⇒ {
         val record = new GenericData.Record(schema)
-        header(record, mutation)
+        header(record, mutation, row)
 
         if (Conf.INCLUDE_ROW_DATA) {
           val (integers, strings, longs) = columnsToMaps(row.columns)
@@ -58,7 +58,7 @@ class SQSMutationGenericAvroProducer(config: Config)
 
       case Mutation.DeleteByte ⇒ mutation.asInstanceOf[DeleteMutation].rows.map(row ⇒ {
         val record = new GenericData.Record(schema)
-        header(record, mutation)
+        header(record, mutation, row)
 
         if (Conf.INCLUDE_ROW_DATA) {
           val (integers, strings, longs) = columnsToMaps(row.columns)
@@ -70,7 +70,7 @@ class SQSMutationGenericAvroProducer(config: Config)
 
       case Mutation.UpdateByte ⇒ mutation.asInstanceOf[UpdateMutation].rows.map(row ⇒ {
         val record = new GenericData.Record(schema)
-        header(record, mutation)
+        header(record, mutation, row._1)
 
         if (Conf.INCLUDE_ROW_DATA) {
           val (integersOld, stringsOld, longsOld) = columnsToMaps(row._1.columns)
@@ -96,6 +96,37 @@ class SQSMutationGenericAvroProducer(config: Config)
     record.put(keyOp("integers"), integers)
     record.put(keyOp("strings"), strings)
     record.put(keyOp("longs"), longs)
+  }
+
+  protected def getRowId(columns: Map[String, Column]): java.lang.Long = {
+    var pkId: java.lang.Long = null
+
+    val cols = columns.values.groupBy(_.metadata.colType)
+
+    cols.foreach({
+
+      case (ColumnType.INT24, colz) ⇒
+        colz.foreach(c ⇒ {
+          val v = c.valueOption[Int]
+          if (v.isDefined && c.metadata.isPrimaryKey) pkId = new java.lang.Long(v.get.toLong)
+        })
+
+      case (ColumnType.LONG, colz) ⇒
+        colz.foreach(c ⇒ {
+          // this damn thing can come in as an Integer or Long
+          val v = c.value match {
+            case i: java.lang.Integer ⇒ new java.lang.Long(i.toLong)
+            case l: java.lang.Long    ⇒ l
+            case null                 ⇒ null
+          }
+
+          if (v != null && c.metadata.isPrimaryKey) pkId = v
+        })
+
+      case _ ⇒ // unsupported
+    })
+
+    pkId
   }
 
   protected def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {
