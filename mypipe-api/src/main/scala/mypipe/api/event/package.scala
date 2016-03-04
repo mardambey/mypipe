@@ -38,6 +38,7 @@ sealed abstract class Mutation(override val table: Table, val txid: UUID, val tx
   val database = table.db
   def txAware(txid: UUID): Mutation
   def txQueryCount(txQueryCount: Int): Mutation
+  def txRowCount: Int = 0
 }
 
 /** Represents a Mutation that holds a single set of values for each row (Insert or Delete, not Update)
@@ -81,6 +82,8 @@ case class InsertMutation(
   override def txQueryCount(txQueryCount: Int = 0): Mutation = {
     InsertMutation(table, rows, txid, txQueryCount)
   }
+
+  override def txRowCount: Int = rows.length
 }
 
 /** Represents an updated row.
@@ -101,6 +104,8 @@ case class UpdateMutation(
   override def txQueryCount(txQueryCount: Int = 0): Mutation = {
     UpdateMutation(table, rows, txid, txQueryCount)
   }
+
+  override def txRowCount: Int = rows.length
 }
 
 /** Represents a deleted row.
@@ -122,6 +127,8 @@ case class DeleteMutation(
   override def txQueryCount(txQueryCount: Int = 0): Mutation = {
     DeleteMutation(table, rows, txid, txQueryCount)
   }
+
+  override def txRowCount: Int = rows.length
 }
 
 /** General purpose Mutation helpers.

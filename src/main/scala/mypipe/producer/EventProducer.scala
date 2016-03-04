@@ -161,7 +161,9 @@ class EventProducer(config: Config)
       "rowId" -> getRowId(row.columns),
       "mutation" -> mutationTypeString(mutation),
       "txId" -> uuidString,
-      "txQueryCount" -> mutation.txQueryCount)
+      "txQueryCount" -> mutation.txQueryCount,
+      "txRowCount" -> mutation.txRowCount,
+      "txEventCount" -> mutation.txQueryCount * mutation.txRowCount)
   }
 
   protected def getRowId(columns: Map[String, Column]): java.lang.Long = {
