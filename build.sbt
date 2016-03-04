@@ -48,11 +48,6 @@ lazy val avroDependencies = Seq(
   scalaReflect
 )
 
-lazy val kafkaDependencies = Seq(
-  kafka,
-  scalaTest
-)
-
 lazy val redisDependencies = Seq(
   redisclient,
   scalaTest
@@ -66,7 +61,7 @@ lazy val sqsDependencies = Seq(
 lazy val root = (project in file(".")).
   settings(commonSettings: _*).
   settings(name := "mypipe").
-  aggregate(api, producers, runner, myavro, mykafka, myredis, mysqs)
+  aggregate(api, producers, runner, myavro, myredis, mysqs)
 
 lazy val runner = (project in file("mypipe-runner")).
   settings(commonSettings: _*).
@@ -74,7 +69,7 @@ lazy val runner = (project in file("mypipe-runner")).
     name := "runner",
     fork in run := false,
     libraryDependencies ++= runnerDependencies).
-  settings(Format.settings) dependsOn(api, producers, myavro, mykafka, myredis, mysqs)
+  settings(Format.settings) dependsOn(api, producers, myavro, myredis, mysqs)
 
 lazy val producers = (project in file("mypipe-producers")).
   settings(commonSettings: _*).
@@ -102,16 +97,6 @@ lazy val myavro = (project in file("mypipe-avro")).
     parallelExecution in Test := false).
   settings(AvroCompiler.settingsCompile).
   settings(Format.settings) dependsOn(api % "compile->compile;test->test")
-
-lazy val mykafka = (project in file("mypipe-kafka")).
-  settings(commonSettings: _*).
-  settings(
-    name := "mykafka",
-    fork in run := false,
-    libraryDependencies ++= kafkaDependencies,
-    parallelExecution in Test := false).
-  settings(AvroCompiler.settingsTest).
-  settings(Format.settings) dependsOn(api % "compile->compile;test->test", myavro)
 
 lazy val myredis = (project in file("mypipe-redis")).
   settings(commonSettings: _*).

@@ -70,7 +70,7 @@ class SQSAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with 
     Await.result(db.connection.sendQuery(Queries.ALTER.statementAdd), 2.seconds)
     // insert into user with new field
     Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT, email = Some("test@test.com"))), 2.seconds)
-    // consume event with new field from kafka
+    // consume event with new field from
     val bytes = iter.next().get
 
     val magicByte = bytes(0)
