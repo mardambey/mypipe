@@ -1,9 +1,9 @@
-package mypipe.producer.stdout
+package mypipe.producer
 
+import com.typesafe.config.Config
 import mypipe.api.event._
 import mypipe.api.producer.Producer
 import org.slf4j.LoggerFactory
-import com.typesafe.config.Config
 
 class StdoutProducer(config: Config) extends Producer(config) {
 

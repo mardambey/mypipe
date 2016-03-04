@@ -1,14 +1,14 @@
-package mypipe.redis
+package mypipe.producer
+
+import java.util
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.logging.Logger
 
 import com.redis.RedisClient
-import java.util.concurrent.LinkedBlockingQueue
-import java.util
-import java.util.logging.Logger
-import mypipe.producer.MutationProducer
 
 import scala.collection.JavaConversions._
 
-class RedisProducer(redisConnect: String) extends MutationProducer {
+class RedisProducer(redisConnect: String) extends ProviderProducer {
   //TODO add error logging/handling
   val log = Logger.getLogger(getClass.getName)
 

@@ -1,15 +1,16 @@
-package mypipe.sqs
+package mypipe.producer
 
-import awscala._, sqs._
-import java.util.concurrent.LinkedBlockingQueue
 import java.util
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.logging.Logger
-import mypipe.producer.MutationProducer
+
+import awscala._
+import awscala.sqs._
 
 import scala.collection.JavaConversions._
 import scala.util.control.NonFatal
 
-class SQSProducer(sqsQueueName: String) extends MutationProducer {
+class SQSProducer(sqsQueueName: String) extends ProviderProducer {
   //TODO add error logging/handling
   val log = Logger.getLogger(getClass.getName)
 
@@ -28,12 +29,10 @@ class SQSProducer(sqsQueueName: String) extends MutationProducer {
         sqsQueue.addAll(events)
         events.clear()
         queue.drainTo(events, 10)
-        println("yes")
       } catch {
         case NonFatal(e) ⇒ {
           queue.addAll(events)
           events.clear()
-          println("no")
         }
       }
     }

@@ -5,7 +5,7 @@ import mypipe.pipe.Pipe
 
 import scala.concurrent.duration._
 import mypipe._
-import mypipe.producer.{TopicUtil, MutationGenericAvroProducer}
+import mypipe.producer.{TopicUtil, EventProducer}
 import scala.concurrent.{ Future, Await }
 import mypipe.mysql.MySQLBinaryLogConsumer
 import org.scalatest.BeforeAndAfterAll
@@ -21,7 +21,7 @@ class RedisGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
 
   @volatile var done = false
 
-  val redisProducer = new MutationGenericAvroProducer(conf.getConfig("mypipe.test.redis-generic-producer"))
+  val redisProducer = new EventProducer(conf.getConfig("mypipe.test.redis-generic-producer"))
 
   val binlogConsumer = MySQLBinaryLogConsumer(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Queries.DATABASE.password)
   val pipe = new Pipe("test-pipe-redis-generic", List(binlogConsumer), redisProducer)
@@ -43,62 +43,62 @@ class RedisGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     // TODO redisize
     val redisConnect = conf.getString("mypipe.test.redis-generic-producer.redis-connect")
 
-    val redisConsumer = new RedisGenericMutationAvroConsumer[Short](
-      topic = TopicUtil.topic(Queries.DATABASE.name, Queries.TABLE.name),
-      redisConnect = redisConnect,
-      groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}",
-      schemaIdSizeInBytes = 2)(
-
-      insertCallback = { insertMutation ⇒
-        log.debug("consumed insert mutation: " + insertMutation)
-        try {
-          assert(insertMutation.getDatabase.toString == Queries.DATABASE.name)
-          assert(insertMutation.getTable.toString == Queries.TABLE.name)
-          assert(insertMutation.getStrings.get(username).toString.equals(Queries.INSERT.username))
-        } catch {
-          case e: Exception ⇒ log.error("Failed testing insert: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
-        }
-
-        true
-      },
-
-      updateCallback = { updateMutation ⇒
-        log.debug("consumed update mutation: " + updateMutation)
-        try {
-          assert(updateMutation.getDatabase.toString == Queries.DATABASE.name)
-          assert(updateMutation.getTable.toString == Queries.TABLE.name)
-          assert(updateMutation.getOldStrings.get(username).toString == Queries.INSERT.username)
-          assert(updateMutation.getNewStrings.get(username).toString == Queries.UPDATE.username)
-        } catch {
-          case e: Exception ⇒ log.error("Failed testing update: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
-        }
-
-        true
-      },
-
-      deleteCallback = { deleteMutation ⇒
-        log.debug("consumed delete mutation: " + deleteMutation)
-        try {
-          assert(deleteMutation.getDatabase.toString == Queries.DATABASE.name)
-          assert(deleteMutation.getTable.toString == Queries.TABLE.name)
-          assert(deleteMutation.getStrings.get(username).toString == Queries.UPDATE.username)
-        } catch {
-          case e: Exception ⇒ log.error("Failed testing delete: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
-        }
-
-        done = true
-        true
-
-      }) {
-
-      protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
-      override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
-      private def byteArray2Short(data: Array[Byte], offset: Int) = ((data(offset) << 8) | (data(offset + 1) & 0xff)).toShort
-
-      override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.genericSubject(Mutation.byteToString(byte))
-    }
-
-    val future = redisConsumer.start
+////    val redisConsumer = new RedisGenericMutationAvroConsumer[Short](
+////      topic = TopicUtil.topic(Queries.DATABASE.name, Queries.TABLE.name),
+////      redisConnect = redisConnect,
+////      groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}",
+////      schemaIdSizeInBytes = 2)(
+////
+////      insertCallback = { insertMutation ⇒
+////        log.debug("consumed insert mutation: " + insertMutation)
+////        try {
+////          assert(insertMutation.getDatabase.toString == Queries.DATABASE.name)
+////          assert(insertMutation.getTable.toString == Queries.TABLE.name)
+////          assert(insertMutation.getStrings.get(username).toString.equals(Queries.INSERT.username))
+////        } catch {
+////          case e: Exception ⇒ log.error("Failed testing insert: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
+////        }
+////
+////        true
+////      },
+////
+////      updateCallback = { updateMutation ⇒
+////        log.debug("consumed update mutation: " + updateMutation)
+////        try {
+////          assert(updateMutation.getDatabase.toString == Queries.DATABASE.name)
+////          assert(updateMutation.getTable.toString == Queries.TABLE.name)
+////          assert(updateMutation.getOldStrings.get(username).toString == Queries.INSERT.username)
+////          assert(updateMutation.getNewStrings.get(username).toString == Queries.UPDATE.username)
+////        } catch {
+////          case e: Exception ⇒ log.error("Failed testing update: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
+////        }
+////
+////        true
+////      },
+////
+////      deleteCallback = { deleteMutation ⇒
+////        log.debug("consumed delete mutation: " + deleteMutation)
+////        try {
+////          assert(deleteMutation.getDatabase.toString == Queries.DATABASE.name)
+////          assert(deleteMutation.getTable.toString == Queries.TABLE.name)
+////          assert(deleteMutation.getStrings.get(username).toString == Queries.UPDATE.username)
+////        } catch {
+////          case e: Exception ⇒ log.error("Failed testing delete: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
+////        }
+////
+////        done = true
+////        true
+////
+////      }) {
+////
+////      protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
+////      override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
+////      private def byteArray2Short(data: Array[Byte], offset: Int) = ((data(offset) << 8) | (data(offset + 1) & 0xff)).toShort
+////
+////      override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.genericSubject(Mutation.byteToString(byte))
+////    }
+//
+//    val future = redisConsumer.start
 
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 2.seconds)
     Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2.seconds)
@@ -106,7 +106,7 @@ class RedisGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     Await.result(Future { while (!done) Thread.sleep(100) }, 20.seconds)
 
     try {
-      redisConsumer.stop
+//      redisConsumer.stop
       Await.result(future, 5.seconds)
     } catch {
       case e: Exception ⇒ log.error("Failed stopping consumer: {} -> {}", e.getMessage, e.getStackTrace.mkString(System.lineSeparator()))
