@@ -1,7 +1,5 @@
 package mypipe.producer
 
-import java.lang.{ Long ⇒ JLong }
-import java.util.{ HashMap ⇒ JMap }
 import java.nio.ByteBuffer
 
 import com.typesafe.config.Config
@@ -87,10 +85,12 @@ class EventProducer(config: Config)
       Json.obj(map.map {
         case (s, o) ⇒
           val ret: (String, JsValueWrapper) = o match {
-            case _: String ⇒ s -> JsString(o.asInstanceOf[String])
-            case _: Long   ⇒ s -> JsNumber(o.asInstanceOf[Long])
-            case _: Int    ⇒ s -> JsNumber(o.asInstanceOf[Int])
-            case _         ⇒ s -> JsArray(o.asInstanceOf[List[String]].map(JsString(_)))
+            case _: String           ⇒ s -> JsString(o.asInstanceOf[String])
+            case _: Long             ⇒ s -> JsNumber(o.asInstanceOf[Long])
+            case _: Int              ⇒ s -> JsNumber(o.asInstanceOf[Int])
+            case _: Boolean          ⇒ s -> JsBoolean(o.asInstanceOf[Boolean])
+            case _: Map[String, Any] ⇒ s -> writes(o.asInstanceOf[Map[String, Any]])
+            case _                   ⇒ s -> JsArray(o.asInstanceOf[List[String]].map(JsString(_)))
           }
           ret
       }.toSeq: _*)
@@ -99,9 +99,11 @@ class EventProducer(config: Config)
       JsSuccess(jv.as[Map[String, JsValue]].map {
         case (k, v) ⇒
           k -> (v match {
-            case s: JsString ⇒ s.as[String]
-            case n: JsNumber ⇒ n.as[Long]
-            case l           ⇒ l.as[List[String]]
+            case s: JsString  ⇒ s.as[String]
+            case n: JsNumber  ⇒ n.as[Long]
+            case b: JsBoolean ⇒ b.as[Boolean]
+            case o: JsObject  ⇒ reads(o)
+            case l            ⇒ l.as[List[String]]
           })
       })
   }
@@ -114,9 +116,7 @@ class EventProducer(config: Config)
 
       case Mutation.InsertByte ⇒ mutation.asInstanceOf[InsertMutation].rows.map(row ⇒ {
         if (Conf.INCLUDE_ROW_DATA) {
-          val (integers, strings, longs) = columnsToMaps(row.columns)
-
-          header(mutation, row) ++ body(mutation, integers, strings, longs)
+          body(mutation, row, columnsToMaps(row.columns.values))
         } else {
           header(mutation, row)
         }
@@ -124,9 +124,7 @@ class EventProducer(config: Config)
 
       case Mutation.DeleteByte ⇒ mutation.asInstanceOf[DeleteMutation].rows.map(row ⇒ {
         if (Conf.INCLUDE_ROW_DATA) {
-          val (integers, strings, longs) = columnsToMaps(row.columns)
-
-          header(mutation, row) ++ body(mutation, integers, strings, longs)
+          body(mutation, row, columnsToMaps(row.columns.values))
         } else {
           header(mutation, row)
         }
@@ -134,10 +132,7 @@ class EventProducer(config: Config)
 
       case Mutation.UpdateByte ⇒ mutation.asInstanceOf[UpdateMutation].rows.map(row ⇒ {
         if (Conf.INCLUDE_ROW_DATA) {
-          val (integersOld, stringsOld, longsOld) = columnsToMaps(row._1.columns)
-          val (integersNew, stringsNew, longsNew) = columnsToMaps(row._2.columns)
-
-          header(mutation, row._1) ++ body(mutation, integersOld, stringsOld, longsOld) { s ⇒ "old_" + s } ++ body(mutation, integersNew, stringsNew, longsNew) { s ⇒ "new_" + s }
+          update_body(mutation, row._1, columnsToMaps(row._1.columns.values), columnsToMaps(row._2.columns.values))
         } else {
           header(mutation, row._1)
         }
@@ -200,55 +195,47 @@ class EventProducer(config: Config)
     pkId
   }
 
-  protected def body(mutation: Mutation,
-                     integers: JMap[CharSequence, Integer],
-                     strings: JMap[CharSequence, CharSequence],
-                     longs: JMap[CharSequence, JLong])(implicit keyOp: String ⇒ String = s ⇒ s): Map[String, Any] = {
-    Map[String, Any](
-      keyOp("integers") -> integers,
-      keyOp("strings") -> strings,
-      keyOp("longs") -> longs)
+  protected def body(mutation: Mutation, row: Row, fields: Map[String, Any]): Map[String, Any] = {
+    header(mutation, row) + ("row" -> fields)
   }
 
-  protected def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {
+  protected def update_body(mutation: Mutation, row: Row, old_fields: Map[String, Any], new_fields: Map[String, Any]): Map[String, Any] = {
+    body(mutation, row, new_fields) + ("old_row" -> old_fields)
+  }
 
-    val cols = columns.values.groupBy(_.metadata.colType)
+  protected def columnsToMaps(columns: Iterable[Column]): Map[String, Any] = {
+    val ret = scala.collection.mutable.Map[String, Any]()
 
-    // ugliness follows... we'll clean it up some day.
-    val integers = new java.util.HashMap[CharSequence, Integer]()
-    val strings = new java.util.HashMap[CharSequence, CharSequence]()
-    val longs = new java.util.HashMap[CharSequence, java.lang.Long]()
+    columns.foreach(col ⇒ {
+      if (col.metadata.colType == ColumnType.INT24) {
+        val v = col.valueOption[Int]
+        if (v.isDefined) {
+          ret(col.metadata.name) = v.get
+        }
+      }
 
-    cols.foreach({
+      if (col.metadata.colType == ColumnType.VARCHAR) {
+        val v = col.valueOption[String]
+        if (v.isDefined) {
+          ret(col.metadata.name) = v.get
+        }
+      }
 
-      case (ColumnType.INT24, colz) ⇒
-        colz.foreach(c ⇒ {
-          val v = c.valueOption[Int]
-          if (v.isDefined) integers.put(c.metadata.name, v.get)
-        })
+      if (col.metadata.colType == ColumnType.LONG) {
+        // this damn thing can come in as an Integer or Long
+        val v = col.value match {
+          case i: java.lang.Integer ⇒ i.toLong
+          case l: java.lang.Long    ⇒ l.toLong
+          case null                 ⇒ null
+        }
 
-      case (ColumnType.VARCHAR, colz) ⇒
-        colz.foreach(c ⇒ {
-          val v = c.valueOption[String]
-          if (v.isDefined) strings.put(c.metadata.name, v.get)
-        })
-
-      case (ColumnType.LONG, colz) ⇒
-        colz.foreach(c ⇒ {
-          // this damn thing can come in as an Integer or Long
-          val v = c.value match {
-            case i: java.lang.Integer ⇒ new java.lang.Long(i.toLong)
-            case l: java.lang.Long    ⇒ l
-            case null                 ⇒ null
-          }
-
-          if (v != null) longs.put(c.metadata.name, v)
-        })
-
-      case _ ⇒ // unsupported
+        if (v != null) {
+          ret(col.metadata.name) = v
+        }
+      }
     })
 
-    (integers, strings, longs)
+    ret.toMap
   }
 
   override def toString(): String = {
