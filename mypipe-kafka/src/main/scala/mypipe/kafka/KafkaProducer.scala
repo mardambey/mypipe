@@ -30,7 +30,7 @@ class KafkaProducer[MessageType](metadataBrokers: String) {
   }
 
   def flush: Boolean = {
-    val s = new util.HashSet[KeyedMessage[KeyType, MessageType]]
+    val s = new util.ArrayList[KeyedMessage[KeyType, MessageType]]
     queue.drainTo(s)
     val a = s.toArray[KeyedMessage[Array[Byte], Array[Byte]]](Array[KeyedMessage[Array[Byte], Array[Byte]]]())
     producer.send(a: _*)
