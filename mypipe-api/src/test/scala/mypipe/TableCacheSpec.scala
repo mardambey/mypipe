@@ -80,7 +80,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
       Await.result(insertFuture, 2000.millis)
 
       val table = queueTableMap.poll(10, TimeUnit.SECONDS)
-      tableCache.addTableByEvent(TableMapEvent(Long.unbox(table.id), table.name, table.db, table.columns.map(_.colType.value.toByte).toArray))
+      tableCache.addTableByEvent(TableMapEvent(0, Long.unbox(table.id), table.name, table.db, table.columns.map(_.colType.value.toByte).toArray))
       val table2 = tableCache.getTable(table.id)
       assert(table2.isDefined)
       assert(table2.get.name == Queries.TABLE.name)

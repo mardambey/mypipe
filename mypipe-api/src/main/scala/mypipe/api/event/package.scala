@@ -4,29 +4,40 @@ import java.util.UUID
 
 import mypipe.api.data.{ Row, Table }
 
-sealed abstract class Event
+sealed trait Event {
+  /** This is the timestamp of the event (as reported by MySql in the binlog). If group-mutations-by-tx is
+   *  enabled, the timestamp reported by BinaryLogConsumer for Mutation events will be time of the commit,
+   *  not the event itself.
+   */
+  val timestamp: Long
+}
 
 sealed trait QueryEvent extends Event {
   val database: String
   val sql: String
 }
 
-final case class UnknownEvent(database: String = "", sql: String = "") extends QueryEvent
-final case class UnknownQueryEvent(database: String = "", sql: String = "") extends QueryEvent
-final case class BeginEvent(database: String, sql: String) extends QueryEvent
-final case class CommitEvent(database: String, sql: String) extends QueryEvent
-final case class RollbackEvent(database: String, sql: String) extends QueryEvent
+final case class UnknownEvent(timestamp: Long, database: String = "", sql: String = "") extends QueryEvent
+final case class UnknownQueryEvent(timestamp: Long, database: String = "", sql: String = "") extends QueryEvent
+final case class BeginEvent(timestamp: Long, database: String, sql: String) extends QueryEvent
+final case class CommitEvent(timestamp: Long, database: String, sql: String) extends QueryEvent
+final case class RollbackEvent(timestamp: Long, database: String, sql: String) extends QueryEvent
 
 sealed trait TableContainingEvent extends QueryEvent {
   val table: Table
 }
 
-final case class AlterEvent(table: Table, sql: String) extends TableContainingEvent {
+final case class AlterEvent(timestamp: Long, table: Table, sql: String) extends TableContainingEvent {
   val database = table.db
 }
 
-final case class XidEvent(xid: Long) extends Event
-final case class TableMapEvent(tableId: Long, tableName: String, database: String, columnTypes: Array[Byte]) extends Event
+final case class XidEvent(timestamp: Long, xid: Long) extends Event
+final case class TableMapEvent(
+  timestamp: Long,
+  tableId: Long,
+  tableName: String,
+  database: String,
+  columnTypes: Array[Byte]) extends Event
 
 /** Represents a row change event (Insert, Update, or Delete).
  *
@@ -37,6 +48,7 @@ sealed abstract class Mutation(override val table: Table, val txid: UUID) extend
   val sql = ""
   val database = table.db
   def txAware(txid: UUID): Mutation
+  def withTimestamp(newTimestamp: Long): Mutation
 }
 
 /** Represents a Mutation that holds a single set of values for each row (Insert or Delete, not Update)
@@ -66,13 +78,18 @@ object SingleValuedMutation {
  *  @param rows which are changed by the mutation
  */
 case class InsertMutation(
+  timestamp: Long,
   override val table: Table,
   override val rows: List[Row],
   override val txid: UUID = null)
     extends SingleValuedMutation(table, rows, txid) {
 
   override def txAware(txid: UUID = null): Mutation = {
-    InsertMutation(table, rows, txid)
+    InsertMutation(timestamp, table, rows, txid)
+  }
+
+  override def withTimestamp(newTimestamp: Long): Mutation = {
+    copy(timestamp = newTimestamp)
   }
 }
 
@@ -81,13 +98,18 @@ case class InsertMutation(
  *  @param rows changes rows
  */
 case class UpdateMutation(
+  timestamp: Long,
   override val table: Table,
   rows: List[(Row, Row)],
   override val txid: UUID = null)
     extends Mutation(table, txid) {
 
   override def txAware(txid: UUID = null): Mutation = {
-    UpdateMutation(table, rows, txid)
+    UpdateMutation(timestamp, table, rows, txid)
+  }
+
+  override def withTimestamp(newTimestamp: Long): Mutation = {
+    copy(timestamp = newTimestamp)
   }
 }
 
@@ -97,13 +119,18 @@ case class UpdateMutation(
  *  @param rows which are changed by the mutation
  */
 case class DeleteMutation(
+  timestamp: Long,
   override val table: Table,
   override val rows: List[Row],
   override val txid: UUID = null)
     extends SingleValuedMutation(table, rows, txid) {
 
   override def txAware(txid: UUID = null): Mutation = {
-    DeleteMutation(table, rows, txid)
+    DeleteMutation(timestamp, table, rows, txid)
+  }
+
+  override def withTimestamp(newTimestamp: Long): Mutation = {
+    copy(timestamp = newTimestamp)
   }
 }
 

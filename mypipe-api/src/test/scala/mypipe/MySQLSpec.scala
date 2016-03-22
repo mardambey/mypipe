@@ -28,6 +28,10 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
   val binlogPosRepo = new FileBasedBinaryLogPositionRepository(filePrefix = "test-pipe", dataDir = Conf.DATADIR)
   val pipe = new Pipe("test-pipe", consumer, queueProducer, binlogPosRepo)
 
+  private def sendTimestamp(timestamp: Long) = {
+    Await.result(db.connection.sendQuery(s"SET TIMESTAMP = $timestamp"), 1.second)
+  }
+
   override def beforeAll() {
     super.beforeAll()
     pipe.connect()
@@ -41,6 +45,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 
   "A binlog consumer" should "properly consume insert events" in withDatabase { db ⇒
 
+    sendTimestamp(42)
     db.connection.sendQuery(Queries.INSERT.statement)
 
     log.info("Waiting for binary log event to arrive.")
@@ -49,10 +54,12 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[InsertMutation])
+    assert(mutation.timestamp == 42000L)
   }
 
   "A binlog consumer" should "properly consume update events" in withDatabase { db ⇒
 
+    sendTimestamp(43)
     db.connection.sendQuery(Queries.UPDATE.statement)
 
     log.info("Waiting for binary log event to arrive.")
@@ -61,10 +68,12 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[UpdateMutation])
+    assert(mutation.timestamp == 43000L)
   }
 
   "A binlog consumer" should "properly consume delete events" in withDatabase { db ⇒
 
+    sendTimestamp(44)
     db.connection.sendQuery(Queries.DELETE.statement)
 
     log.info("Waiting for binary log event to arrive.")
@@ -73,6 +82,7 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     // expect the row back
     assert(mutation != null)
     assert(mutation.isInstanceOf[DeleteMutation])
+    assert(mutation.timestamp == 44000L)
   }
 
   "A binlog consumer" should "not advance it's binlog position until a transaction is committed" in withDatabase { db ⇒
@@ -82,13 +92,20 @@ class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
     val position1 = consumer.position.get
 
     Await.result(db.connection.sendQuery(Queries.TX.BEGIN), 1.second)
+    sendTimestamp(50L)
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)
 
-    queue.poll(10, TimeUnit.SECONDS)
+    assert(queue.poll(10, TimeUnit.SECONDS) == null)
 
     val position2 = consumer.position.get
 
+    sendTimestamp(51L)
     Await.result(db.connection.sendQuery(Queries.TX.COMMIT), 1.second)
+
+    val insert1 = queue.poll(10, TimeUnit.SECONDS)
+    assert(insert1 != null)
+    assert(insert1.isInstanceOf[InsertMutation])
+    assert(insert1.timestamp == 51000L)
 
     // used to block
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 1.second)

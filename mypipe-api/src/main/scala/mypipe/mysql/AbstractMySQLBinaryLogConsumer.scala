@@ -41,35 +41,38 @@ abstract class AbstractMySQLBinaryLogConsumer
   }
 
   override protected def decodeEvent(event: MEvent): Option[Event] = {
-    event.getHeader[EventHeader].getEventType match {
-      case TABLE_MAP                     ⇒ decodeTableMapEvent(event)
-      case QUERY                         ⇒ decodeQueryEvent(event)
-      case XID                           ⇒ decodeXidEvent(event)
-      case e: EventType if isMutation(e) ⇒ decodeMutationEvent(event)
-      case _                             ⇒ Some(UnknownEvent())
+    val header = event.getHeader[EventHeader]
+    val timestamp = header.getTimestamp
+    header.getEventType match {
+      case TABLE_MAP                     ⇒ decodeTableMapEvent(timestamp, event)
+      case QUERY                         ⇒ decodeQueryEvent(timestamp, event)
+      case XID                           ⇒ decodeXidEvent(timestamp, event)
+      case e: EventType if isMutation(e) ⇒ decodeMutationEvent(timestamp, event)
+      case _                             ⇒ Some(UnknownEvent(timestamp))
     }
   }
 
-  private def decodeTableMapEvent(event: MEvent): Option[TableMapEvent] = {
+  private def decodeTableMapEvent(timestamp: Long, event: MEvent): Option[TableMapEvent] = {
     val tableMapEventData = event.getData[TableMapEventData]
     Some(TableMapEvent(
+      timestamp,
       tableMapEventData.getTableId,
       tableMapEventData.getTable,
       tableMapEventData.getDatabase,
       tableMapEventData.getColumnTypes))
   }
 
-  protected def decodeQueryEvent(event: MEvent): Option[QueryEvent] = {
+  protected def decodeQueryEvent(timestamp: Long, event: MEvent): Option[QueryEvent] = {
     val queryEventData = event.getData[QueryEventData]
     val query = queryEventData.getSql
 
     Some(query.toLowerCase match {
       case q if q.indexOf("begin") == 0 ⇒
-        BeginEvent(queryEventData.getDatabase, queryEventData.getSql)
+        BeginEvent(timestamp, queryEventData.getDatabase, queryEventData.getSql)
       case q if q.indexOf("commit") == 0 ⇒
-        CommitEvent(queryEventData.getDatabase, queryEventData.getSql)
+        CommitEvent(timestamp, queryEventData.getDatabase, queryEventData.getSql)
       case q if q.indexOf("rollback") == 0 ⇒
-        RollbackEvent(queryEventData.getDatabase, queryEventData.getSql)
+        RollbackEvent(timestamp, queryEventData.getDatabase, queryEventData.getSql)
       case q if q.indexOf("alter") == 0 ⇒
         val databaseName = {
           if (queryEventData.getDatabase.nonEmpty) queryEventData.getDatabase
@@ -78,10 +81,10 @@ abstract class AbstractMySQLBinaryLogConsumer
 
         val tableName = decodeTableFromAlter(queryEventData.getSql)
         val table = findTable(databaseName, tableName).getOrElse(new UnknownTable(-1.toLong, name = tableName, db = databaseName))
-        AlterEvent(table, queryEventData.getSql)
+        AlterEvent(timestamp, table, queryEventData.getSql)
       case q ⇒
         log.debug("Consumer {} ignoring unknown query query={}", Array(id, q): _*)
-        UnknownQueryEvent(queryEventData.getDatabase, queryEventData.getSql)
+        UnknownQueryEvent(timestamp, queryEventData.getDatabase, queryEventData.getSql)
     })
   }
 
@@ -106,13 +109,13 @@ abstract class AbstractMySQLBinaryLogConsumer
     else t
   }
 
-  protected def decodeXidEvent(event: MEvent): Option[XidEvent] = {
+  protected def decodeXidEvent(timestamp: Long, event: MEvent): Option[XidEvent] = {
     val eventData = event.getData[XidEventData]
-    Some(XidEvent(eventData.getXid))
+    Some(XidEvent(timestamp, eventData.getXid))
   }
 
-  protected def decodeMutationEvent(event: MEvent): Option[Mutation] = {
-    Some(createMutation(event))
+  protected def decodeMutationEvent(timestamp: Long, event: MEvent): Option[Mutation] = {
+    Some(createMutation(timestamp, event))
   }
 
   override def toString: String = s"$hostname:$port"
@@ -152,25 +155,26 @@ abstract class AbstractMySQLBinaryLogConsumer
       EventType.isWrite(eventType)
   }
 
-  protected def createMutation(event: MEvent): Mutation = event.getHeader[EventHeader].getEventType match {
-    case eventType if EventType.isWrite(eventType) ⇒
-      val evData = event.getData[WriteRowsEventData]()
-      // FIXME: handle table being None
-      val table = findTable(evData.getTableId).get
-      InsertMutation(table, createRows(table, evData.getRows))
+  protected def createMutation(timestamp: Long, event: MEvent): Mutation =
+    event.getHeader[EventHeader].getEventType match {
+      case eventType if EventType.isWrite(eventType) ⇒
+        val evData = event.getData[WriteRowsEventData]()
+        // FIXME: handle table being None
+        val table = findTable(evData.getTableId).get
+        InsertMutation(timestamp, table, createRows(table, evData.getRows))
 
-    case eventType if EventType.isUpdate(eventType) ⇒
-      val evData = event.getData[UpdateRowsEventData]()
-      // FIXME: handle table being None
-      val table = findTable(evData.getTableId).get
-      UpdateMutation(table, createRowsUpdate(table, evData.getRows))
+      case eventType if EventType.isUpdate(eventType) ⇒
+        val evData = event.getData[UpdateRowsEventData]()
+        // FIXME: handle table being None
+        val table = findTable(evData.getTableId).get
+        UpdateMutation(timestamp, table, createRowsUpdate(table, evData.getRows))
 
-    case eventType if EventType.isDelete(eventType) ⇒
-      val evData = event.getData[DeleteRowsEventData]()
-      // FIXME: handle table being None
-      val table = findTable(evData.getTableId).get
-      DeleteMutation(table, createRows(table, evData.getRows))
-  }
+      case eventType if EventType.isDelete(eventType) ⇒
+        val evData = event.getData[DeleteRowsEventData]()
+        // FIXME: handle table being None
+        val table = findTable(evData.getTableId).get
+        DeleteMutation(timestamp, table, createRows(table, evData.getRows))
+    }
 
   protected def createRows(table: Table, evRows: java.util.List[Array[java.io.Serializable]]): List[Row] = {
     evRows.asScala.map(evRow ⇒ {

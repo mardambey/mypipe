@@ -131,11 +131,11 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsum
 
   private def handleCommit(event: CommitEvent): Boolean = {
     log.debug("Handling commit event {}", event)
-    commit() && updateBinaryLogPosition()
+    commit(event.timestamp) && updateBinaryLogPosition()
   }
 
   private def handleXid(event: XidEvent): Boolean = {
-    commit() && updateBinaryLogPosition()
+    commit(event.timestamp) && updateBinaryLogPosition()
   }
 
   private def clearTxState() {
@@ -145,11 +145,11 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsum
     curTxid = None
   }
 
-  private def commit(): Boolean = {
+  private def commit(timestamp: Long): Boolean = {
     if (txQueue.nonEmpty) {
       val success =
         if (groupMutationsByTx) {
-          val mutations = txQueue.toList
+          val mutations = txQueue.toList.map(_.withTimestamp(timestamp))
           processList[BinaryLogConsumerListener[BinaryLogEvent]](
             list = listeners.toList,
             listOp = _.onMutation(this, mutations),
