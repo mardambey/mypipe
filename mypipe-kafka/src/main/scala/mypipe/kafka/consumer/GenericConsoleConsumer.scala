@@ -12,7 +12,7 @@ import ExecutionContext.Implicits.global
 
 class GenericConsoleConsumer(topic: String, zkConnect: String, groupId: String) {
 
-  val timeout = 10 seconds
+  val timeout = 10.seconds
   var future: Option[Future[Unit]] = None
 
   val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
@@ -38,7 +38,7 @@ class GenericConsoleConsumer(topic: String, zkConnect: String, groupId: String) 
 
     protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
     override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
-    private def byteArray2Short(data: Array[Byte], offset: Int) = (((data(offset) << 8)) | ((data(offset + 1) & 0xff))).toShort
+    private def byteArray2Short(data: Array[Byte], offset: Int) = (data(offset) << 8 | data(offset + 1) & 0xff).toShort
 
     override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.genericSubject(Mutation.byteToString(byte))
   }
@@ -49,7 +49,7 @@ class GenericConsoleConsumer(topic: String, zkConnect: String, groupId: String) 
 
   def stop(): Unit = {
 
-    kafkaConsumer.stop
-    future.map(Await.result(_, timeout))
+    kafkaConsumer.stop()
+    future.foreach(Await.result(_, timeout))
   }
 }

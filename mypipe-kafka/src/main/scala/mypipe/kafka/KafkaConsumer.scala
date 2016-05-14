@@ -1,10 +1,18 @@
 package mypipe.kafka
 
 import org.slf4j.LoggerFactory
+
 import scala.concurrent._
 import ExecutionContext.Implicits.global
-import kafka.consumer.{ ConsumerConfig, Consumer ⇒ KConsumer, ConsumerConnector }
+import kafka.consumer.{ ConsumerConfig, ConsumerConnector, Consumer ⇒ KConsumer }
 import java.util.Properties
+
+import kafka.serializer._
+import mypipe.api.event.Mutation
+import mypipe.avro._
+import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
+import org.apache.avro.Schema
+
 import scala.annotation.tailrec
 
 /** Abstract class that consumes messages for the given topic from
@@ -16,20 +24,20 @@ import scala.annotation.tailrec
  *  @param zkConnect containing the kafka brokers
  *  @param groupId used to identify the consumer
  */
-abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) {
+abstract class KafkaConsumer[T](topic: String, zkConnect: String, groupId: String, valueDecoder: Decoder[T]) {
 
   protected val log = LoggerFactory.getLogger(getClass.getName)
   protected var future: Future[Unit] = _
   @volatile protected var loop = true
-  val iterator = new KafkaIterator(topic, zkConnect, groupId)
+  val iterator = new KafkaIterator(topic, zkConnect, groupId, valueDecoder)
 
   /** Called every time a new message is pulled from
    *  the Kafka topic.
    *
-   *  @param bytes the message
+   *  @param data the data
    *  @return true to continue reading messages, false to stop
    */
-  def onEvent(bytes: Array[Byte]): Boolean
+  def onEvent(data: T): Boolean
 
   @tailrec private def consume(): Unit = {
     val message = iterator.next()
@@ -51,24 +59,72 @@ abstract class KafkaConsumer(topic: String, zkConnect: String, groupId: String) 
     future = Future {
       try {
         consume()
-        stop
+        stop()
       } catch {
-        case e: Exception ⇒ stop
+        case e: Exception ⇒ stop()
       }
     }
 
     future
   }
 
-  def stop {
+  def stop() {
     loop = false
     iterator.stop()
   }
 }
 
-class KafkaIterator(topic: String, zkConnect: String, groupId: String) {
+case class KafkaGenericAvroDecoder() extends Decoder[Mutation] {
+
+  protected val logger = LoggerFactory.getLogger(getClass.getName)
+
+  protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
+  protected def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
+  protected def byteArray2Short(data: Array[Byte], offset: Int) = (data(offset) << 8 | data(offset + 1) & 0xff).toShort
+  protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.genericSubject(Mutation.byteToString(byte))
+  protected val schemaIdSizeInBytes = 2
+  protected val headerLength = PROTO_HEADER_LEN_V0 + schemaIdSizeInBytes
+
+  lazy val insertDeserializer = new AvroVersionedRecordDeserializer[InsertMutation]()
+  lazy val updateDeserializer = new AvroVersionedRecordDeserializer[UpdateMutation]()
+  lazy val deleteDeserializer = new AvroVersionedRecordDeserializer[DeleteMutation]()
+
+  override def fromBytes(bytes: Array[Byte]): Mutation = {
+    val magicByte = bytes(0)
+
+    if (magicByte != PROTO_MAGIC_V0) {
+      logger.error(s"We have encountered an unknown magic byte! Magic Byte: $magicByte")
+      null
+    } else {
+      val mutationType = bytes(1)
+      val schemaId = bytesToSchemaId(bytes, PROTO_HEADER_LEN_V0)
+
+      mutationType match {
+        case Mutation.InsertByte ⇒ schemaRepoClient
+          .getSchema(avroSchemaSubjectForMutationByte(Mutation.InsertByte), schemaId)
+          .flatMap(insertDeserializer.deserialize(_, bytes, headerLength))
+          .getOrElse(null)
+          .asInstanceOf[Mutation]
+
+        case Mutation.UpdateByte ⇒ schemaRepoClient
+          .getSchema(avroSchemaSubjectForMutationByte(Mutation.UpdateByte), schemaId)
+          .flatMap(updateDeserializer.deserialize(_, bytes, headerLength))
+          .getOrElse(null)
+          .asInstanceOf[Mutation]
+
+        case Mutation.DeleteByte ⇒ schemaRepoClient
+          .getSchema(avroSchemaSubjectForMutationByte(Mutation.DeleteByte), schemaId)
+          .flatMap(deleteDeserializer.deserialize(_, bytes, headerLength))
+          .getOrElse(null)
+          .asInstanceOf[Mutation]
+      }
+    }
+  }
+}
+
+class KafkaIterator[T](topic: String, zkConnect: String, groupId: String, valueDecoder: Decoder[T]) {
   protected val consumerConnector = createConsumerConnector(zkConnect, groupId)
-  protected val mapStreams = consumerConnector.createMessageStreams(Map(topic -> 1))
+  protected val mapStreams = consumerConnector.createMessageStreams(Map(topic -> 1), keyDecoder = new DefaultDecoder(), valueDecoder = valueDecoder)
   protected val stream = mapStreams.get(topic).get.head
   protected val consumerIterator = stream.iterator()
 
@@ -82,6 +138,7 @@ class KafkaIterator(topic: String, zkConnect: String, groupId: String) {
     KConsumer.create(new ConsumerConfig(props))
   }
 
-  def next(): Option[Array[Byte]] = Option(consumerIterator.next()).map(_.message())
+  // TODO: this can't be a mutation, it might have to be a specificrecord
+  def next(): Option[T] = Option(consumerIterator.next()).map(_.message())
   def stop(): Unit = consumerConnector.shutdown()
 }
