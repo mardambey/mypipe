@@ -3,17 +3,17 @@ package mypipe.producer
 import java.nio.ByteBuffer
 
 import mypipe.api.data.Row
-import mypipe.api.event.{ UpdateMutation, SingleValuedMutation, Serializer, Mutation }
+import mypipe.api.event.{ Mutation, Serializer, SingleValuedMutation, UpdateMutation }
 import mypipe.api.producer.Producer
 import mypipe.avro.Guid
-import mypipe.kafka.KafkaProducer
 import com.typesafe.config.Config
 import mypipe.avro.schema.GenericSchemaRepository
 import org.apache.avro.specific.SpecificRecord
 import org.apache.avro.Schema
-import org.apache.avro.generic.{ GenericRecord, GenericDatumWriter, GenericData }
+import org.apache.avro.generic.{ GenericData, GenericDatumWriter, GenericRecord }
 import org.apache.avro.io.EncoderFactory
 import java.io.ByteArrayOutputStream
+
 import mypipe.kafka.PROTO_MAGIC_V0
 import org.slf4j.LoggerFactory
 

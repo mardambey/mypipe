@@ -3,11 +3,11 @@ package mypipe.kafka
 import com.typesafe.config.ConfigFactory
 import mypipe._
 import mypipe.api.Conf
-
 import mypipe.api.event.Mutation
 import mypipe.api.repo.FileBasedBinaryLogPositionRepository
 import mypipe.avro.{ AvroVersionedRecordDeserializer, InMemorySchemaRepo }
-import mypipe.avro.schema.{ AvroSchemaUtils, ShortSchemaId, AvroSchema, GenericSchemaRepository }
+import mypipe.avro.schema.{ AvroSchema, AvroSchemaUtils, GenericSchemaRepository, ShortSchemaId }
+import mypipe.kafka.consumer.{ KafkaMutationAvroConsumer, KafkaSpecificAvroDecoder }
 import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
 import mypipe.producer.KafkaMutationSpecificAvroProducer
@@ -17,7 +17,6 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{ Await, Future }
-
 import scala.reflect.runtime.universe._
 
 class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
@@ -61,11 +60,11 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
     val LOGIN_COUNT = 5
     val zkConnect = conf.getString("mypipe.test.kafka-specific-producer.zk-connect")
 
-    val kafkaConsumer = new KafkaMutationAvroConsumer[mypipe.kafka.UserInsert, mypipe.kafka.UserUpdate, mypipe.kafka.UserDelete, Short](
+    val kafkaConsumer = new KafkaMutationAvroConsumer[mypipe.kafka.UserInsert, mypipe.kafka.UserUpdate, mypipe.kafka.UserDelete](
       topic = KafkaUtil.specificTopic(DATABASE, TABLE),
       zkConnect = zkConnect,
       groupId = s"${DATABASE}_${TABLE}_specific_test-${System.currentTimeMillis()}",
-      schemaIdSizeInBytes = 2)(
+      valueDecoder = KafkaSpecificAvroDecoder[mypipe.kafka.UserInsert, mypipe.kafka.UserUpdate, mypipe.kafka.UserDelete](DATABASE, TABLE, TestSchemaRepo))(
 
       insertCallback = { insertMutation ⇒
         log.debug("consumed insert mutation: " + insertMutation)
@@ -117,19 +116,7 @@ class KafkaSpecificSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 
       implicitly[TypeTag[UserInsert]],
       implicitly[TypeTag[UserUpdate]],
-      implicitly[TypeTag[UserDelete]]) {
-
-      protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = TestSchemaRepo
-
-      override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
-      private def byteArray2Short(data: Array[Byte], offset: Int) = ((data(offset) << 8) | (data(offset + 1) & 0xff)).toShort
-
-      override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.byteToString(byte))
-
-      override val insertDeserializer: AvroVersionedRecordDeserializer[UserInsert] = new AvroVersionedRecordDeserializer[UserInsert]()
-      override val updateDeserializer: AvroVersionedRecordDeserializer[UserUpdate] = new AvroVersionedRecordDeserializer[UserUpdate]()
-      override val deleteDeserializer: AvroVersionedRecordDeserializer[UserDelete] = new AvroVersionedRecordDeserializer[UserDelete]()
-    }
+      implicitly[TypeTag[UserDelete]])
 
     val future = kafkaConsumer.start
 

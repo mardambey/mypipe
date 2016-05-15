@@ -9,7 +9,7 @@
 
   <logger name="mypipe" level="info"/>
 
-  <root level="warn">
+  <root level="info">
     <appender-ref ref="STDOUT" />
   </root>
 </configuration>

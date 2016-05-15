@@ -144,6 +144,54 @@
   {
     "namespace": "mypipe.kafka",
     "type": "record",
+    "name": "UserDelete2",
+    "fields": [
+  	    {
+  			"name": "database",
+  			"type": "string"
+  		},
+  		{
+  			"name": "table",
+  			"type": "string"
+  		},
+  		{
+  			"name": "tableId",
+  			"type": "int"
+  		},
+  		{
+    	    "name": "txid",
+            "type": ["null", "mypipe.avro.Guid"],
+            "default": "null"
+    	},
+  		{
+  			"name": "id",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "username",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "password",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "login_count",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "bio",
+  			"type": ["bytes", "null"]
+  		},
+  		{
+  			"name": "email",
+  			"type": ["string", "null"]
+  		}
+  	]
+  },
+  {
+    "namespace": "mypipe.kafka",
+    "type": "record",
     "name": "UserUpdate",
     "fields": [
   	  {
@@ -202,6 +250,78 @@
   		{
   			"name": "new_bio",
   			"type": ["bytes", "null"]
+  		}
+  	]
+  },
+  {
+    "namespace": "mypipe.kafka",
+    "type": "record",
+    "name": "UserUpdate2",
+    "fields": [
+  	  {
+  			"name": "database",
+  			"type": "string"
+  		},
+  		{
+  			"name": "table",
+  			"type": "string"
+  		},
+  		{
+  			"name": "tableId",
+  			"type": "int"
+  		},
+  		{
+    	    "name": "txid",
+            "type": ["null", "mypipe.avro.Guid"],
+            "default": "null"
+    	},
+  		{
+  			"name": "old_id",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "old_username",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "old_password",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "old_login_count",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "old_bio",
+  			"type": ["bytes", "null"]
+  		},
+  		{
+  			"name": "old_email",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "new_id",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "new_username",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "new_password",
+  			"type": ["string", "null"]
+  		},
+  		{
+  			"name": "new_login_count",
+  			"type": ["int", "null"]
+  		},
+  		{
+  			"name": "new_bio",
+  			"type": ["bytes", "null"]
+  		},
+  		{
+  			"name": "new_email",
+  			"type": ["string", "null"]
   		}
   	]
   }

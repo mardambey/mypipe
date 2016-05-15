@@ -9,13 +9,15 @@ import mypipe.pipe.Pipe
 import scala.concurrent.duration._
 import mypipe._
 import mypipe.producer.KafkaMutationGenericAvroProducer
-import scala.concurrent.{ Future, Await }
+
+import scala.concurrent.{ Await, Future }
 import mypipe.mysql.MySQLBinaryLogConsumer
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 import org.apache.avro.util.Utf8
 import mypipe.avro.GenericInMemorySchemaRepo
 import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
+import mypipe.kafka.consumer.KafkaGenericMutationAvroConsumer
 import org.apache.avro.Schema
 
 class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
@@ -52,11 +54,10 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     val username = new Utf8("username")
     val zkConnect = conf.getString("mypipe.test.kafka-generic-producer.zk-connect")
 
-    val kafkaConsumer = new KafkaGenericMutationAvroConsumer[Short](
+    val kafkaConsumer = new KafkaGenericMutationAvroConsumer(
       topic = KafkaUtil.genericTopic(Queries.DATABASE.name, Queries.TABLE.name),
       zkConnect = zkConnect,
-      groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}",
-      schemaIdSizeInBytes = 2)(
+      groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}")(
 
       insertCallback = { insertMutation ⇒
         log.debug("consumed insert mutation: " + insertMutation)
@@ -98,21 +99,14 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
         done = true
         true
 
-      }) {
-
-      protected val schemaRepoClient: GenericSchemaRepository[Short, Schema] = GenericInMemorySchemaRepo
-      override def bytesToSchemaId(bytes: Array[Byte], offset: Int): Short = byteArray2Short(bytes, offset)
-      private def byteArray2Short(data: Array[Byte], offset: Int) = ((data(offset) << 8) | (data(offset + 1) & 0xff)).toShort
-
-      override protected def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.genericSubject(Mutation.byteToString(byte))
-    }
+      })
 
     val future = kafkaConsumer.start
 
     Await.result(db.connection.sendQuery(Queries.INSERT.statement), 2.seconds)
     Await.result(db.connection.sendQuery(Queries.UPDATE.statement), 2.seconds)
     Await.result(db.connection.sendQuery(Queries.DELETE.statement), 2.seconds)
-    Await.result(Future { while (!done) Thread.sleep(100) }, 20.seconds)
+    Await.result(Future { while (!done) Thread.sleep(10) }, 20.seconds)
 
     try {
       kafkaConsumer.stop

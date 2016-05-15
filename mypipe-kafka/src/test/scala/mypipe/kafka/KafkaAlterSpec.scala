@@ -4,18 +4,17 @@ import com.typesafe.config.ConfigFactory
 import mypipe.Queries
 import mypipe._
 import mypipe.api.Conf
-
 import mypipe.api.event.Mutation
 import mypipe.api.repo.FileBasedBinaryLogPositionRepository
-import mypipe.avro.AvroVersionedRecordDeserializer
 import mypipe.avro.schema.AvroSchemaUtils
+import mypipe.kafka.consumer.{ KafkaIterator, KafkaSpecificAvroDecoder }
 import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
 import mypipe.producer.KafkaMutationSpecificAvroProducer
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.concurrent.Await
 
 class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
@@ -62,39 +61,33 @@ class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     val zkConnect = conf.getString("mypipe.test.kafka-specific-producer.zk-connect")
     val topic = KafkaUtil.specificTopic(DATABASE, TABLE)
     val groupId = s"${DATABASE}_${TABLE}_specific_test-${System.currentTimeMillis()}"
-    val iter = new KafkaIterator(topic, zkConnect, groupId)
-
-      def byteArray2Short(data: Array[Byte], offset: Int) = ((data(offset) << 8) | (data(offset + 1) & 0xff)).toShort
-      def avroSchemaSubjectForMutationByte(byte: Byte): String = AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.byteToString(byte))
+    var iter = new KafkaIterator(topic, zkConnect, groupId, valueDecoder = KafkaSpecificAvroDecoder[mypipe.kafka.UserInsert, mypipe.kafka.UserUpdate, mypipe.kafka.UserDelete](DATABASE, TABLE, TestSchemaRepo))
 
     // insert into user
     Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT)), 2.seconds)
-    // consume event from kafka
+
+    // consume event from kafka and close the consumer
     iter.next()
+    iter.stop()
+
     // add new schema to repo
-    val newSchemaId = TestSchemaRepo.registerSchema(
-      AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.InsertString),
-      new UserInsert2().getSchema)
+    val newSchemaId = TestSchemaRepo.registerSchema(AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.InsertString), new UserInsert2().getSchema)
+
+    // recreate the iterator with the new schema added to the repo and the proper types reflecting added column
+    iter = new KafkaIterator(topic, zkConnect, groupId, valueDecoder = KafkaSpecificAvroDecoder[mypipe.kafka.UserInsert2, mypipe.kafka.UserUpdate2, mypipe.kafka.UserDelete2](DATABASE, TABLE, TestSchemaRepo))
+
     // alter user
     Await.result(db.connection.sendQuery(Queries.ALTER.statementAdd), 2.seconds)
+
     // insert into user with new field
     Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT, email = Some("test@test.com"))), 2.seconds)
+
     // consume event with new field from kafka
-    val bytes = iter.next().get
+    val insert = iter.next().get.asInstanceOf[UserInsert2]
 
-    val magicByte = bytes(0)
-
-    if (magicByte != PROTO_MAGIC_V0) {
-      log.error(s"We have encountered an unknown magic byte! Magic Byte: $magicByte")
-      assert(false)
-    } else {
-      val schemaId = byteArray2Short(bytes, PROTO_HEADER_LEN_V0)
-      val schema = TestSchemaRepo
-        .getSchema(avroSchemaSubjectForMutationByte(Mutation.InsertByte), schemaId)
-      val data = new AvroVersionedRecordDeserializer[UserInsert2]().deserialize(schema.get, bytes, headerLength)
-      assert(data.get.getEmail.toString.equals("test@test.com"))
-    }
+    assert(insert.getEmail.toString.equals("test@test.com"))
 
     iter.stop()
   }
 }
+

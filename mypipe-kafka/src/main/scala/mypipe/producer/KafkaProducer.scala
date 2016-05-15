@@ -1,12 +1,11 @@
-package mypipe.kafka
+package mypipe.producer
 
-import kafka.producer.{ Producer ⇒ KProducer, ProducerConfig }
-
-import java.util.Properties
-import kafka.producer.KeyedMessage
-import java.util.concurrent.LinkedBlockingQueue
 import java.util
+import java.util.Properties
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.logging.Logger
+
+import kafka.producer.{ KeyedMessage, ProducerConfig, Producer ⇒ KProducer }
 
 class KafkaProducer[MessageType](metadataBrokers: String) {
 
