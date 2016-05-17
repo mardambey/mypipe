@@ -6,7 +6,7 @@ import mypipe.api.event.{ Mutation, InsertMutation }
 import mypipe.mysql._
 import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration._
-import mypipe.producer.QueueProducer
+import mypipe.kafka.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import akka.actor.ActorDSL._
 import akka.pattern.ask

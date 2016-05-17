@@ -1,4 +1,4 @@
-package mypipe.producer
+package mypipe.kafka.producer
 
 import java.util
 import mypipe.api.event.{ AlterEvent, Mutation }

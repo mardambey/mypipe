@@ -8,7 +8,7 @@ import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import mypipe.producer.QueueProducer
+import mypipe.kafka.producer.QueueProducer
 import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
 import org.slf4j.LoggerFactory
 

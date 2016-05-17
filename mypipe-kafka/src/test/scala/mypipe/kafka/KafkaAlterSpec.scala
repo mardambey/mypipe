@@ -10,7 +10,7 @@ import mypipe.avro.schema.AvroSchemaUtils
 import mypipe.kafka.consumer.{ KafkaIterator, KafkaSpecificAvroDecoder }
 import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
-import mypipe.producer.KafkaMutationSpecificAvroProducer
+import mypipe.kafka.producer.KafkaMutationSpecificAvroProducer
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 

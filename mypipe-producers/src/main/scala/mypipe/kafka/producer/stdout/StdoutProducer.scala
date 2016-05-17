@@ -1,4 +1,4 @@
-package mypipe.producer.stdout
+package mypipe.kafka.producer.stdout
 
 import mypipe.api.event._
 import mypipe.api.data.ColumnType.ColumnValueString

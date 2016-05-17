@@ -1,4 +1,4 @@
-package mypipe.producer
+package mypipe.kafka.producer
 
 import java.nio.ByteBuffer
 
@@ -29,11 +29,9 @@ object KafkaMutationGenericAvroProducer {
  *
  *  @param config configuration must have "metadata-brokers"
  */
-class KafkaMutationGenericAvroProducer(config: Config)
-    extends KafkaMutationAvroProducer[Short](config) {
+class KafkaMutationGenericAvroProducer(config: Config) extends KafkaMutationAvroProducer[Short](config) {
 
   override protected val schemaRepoClient = GenericInMemorySchemaRepo
-  override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
 
   override def handleAlter(event: AlterEvent): Boolean = {
     // no special support for alters needed, "generic" schema

@@ -1,4 +1,4 @@
-package mypipe.producer
+package mypipe.kafka.producer
 
 import java.nio.ByteBuffer
 
@@ -19,8 +19,6 @@ class KafkaMutationSpecificAvroProducer(config: Config)
   override protected val schemaRepoClient = Class.forName(schemaRepoClientClassName + "$")
     .getField("MODULE$").get(null)
     .asInstanceOf[GenericSchemaRepository[Short, Schema]]
-
-  override protected val serializer = new AvroVersionedRecordSerializer[InputRecord](schemaRepoClient)
 
   override def handleAlter(event: AlterEvent): Boolean = {
     // FIXME: if the table is not in the cache already, by it's ID, this will fail

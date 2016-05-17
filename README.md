@@ -127,7 +127,7 @@ all added to a single topic with mutation ordering guarantees.
 If you are running an Avro schema repository you can encode binary log events based on 
 the structures specified in that repository for the incoming database / table streams. 
 
-In order to configure a specific producer you should add a `pipe` using a `mypipe.producer.KafkaMutationSpecificAvroProducer` 
+In order to configure a specific producer you should add a `pipe` using a `mypipe.kafka.producer.KafkaMutationSpecificAvroProducer`
 as it's producer. The producer needs some configuration values in order to find the Kafka brokers, 
 ZooKeeper ensemble, and the Avro schema repository. Here is a sample configuration:
 
@@ -306,7 +306,7 @@ do so:
 
     producers {
       stdout {
-         class = "mypipe.producer.stdout.StdoutProducer"
+         class = "mypipe.kafka.producer.stdout.StdoutProducer"
       }
     }
 
@@ -348,7 +348,7 @@ This is similar to the `stdout` producer added earlier.
 
     producers {
         kafka-generic {
-            class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+            class = "mypipe.kafka.producer.KafkaMutationGenericAvroProducer"
         }
     }
 
@@ -458,11 +458,11 @@ The database must also have binary logging enabled in `row` format.
       producers {
     
         stdout {
-          class = "mypipe.producer.stdout.StdoutProducer"
+          class = "mypipe.kafka.producer.stdout.StdoutProducer"
         }
     
         kafka-generic {
-          class = "mypipe.producer.KafkaMutationGenericAvroProducer"
+          class = "mypipe.kafka.producer.KafkaMutationGenericAvroProducer"
         }
       }
     

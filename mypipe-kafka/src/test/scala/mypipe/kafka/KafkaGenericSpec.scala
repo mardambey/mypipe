@@ -8,7 +8,7 @@ import mypipe.pipe.Pipe
 
 import scala.concurrent.duration._
 import mypipe._
-import mypipe.producer.KafkaMutationGenericAvroProducer
+import mypipe.kafka.producer.KafkaMutationGenericAvroProducer
 
 import scala.concurrent.{ Await, Future }
 import mypipe.mysql.MySQLBinaryLogConsumer

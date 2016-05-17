@@ -1,4 +1,4 @@
-package mypipe.producer
+package mypipe.kafka.producer
 
 import java.nio.ByteBuffer
 
@@ -29,11 +29,9 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
   type OutputType = Array[Byte]
 
   protected val schemaRepoClient: GenericSchemaRepository[SchemaId, Schema]
-  protected val serializer: Serializer[InputRecord, OutputType]
 
   protected val metadataBrokers = config.getString("metadata-brokers")
-  protected val producer = new KafkaProducer[OutputType](metadataBrokers)
-
+  protected val producer = new KafkaProducer[GenericData.Record](metadataBrokers)
   protected val logger = LoggerFactory.getLogger(getClass)
   protected val encoderFactory = EncoderFactory.get()
 
@@ -114,12 +112,11 @@ abstract class KafkaMutationAvroProducer[SchemaId](config: Config)
             case (record, row) ⇒
               val bytes = serialize(record, schema.get, schemaId.get, mutationType)
               val pKeyStr = SingleValuedMutation.primaryKeyAsString(mut, row)
-              producer.queue(getKafkaTopic(input), pKeyStr.getOrElse("").getBytes("utf-8"), bytes)
+              producer.queue(getKafkaTopic(input), pKeyStr.getOrElse("").getBytes("utf-8"), record)
           }
         } else {
           records foreach { record ⇒
-            val bytes = serialize(record, schema.get, schemaId.get, mutationType)
-            producer.queue(getKafkaTopic(input), bytes)
+            producer.queue(getKafkaTopic(input), record)
           }
         }
 
