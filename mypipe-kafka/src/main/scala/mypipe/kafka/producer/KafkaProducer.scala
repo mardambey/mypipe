@@ -5,34 +5,42 @@ import java.util.Properties
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.logging.Logger
 
-import kafka.producer.{ KeyedMessage, ProducerConfig, Producer ⇒ KProducer }
+import org.apache.kafka.common.serialization.{ByteArraySerializer, Serializer}
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.clients.producer.{ProducerRecord, KafkaProducer => KProducer}
+import KafkaMutationAvroProducer.MessageType
 
-class KafkaProducer[MessageType](metadataBrokers: String) {
+import scala.collection.JavaConverters._
+
+class KafkaProducer[T <: Serializer[MessageType]](metadataBrokers: String, serializerClass: Class[T], producerProperties: Map[AnyRef, AnyRef] = Map.empty) {
 
   type KeyType = Array[Byte]
 
   val log = Logger.getLogger(getClass.getName)
+
   val properties = new Properties()
-  properties.put("request.required.acks", "1")
-  properties.put("metadata.broker.list", metadataBrokers)
+  properties.put(ProducerConfig.ACKS_CONFIG, "1")
+  properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, metadataBrokers)
+  properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[ByteArraySerializer].getName)
+  properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, serializerClass.getName)
+  properties.putAll(producerProperties.asJava)
 
-  val conf = new ProducerConfig(properties)
-  val producer = new KProducer[Array[Byte], Array[Byte]](conf)
-  val queue = new LinkedBlockingQueue[KeyedMessage[KeyType, MessageType]]()
+  val producer = new KProducer[KeyType, MessageType](properties)
+  val queue = new LinkedBlockingQueue[ProducerRecord[KeyType, MessageType]]()
 
-  def queue(topic: String, bytes: MessageType) {
-    queue.add(new KeyedMessage[KeyType, MessageType](topic, bytes))
+  def queue(topic: String, message: MessageType) {
+    queue.add(new ProducerRecord[KeyType, MessageType](topic, message))
   }
 
-  def queue(topic: String, messageKey: Array[Byte], bytes: MessageType) {
-    queue.add(new KeyedMessage[KeyType, MessageType](topic, messageKey, bytes))
+  def queue(topic: String, messageKey: Array[Byte], message: MessageType) {
+    queue.add(new ProducerRecord[KeyType, MessageType](topic, messageKey, message))
   }
 
   def flush: Boolean = {
-    val s = new util.ArrayList[KeyedMessage[KeyType, MessageType]]
+    val s = new util.ArrayList[ProducerRecord[KeyType, MessageType]]
     queue.drainTo(s)
-    val a = s.toArray[KeyedMessage[Array[Byte], Array[Byte]]](Array[KeyedMessage[Array[Byte], Array[Byte]]]())
-    producer.send(a: _*)
+    val a = s.toArray[ProducerRecord[KeyType, MessageType]](Array[ProducerRecord[KeyType, MessageType]]())
+    a foreach producer.send
     true
   }
 }

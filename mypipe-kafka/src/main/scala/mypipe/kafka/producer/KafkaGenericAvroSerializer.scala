@@ -1,68 +1,44 @@
 package mypipe.kafka.producer
 
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
-import java.util
+import java.lang.{ Long ⇒ JLong }
+import java.util.{ HashMap ⇒ JMap }
 
-import mypipe.api.data.Row
-import mypipe.api.event.{ Mutation, SingleValuedMutation, UpdateMutation }
-import mypipe.avro.Guid
-import mypipe.avro.schema.GenericSchemaRepository
+import mypipe.api.data.{ Column, ColumnType, Row }
+import mypipe.api.event.Mutation
+import mypipe.avro.GenericInMemorySchemaRepo
+import mypipe.avro.schema.AvroSchemaUtils
 import org.apache.avro.Schema
-import org.apache.avro.generic.{ GenericData, GenericDatumWriter, GenericRecord }
-import org.apache.avro.io.EncoderFactory
-import org.apache.kafka.common.serialization.Serializer
-import org.slf4j.LoggerFactory
-import mypipe.kafka.PROTO_MAGIC_V0
+import org.apache.avro.generic.GenericData
+import mypipe.kafka.KafkaUtil
 
-abstract class KafkaGenericAvroSerializer() extends Serializer[(Mutation, Either[Row, (Row, Row)])] {
+/** An implementation of the base KafkaAvroSerializer that uses a
+ *  GenericInMemorySchemaRepo in order to encode mutations as Avro beans.
+ *  Three beans are encoded:
+ *  InsertMutation
+ *  UpdateMutation
+ *  DeleteMutation
+ *
+ *  The Kafka topic names are calculated as:
+ *  dbName_tableName_(insert|update|delete)
+ *
+ */
+class KafkaGenericAvroSerializer extends KafkaAvroSerializer {
 
-  protected val logger = LoggerFactory.getLogger(getClass)
+  //override protected val schemaRepoClient = GenericInMemorySchemaRepo
 
-  override def configure(configs: util.Map[String, _], isKey: Boolean): Unit = {
+  //override def handleAlter(event: AlterEvent): Boolean = {
+  //  // no special support for alters needed, "generic" schema
+  //  true
+  //}
 
-  }
-
-  override def serialize(topic: String, mutationAndRecord: (Mutation, Either[Row, (Row, Row)])): Array[Byte] = {
-    try {
-      val mutation = mutationAndRecord._1
-      val rowOrTupleRows = mutationAndRecord._2
-
-      val schemaTopic = avroSchemaSubject(mutation)
-      val mutationType = magicByte(mutation)
-      val schema = schemaRepoClient.getLatestSchema(schemaTopic)
-
-      if (schema.isDefined) {
-
-        val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema.get)
-        val record = avroRecord(mutation, rowOrTupleRows, schema.get)
-
-        serialize(record, schema.get, schemaId.get, mutationType)
-
-      } else {
-        logger.error(s"Could not find schema for schemaTopic: $schemaTopic and mutation: $mutation")
-        Array.empty
-      }
-    } catch {
-      case e: Exception ⇒
-        logger.error(s"failed to queue: ${e.getMessage}\n${e.getStackTraceString}")
-        Array.empty
-    }
-  }
-
-  override def close(): Unit = {
-
-  }
-
-  protected val schemaRepoClient: GenericSchemaRepository[Short, Schema]
-
-  /** Given a mutation, returns the "subject" that this mutation's
-   *  Schema is registered under in the Avro schema repository.
+  /** Given a schema ID of type SchemaId, converts it to a byte array.
    *
-   *  @param mutation mutation
+   *  @param s schema id
    *  @return
    */
-  protected def avroSchemaSubject(mutation: Mutation): String
+  override protected def schemaIdToByteArray(s: Short) =
+    Array[Byte](((s & 0xFF00) >> 8).toByte, (s & 0x00FF).toByte)
 
   /** Builds the Kafka topic using the mutation's database, table name, and
    *  the mutation type (insert, update, delete) concatenating them with "_"
@@ -71,98 +47,71 @@ abstract class KafkaGenericAvroSerializer() extends Serializer[(Mutation, Either
    *  @param mutation mutation
    *  @return the topic name
    */
-  protected def getKafkaTopic(mutation: Mutation): String
+  override protected def getKafkaTopic(mutation: Mutation): String =
+    KafkaUtil.genericTopic(mutation)
 
-  /** Given a schema ID of type SchemaId, converts it to a byte array.
+  /** Given a mutation, returns the "subject" that this mutation's
+   *  Schema is registered under in the Avro schema repository.
    *
-   *  @param schemaId schema id
+   *  @param mutation mutation to get subject for
    *  @return
    */
-  protected def schemaIdToByteArray(schemaId: Short): Array[Byte]
+  override protected def avroSchemaSubject(mutation: Mutation): String =
+    AvroSchemaUtils.genericSubject(mutation)
 
-  /** Given a mutation, returns a magic byte that can be associated
-   *  with the mutation's type (for example: insert, update, delete).
-   *
-   *  @param mutation mutation
-   *  @return magic byte
-   */
-  protected def magicByte(mutation: Mutation): Byte = Mutation.getMagicByte(mutation)
-
-  /** Adds a header into the given Record based on the Mutation's
-   *  database, table, and tableId.
-   *
-   *  @param record Avro generic record
-   *  @param mutation mutation
-   */
-  protected def addHeader(record: GenericData.Record, mutation: Mutation) {
-    record.put("database", mutation.table.db)
-    record.put("table", mutation.table.name)
-    record.put("tableId", mutation.table.id)
-
-    // TODO: avoid null check
-    if (mutation.txid != null && record.getSchema.getField("txid") != null) {
-      val uuidBytes = ByteBuffer.wrap(new Array[Byte](16))
-      uuidBytes.putLong(mutation.txid.getMostSignificantBits)
-      uuidBytes.putLong(mutation.txid.getLeastSignificantBits)
-      record.put("txid", new GenericData.Fixed(Guid.getClassSchema, uuidBytes.array))
-    }
+  override protected def body(record: GenericData.Record, row: Row, schema: Schema)(implicit keyOp: String ⇒ String = s ⇒ s) {
+    val (byteArrays, integers, strings, longs) = columnsToMaps(row.columns)
+    record.put(keyOp("bytes"), byteArrays)
+    record.put(keyOp("integers"), integers)
+    record.put(keyOp("strings"), strings)
+    record.put(keyOp("longs"), longs)
   }
 
-  protected def body(record: GenericData.Record, row: Row, schema: Schema)(implicit keyOp: String ⇒ String = s ⇒ s)
+  private def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, ByteBuffer], JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {
 
-  protected def insertOrDeleteMutationToAvro(mutation: SingleValuedMutation, row: Row, schema: Schema): GenericData.Record = {
-    val record = new GenericData.Record(schema)
-    addHeader(record, mutation)
-    body(record, row, schema)
-    record
-  }
+    val cols = columns.values.groupBy(_.metadata.colType)
 
-  protected def updateMutationToAvro(mutation: UpdateMutation, row: (Row, Row), schema: Schema): GenericData.Record = {
-    val record = new GenericData.Record(schema)
-    addHeader(record, mutation)
-    body(record, row._1, schema) { s ⇒ "old_" + s }
-    body(record, row._2, schema) { s ⇒ "new_" + s }
-    record
-  }
+    // ugliness follows... we'll clean it up some day.
+    val byteArrays = new java.util.HashMap[CharSequence, ByteBuffer]()
+    val integers = new java.util.HashMap[CharSequence, Integer]()
+    val strings = new java.util.HashMap[CharSequence, CharSequence]()
+    val longs = new java.util.HashMap[CharSequence, java.lang.Long]()
 
-  /** Given a Mutation, this method must convert it into a(n) Avro record(s)
-   *  for the given Avro schema.
-   *
-   *  @param mutation mutation
-   *  @param schema Avro schema
-   *  @return the Avro generic record(s)
-   */
-  private def avroRecord(mutation: Mutation, row: Either[Row, (Row, Row)], schema: Schema): GenericData.Record = {
+    cols.foreach({
 
-    Mutation.getMagicByte(mutation) match {
-      case Mutation.InsertByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], row.left.get, schema)
-      case Mutation.DeleteByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], row.left.get, schema)
-      case Mutation.UpdateByte ⇒ updateMutationToAvro(mutation.asInstanceOf[UpdateMutation], row.right.get, schema)
-      case _ ⇒
-        logger.error(s"Unexpected mutation type ${mutation.getClass} encountered; retuning empty Avro GenericData.Record(schema=$schema")
-        new GenericData.Record(schema)
-    }
-  }
+      case (ColumnType.INT24, colz) ⇒
+        colz.foreach(c ⇒ {
+          val v = c.valueOption[Int]
+          if (v.isDefined) integers.put(c.metadata.name, v.get)
+        })
 
-  /** Given an Avro generic record, schema, and schemaId, serialize
-   *  them into an array of bytes.
-   *
-   *  @param record Avro generic record
-   *  @param schema Avro schema
-   *  @param schemaId schema id
-   *  @return
-   */
-  private def serialize(record: GenericData.Record, schema: Schema, schemaId: Short, mutationType: Byte): Array[Byte] = {
-    val encoderFactory = EncoderFactory.get()
-    val writer = new GenericDatumWriter[GenericRecord]()
-    writer.setSchema(schema)
-    val out = new ByteArrayOutputStream()
-    out.write(PROTO_MAGIC_V0)
-    out.write(mutationType)
-    out.write(schemaIdToByteArray(schemaId))
-    val enc = encoderFactory.binaryEncoder(out, null)
-    writer.write(record, enc)
-    enc.flush()
-    out.toByteArray
+      case (ColumnType.VARCHAR, colz) ⇒
+        colz.foreach(c ⇒ {
+          val v = c.valueOption[String]
+          if (v.isDefined) strings.put(c.metadata.name, v.get)
+        })
+
+      case (ColumnType.LONG, colz) ⇒
+        colz.foreach(c ⇒ {
+          // this damn thing can come in as an Integer or Long
+          val v = c.value match {
+            case i: java.lang.Integer ⇒ new java.lang.Long(i.toLong)
+            case l: java.lang.Long    ⇒ l
+            case null                 ⇒ null
+          }
+
+          if (v != null) longs.put(c.metadata.name, v)
+        })
+
+      case (ColumnType.VAR_STRING, colz) ⇒
+        colz.foreach(c ⇒ {
+          val v = c.valueOption[Array[Byte]].map(ByteBuffer.wrap)
+          if (v.isDefined) byteArrays.put(c.metadata.name, v.get)
+        })
+
+      case _ ⇒ // unsupported
+    })
+
+    (byteArrays, integers, strings, longs)
   }
 }
