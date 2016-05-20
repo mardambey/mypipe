@@ -163,7 +163,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
     mainCache.get(subject) match {
       case Some(existingCachedMap) ⇒ Option(existingCachedMap.get(key)) match {
         case None                       ⇒ specificRetrieveFunction(existingCachedMap)
-        case someSchema if (flushCache) ⇒ specificRetrieveFunction(existingCachedMap)
+        case someSchema if flushCache ⇒ specificRetrieveFunction(existingCachedMap)
         case someSchema                 ⇒ someSchema
       }
       case None ⇒ {
