@@ -6,18 +6,7 @@ import mypipe.kafka.KafkaUtil
 
 class KafkaMutationSpecificAvroProducer(config: Config) extends KafkaMutationAvroProducer(config, classOf[mypipe.kafka.producer.KafkaSpecificAvroSerializer], Map("schema-repo-client" -> config.getString("schema-repo-client"))) {
 
-  // TODO: re-implement support for this
   override def handleAlter(event: AlterEvent): Boolean = {
-    //// FIXME: if the table is not in the cache already, by it's ID, this will fail
-    //// refresh insert, update, and delete schemas
-    //(for (
-    //  i ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.InsertString), flushCache = true);
-    //  u ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.UpdateString), flushCache = true);
-    //  d ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.DeleteString), flushCache = true)
-    //) yield {
-    //  true
-    //}).getOrElse(false)
-    println("\n\n----------->> TODO: handle alter!\n\n")
     true
   }
 
