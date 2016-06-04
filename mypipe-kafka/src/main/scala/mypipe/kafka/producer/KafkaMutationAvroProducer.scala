@@ -36,7 +36,7 @@ abstract class KafkaMutationAvroProducer[T <: Serializer[MessageType]](config: C
 
   /** Builds the Kafka topic using the mutation's database, table name, and
    *  the mutation type (insert, update, delete) concatenating them with "_"
-   *  as a delimeter.
+   *  as a delimiter.
    *
    *  @param mutation mutation
    *  @return the topic name
