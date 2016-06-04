@@ -3,32 +3,13 @@ package mypipe.kafka.producer
 import java.nio.ByteBuffer
 
 import mypipe.api.data.{ Column, ColumnType, Row }
-import mypipe.api.event.Mutation
+import mypipe.api.event.{ Mutation, SingleValuedMutation, UpdateMutation }
 import mypipe.avro.schema.AvroSchemaUtils
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
 import mypipe.kafka.KafkaUtil
 
-class KafkaSpecificAvroSerializer extends KafkaAvroSerializer {
-
-  //private val schemaRepoClientClassName = config.getString("schema-repo-client")
-
-  //override protected val schemaRepoClient = Class.forName(schemaRepoClientClassName + "$")
-  //  .getField("MODULE$").get(null)
-  //  .asInstanceOf[GenericSchemaRepository[Short, Schema]]
-
-  // TODO: re-implement support for this
-  //override def handleAlter(event: AlterEvent): Boolean = {
-  //  // FIXME: if the table is not in the cache already, by it's ID, this will fail
-  //  // refresh insert, update, and delete schemas
-  //  (for (
-  //    i ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.InsertString), flushCache = true);
-  //    u ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.UpdateString), flushCache = true);
-  //    d ← schemaRepoClient.getLatestSchema(AvroSchemaUtils.specificSubject(event.database, event.table.name, Mutation.DeleteString), flushCache = true)
-  //  ) yield {
-  //    true
-  //  }).getOrElse(false)
-  //}
+case class KafkaSpecificAvroSerializer() extends KafkaAvroSerializer {
 
   /** Given a schema ID of type SchemaId, converts it to a byte array.
    *
@@ -58,6 +39,17 @@ class KafkaSpecificAvroSerializer extends KafkaAvroSerializer {
 
   override protected def body(record: GenericData.Record, row: Row, schema: Schema)(implicit keyOp: String ⇒ String = s ⇒ s) {
     row.columns.foreach(col ⇒ Option(schema.getField(keyOp(col._1))).foreach(f ⇒ record.put(f.name(), value2Avro(col._2))))
+  }
+
+  override protected def validateInsertOrDelete(mutation: SingleValuedMutation, row: Row, schema: Schema): Boolean = {
+    val missingFields = row.columns.filterNot(col ⇒ Option(schema.getField(col._1)).isDefined)
+    missingFields.isEmpty
+  }
+
+  override protected def validateUpdate(mutation: UpdateMutation, row: (Row, Row), schema: Schema): Boolean = {
+    val missingFieldsOld = row._1.columns.filterNot(col ⇒ Option(schema.getField("old_" + col._1)).isDefined)
+    val missingFieldsNew = row._2.columns.filterNot(col ⇒ Option(schema.getField("new_" + col._1)).isDefined)
+    missingFieldsOld.isEmpty && missingFieldsNew.isEmpty
   }
 
   private def value2Avro(column: Column): Object = {

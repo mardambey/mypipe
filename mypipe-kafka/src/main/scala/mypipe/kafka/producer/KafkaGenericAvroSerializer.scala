@@ -5,8 +5,7 @@ import java.lang.{ Long ⇒ JLong }
 import java.util.{ HashMap ⇒ JMap }
 
 import mypipe.api.data.{ Column, ColumnType, Row }
-import mypipe.api.event.Mutation
-import mypipe.avro.GenericInMemorySchemaRepo
+import mypipe.api.event.{ Mutation, SingleValuedMutation, UpdateMutation }
 import mypipe.avro.schema.AvroSchemaUtils
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData
@@ -24,13 +23,6 @@ import mypipe.kafka.KafkaUtil
  *
  */
 class KafkaGenericAvroSerializer extends KafkaAvroSerializer {
-
-  //override protected val schemaRepoClient = GenericInMemorySchemaRepo
-
-  //override def handleAlter(event: AlterEvent): Boolean = {
-  //  // no special support for alters needed, "generic" schema
-  //  true
-  //}
 
   /** Given a schema ID of type SchemaId, converts it to a byte array.
    *
@@ -65,6 +57,14 @@ class KafkaGenericAvroSerializer extends KafkaAvroSerializer {
     record.put(keyOp("integers"), integers)
     record.put(keyOp("strings"), strings)
     record.put(keyOp("longs"), longs)
+  }
+
+  override protected def validateInsertOrDelete(mutation: SingleValuedMutation, row: Row, schema: Schema): Boolean = {
+    true
+  }
+
+  override protected def validateUpdate(mutation: UpdateMutation, row: (Row, Row), schema: Schema): Boolean = {
+    true
   }
 
   private def columnsToMaps(columns: Map[String, Column]): (JMap[CharSequence, ByteBuffer], JMap[CharSequence, Integer], JMap[CharSequence, CharSequence], JMap[CharSequence, JLong]) = {

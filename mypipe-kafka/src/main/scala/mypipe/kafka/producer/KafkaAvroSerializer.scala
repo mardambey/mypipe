@@ -36,14 +36,30 @@ abstract class KafkaAvroSerializer() extends Serializer[(Mutation, Either[Row, (
 
       val schemaTopic = avroSchemaSubject(mutation)
       val mutationType = magicByte(mutation)
-      val schema = schemaRepoClient.getLatestSchema(schemaTopic)
+      var schema = schemaRepoClient.getLatestSchema(schemaTopic)
 
       if (schema.isDefined) {
 
-        val schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema.get)
-        val record = avroRecord(mutation, rowOrTupleRows, schema.get)
+        var schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema.get)
+        logger.debug("Serializing data for topic {} using schema {}, with id {} => {}", Array(topic, schema.get.getFullName, schemaId, schema.get): _*)
+        var record = avroRecord(mutation, rowOrTupleRows, schema.get)
 
-        serialize(record, schema.get, schemaId.get, mutationType)
+        if (record.isEmpty) {
+          schema = schemaRepoClient.getLatestSchema(schemaTopic, flushCache = true)
+          if (schema.isDefined) {
+
+            schemaId = schemaRepoClient.getSchemaId(schemaTopic, schema.get)
+            logger.debug("Serializing data for topic {} using schema {}, with id {} => {}", Array(topic, schema.get.getFullName, schemaId, schema.get): _*)
+            record = avroRecord(mutation, rowOrTupleRows, schema.get)
+          }
+        }
+
+        if (record.isDefined)
+          serialize(record.get, schema.get, schemaId.get, mutationType)
+        else {
+          logger.error(s"Could not find suitable schema for schemaTopic: $schemaTopic and mutation: $mutation")
+          Array.empty
+        }
 
       } else {
         logger.error(s"Could not find schema for schemaTopic: $schemaTopic and mutation: $mutation")
@@ -114,19 +130,33 @@ abstract class KafkaAvroSerializer() extends Serializer[(Mutation, Either[Row, (
 
   protected def body(record: GenericData.Record, row: Row, schema: Schema)(implicit keyOp: String ⇒ String = s ⇒ s)
 
-  protected def insertOrDeleteMutationToAvro(mutation: SingleValuedMutation, row: Row, schema: Schema): GenericData.Record = {
-    val record = new GenericData.Record(schema)
-    addHeader(record, mutation)
-    body(record, row, schema)
-    record
+  protected def validateInsertOrDelete(mutation: SingleValuedMutation, row: Row, schema: Schema): Boolean
+
+  protected def validateUpdate(mutation: UpdateMutation, row: (Row, Row), schema: Schema): Boolean
+
+  protected def insertOrDeleteMutationToAvro(mutation: SingleValuedMutation, row: Row, schema: Schema): Option[GenericData.Record] = {
+
+    if (!validateInsertOrDelete(mutation, row, schema))
+      None
+    else {
+      val record = new GenericData.Record(schema)
+      addHeader(record, mutation)
+      body(record, row, schema)
+      Some(record)
+    }
   }
 
-  protected def updateMutationToAvro(mutation: UpdateMutation, row: (Row, Row), schema: Schema): GenericData.Record = {
-    val record = new GenericData.Record(schema)
-    addHeader(record, mutation)
-    body(record, row._1, schema) { s ⇒ "old_" + s }
-    body(record, row._2, schema) { s ⇒ "new_" + s }
-    record
+  protected def updateMutationToAvro(mutation: UpdateMutation, row: (Row, Row), schema: Schema): Option[GenericData.Record] = {
+    if (!validateUpdate(mutation, row, schema))
+      None
+    else {
+      val record = new GenericData.Record(schema)
+      addHeader(record, mutation)
+      // TODO: this is also used in the specific child, consolidate
+      body(record, row._1, schema) { s ⇒ "old_" + s }
+      body(record, row._2, schema) { s ⇒ "new_" + s }
+      Some(record)
+    }
   }
 
   /** Given a Mutation, this method must convert it into a(n) Avro record(s)
@@ -136,7 +166,7 @@ abstract class KafkaAvroSerializer() extends Serializer[(Mutation, Either[Row, (
    *  @param schema Avro schema
    *  @return the Avro generic record(s)
    */
-  private def avroRecord(mutation: Mutation, row: Either[Row, (Row, Row)], schema: Schema): GenericData.Record = {
+  private def avroRecord(mutation: Mutation, row: Either[Row, (Row, Row)], schema: Schema): Option[GenericData.Record] = {
 
     Mutation.getMagicByte(mutation) match {
       case Mutation.InsertByte ⇒ insertOrDeleteMutationToAvro(mutation.asInstanceOf[SingleValuedMutation], row.left.get, schema)
@@ -144,7 +174,7 @@ abstract class KafkaAvroSerializer() extends Serializer[(Mutation, Either[Row, (
       case Mutation.UpdateByte ⇒ updateMutationToAvro(mutation.asInstanceOf[UpdateMutation], row.right.get, schema)
       case _ ⇒
         logger.error(s"Unexpected mutation type ${mutation.getClass} encountered; retuning empty Avro GenericData.Record(schema=$schema")
-        new GenericData.Record(schema)
+        None
     }
   }
 

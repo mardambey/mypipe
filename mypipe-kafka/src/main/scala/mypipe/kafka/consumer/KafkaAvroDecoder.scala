@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 import scala.reflect.runtime.universe._
 
 abstract class KafkaAvroDecoder[InsertMutationType <: SpecificRecord, UpdateMutationType <: SpecificRecord, DeleteMutationType <: SpecificRecord]()
-                                                                                                                                                 (implicit val insertTag: TypeTag[InsertMutationType], implicit val updateTag: TypeTag[UpdateMutationType], implicit val deleteTag: TypeTag[DeleteMutationType])
+  (implicit val insertTag: TypeTag[InsertMutationType], implicit val updateTag: TypeTag[UpdateMutationType], implicit val deleteTag: TypeTag[DeleteMutationType])
   extends Decoder[SpecificRecord] {
 
   protected val logger = LoggerFactory.getLogger(getClass.getName)
@@ -39,23 +39,29 @@ abstract class KafkaAvroDecoder[InsertMutationType <: SpecificRecord, UpdateMuta
       null
     } else {
       val mutationType = bytes(1)
-      val schemaId = bytesToSchemaId(bytes, PROTO_HEADER_LEN_V0)
 
-      mutationType match {
-        case Mutation.InsertByte ⇒ schemaRepoClient
-          .getSchema(avroSchemaSubjectForMutationByte(Mutation.InsertByte), schemaId)
-          .flatMap(insertDeserializer.deserialize(_, bytes, headerLength))
-          .orNull
+      def decode(flush: Boolean = false): SpecificRecord = {
+        mutationType match {
+          case Mutation.InsertByte ⇒ schemaRepoClient
+            .getLatestSchema(avroSchemaSubjectForMutationByte(Mutation.InsertByte), flush)
+            .flatMap(insertDeserializer.deserialize(_, bytes, headerLength))
+            .orNull
 
-        case Mutation.UpdateByte ⇒ schemaRepoClient
-          .getSchema(avroSchemaSubjectForMutationByte(Mutation.UpdateByte), schemaId)
-          .flatMap(updateDeserializer.deserialize(_, bytes, headerLength))
-          .orNull
+          case Mutation.UpdateByte ⇒ schemaRepoClient
+            .getLatestSchema(avroSchemaSubjectForMutationByte(Mutation.UpdateByte), flush)
+            .flatMap(updateDeserializer.deserialize(_, bytes, headerLength))
+            .orNull
 
-        case Mutation.DeleteByte ⇒ schemaRepoClient
-          .getSchema(avroSchemaSubjectForMutationByte(Mutation.DeleteByte), schemaId)
-          .flatMap(deleteDeserializer.deserialize(_, bytes, headerLength))
-          .orNull
+          case Mutation.DeleteByte ⇒ schemaRepoClient
+            .getLatestSchema(avroSchemaSubjectForMutationByte(Mutation.DeleteByte), flush)
+            .flatMap(deleteDeserializer.deserialize(_, bytes, headerLength))
+            .orNull
+        }
+      }
+
+      Option(decode()) match {
+        case Some(record) => record
+        case None => decode(flush = true)
       }
     }
   }

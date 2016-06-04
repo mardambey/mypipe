@@ -68,7 +68,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
    *
    *  @param subject to look into to get the repository's corresponding [[org.apache.avro.repo.Subject]]
    *  @param key to store in the cache, if we are able to retrieve an entity
-   *  @param map to store the key and entity into, if we are able to retrieve the entity
+   *  //   *  @param map to store the key and entity into, if we are able to retrieve the entity
    *            N.B.: using a java.util.Map for compatibility with Guava's [[com.google.common.collect.BiMap]]
    *  @param entityRetrievalFunction to use on the [[org.apache.avro.repo.Subject]] to get a [[org.apache.avro.repo.SchemaEntry]]
    *  @param schemaEntryToStringFunction to use on the [[org.apache.avro.repo.SchemaEntry]] in order to get our (Stringly-typed) entity
@@ -243,6 +243,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
       schemaEntryToStringFunction = _.getId,
       stringToValueFunction = stringToId,
       createMissingSubject = true,
+      flushCache = true,
       throwException = true).get
   }
 }

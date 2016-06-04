@@ -17,6 +17,7 @@ class KafkaMutationSpecificAvroProducer(config: Config) extends KafkaMutationAvr
     //) yield {
     //  true
     //}).getOrElse(false)
+    println("\n\n----------->> TODO: handle alter!\n\n")
     true
   }
 

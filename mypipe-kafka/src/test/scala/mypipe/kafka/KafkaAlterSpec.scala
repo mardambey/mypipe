@@ -64,14 +64,15 @@ class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     var iter = new KafkaIterator(topic, zkConnect, groupId, valueDecoder = KafkaSpecificAvroDecoder[mypipe.kafka.UserInsert, mypipe.kafka.UserUpdate, mypipe.kafka.UserDelete](DATABASE, TABLE, TestSchemaRepo))
 
     // insert into user
-    Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT)), 2.seconds)
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement(username = "first", loginCount = LOGIN_COUNT)), 2.seconds)
 
     // consume event from kafka and close the consumer
-    iter.next()
+    val skipped = iter.next()
+    log.info(s"skipping over record $skipped")
     iter.stop()
 
     // add new schema to repo
-    val newSchemaId = TestSchemaRepo.registerSchema(AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.InsertString), new UserInsert2().getSchema)
+    TestSchemaRepo.registerSchema(AvroSchemaUtils.specificSubject(DATABASE, TABLE, Mutation.InsertString), new UserInsert2().getSchema)
 
     // recreate the iterator with the new schema added to the repo and the proper types reflecting added column
     iter = new KafkaIterator(topic, zkConnect, groupId, valueDecoder = KafkaSpecificAvroDecoder[mypipe.kafka.UserInsert2, mypipe.kafka.UserUpdate2, mypipe.kafka.UserDelete2](DATABASE, TABLE, TestSchemaRepo))
@@ -80,7 +81,7 @@ class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
     Await.result(db.connection.sendQuery(Queries.ALTER.statementAdd), 2.seconds)
 
     // insert into user with new field
-    Await.result(db.connection.sendQuery(Queries.INSERT.statement(loginCount = LOGIN_COUNT, email = Some("test@test.com"))), 2.seconds)
+    Await.result(db.connection.sendQuery(Queries.INSERT.statement(username = "second", loginCount = LOGIN_COUNT, email = Some("test@test.com"))), 2.seconds)
 
     // consume event with new field from kafka
     val insert = iter.next().get.asInstanceOf[UserInsert2]
