@@ -17,6 +17,9 @@ object MySQLMetadataManager {
   def props(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")): Props = Props(new MySQLMetadataManager(hostname, port, username, password, database))
   def apply(hostname: String, port: Int, username: String, password: Option[String] = None) =
     system.actorOf(MySQLMetadataManager.props(hostname, port, username, password))
+
+  private def getTableColumnsQuery(table: String, db: String) = s"""select COLUMN_NAME, DATA_TYPE, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION"""
+  private def getPrimaryKeyQuery(table: String, db: String) = s"""select COLUMN_NAME from KEY_COLUMN_USAGE where TABLE_SCHEMA='$db' and TABLE_NAME='$table' and CONSTRAINT_NAME='PRIMARY' order by ORDINAL_POSITION"""
 }
 
 class MySQLMetadataManager(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")) extends Actor {
@@ -25,7 +28,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
   protected val log = LoggerFactory.getLogger(getClass)
 
   override val supervisorStrategy =
-    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
+    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1.minute) {
       case _: Exception ⇒ Restart
     }
 
@@ -69,10 +72,10 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
         List(connection1, connection2)
       })
 
-      val mapCols = getTableColumns(db, table, dbConn(0))
+      val mapCols = getTableColumns(db, table, dbConn.head)
       val pKey = getPrimaryKey(db, table, dbConn(1))
 
-      val results = Await.result(Future.sequence(List(mapCols, pKey)), 1 seconds)
+      val results = Await.result(Future.sequence(List(mapCols, pKey)), 1.seconds)
       val results1 = results(0)
       val results2 = results(1)
 
@@ -96,44 +99,35 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
   }
 
   protected def getTableColumns(db: String, table: String, dbConn: Connection): Future[List[(String, String, Boolean)]] = {
-    val futureCols: Future[QueryResult] = dbConn.sendQuery(
-      // TODO: move this into the config file
-      s"""select COLUMN_NAME, DATA_TYPE, COLUMN_KEY from COLUMNS where TABLE_SCHEMA="$db" and TABLE_NAME = "$table" order by ORDINAL_POSITION""")
+    val futureCols: Future[QueryResult] = dbConn.sendQuery(MySQLMetadataManager.getTableColumnsQuery(table, db))
 
     val mapCols: Future[List[(String, String, Boolean)]] = futureCols.map(queryResult ⇒ queryResult.rows match {
-      case Some(resultSet) ⇒ {
+      case Some(resultSet) ⇒
         resultSet.map(row ⇒ {
           (row(0).asInstanceOf[String], row(1).asInstanceOf[String], row(2).equals("PRI"))
         }).toList
-      }
 
-      case None ⇒ {
+      case None ⇒
         List.empty[(String, String, Boolean)]
-      }
     })
     mapCols
   }
 
   protected def getPrimaryKey(db: String, table: String, dbConn: Connection): Future[Option[List[String]]] = {
-    val futurePkey: Future[QueryResult] = dbConn.sendQuery(
-      // TODO: move this into the config file
-      s"""select COLUMN_NAME from KEY_COLUMN_USAGE where TABLE_SCHEMA='${db}' and TABLE_NAME='${table}' and CONSTRAINT_NAME='PRIMARY' order by ORDINAL_POSITION""")
+    val futurePkey: Future[QueryResult] = dbConn.sendQuery(MySQLMetadataManager.getPrimaryKeyQuery(table, db))
 
     val pKey: Future[Option[List[String]]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
 
-      case Some(resultSet) if (resultSet.nonEmpty) ⇒ {
+      case Some(resultSet) if resultSet.nonEmpty ⇒
         Some(resultSet.map(row ⇒ row(0).asInstanceOf[String]).toList)
-      }
 
-      case Some(resultSet) ⇒ {
+      case Some(resultSet) ⇒
         log.debug(s"No primary key determined for $db:$table")
         None
-      }
 
-      case None ⇒ {
+      case None ⇒
         log.error(s"Failed to determine primary key for $db:$table")
         None
-      }
     })
 
     pKey
@@ -156,10 +150,9 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
       cols
 
     } catch {
-      case e: Exception ⇒ {
+      case e: Exception ⇒
         log.error(s"Failed to determine column names: $columns\n${e.getMessage} -> ${e.getStackTraceString}")
         List.empty[ColumnMetadata]
-      }
     }
   }
 }

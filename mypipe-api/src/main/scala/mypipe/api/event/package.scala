@@ -44,8 +44,6 @@ final case class TableMapEvent(
  *  @param table that the row belongs to
  */
 sealed abstract class Mutation(override val table: Table, val txid: UUID) extends TableContainingEvent {
-  // TODO: populate this field
-  val sql = ""
   val database = table.db
   def txAware(txid: UUID): Mutation
   def withTimestamp(newTimestamp: Long): Mutation
