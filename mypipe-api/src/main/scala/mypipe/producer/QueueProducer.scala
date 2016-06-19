@@ -1,10 +1,11 @@
-package mypipe.kafka.producer
+package mypipe.producer
 
 import java.util
+
 import mypipe.api.event.{ AlterEvent, Mutation }
 import mypipe.api.producer.Producer
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 
 class QueueProducer(queue: util.Queue[Mutation]) extends Producer(config = null) {
 

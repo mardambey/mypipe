@@ -2,19 +2,22 @@ package mypipe
 
 import com.typesafe.config.ConfigFactory
 import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
-import mypipe.api.event.{ Mutation, InsertMutation }
+import mypipe.api.event.{ InsertMutation, Mutation }
 import mypipe.mysql._
-import scala.concurrent.{ Future, Await }
+
+import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
-import mypipe.kafka.producer.QueueProducer
-import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
+import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit }
+
 import akka.actor.ActorDSL._
 import akka.pattern.ask
 import akka.util.Timeout
 import akka.agent.Agent
+
 import scala.collection.mutable.ListBuffer
 import org.slf4j.LoggerFactory
 import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
+import mypipe.producer.QueueProducer
 
 class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
 

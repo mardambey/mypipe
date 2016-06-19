@@ -2,14 +2,16 @@ package mypipe
 
 import com.typesafe.config.ConfigFactory
 import mypipe.api.Conf
-import mypipe.api.event.{ DeleteMutation, Mutation, UpdateMutation, InsertMutation }
+import mypipe.api.event.{ DeleteMutation, InsertMutation, Mutation, UpdateMutation }
 import mypipe.api.repo.FileBasedBinaryLogPositionRepository
 import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import mypipe.kafka.producer.QueueProducer
-import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
+import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit }
+
+import mypipe.producer.QueueProducer
 import org.slf4j.LoggerFactory
 
 class MySQLSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
