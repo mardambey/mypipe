@@ -29,7 +29,7 @@ class MySQLBasedBinaryLogPositionRepository(id: String, source: String, database
 
   private def createTable(): Unit = {
     try {
-      val createF = connection.sendQuery(s"CREATE TABLE IF NOT EXISTS $table (id varchar(128), filename varchar(256), position integer(11), primary key (id)) engine InnoDB;")
+      val createF = connection.sendQuery(s"CREATE TABLE IF NOT EXISTS $table (id varchar(128), filename varchar(256), position bigint(20), primary key (id)) engine InnoDB;")
       Await.result(createF, 5.seconds)
     } catch {
       case e: Exception ⇒
@@ -67,7 +67,9 @@ class MySQLBasedBinaryLogPositionRepository(id: String, source: String, database
       }
 
     } catch {
-      case e: Exception ⇒ None
+      case e: Exception ⇒
+        log.warn(s"Error while loading binary log position for consumer ${consumer.id}, defaulting to None. ${e.getMessage}: ${e.getStackTraceString}")
+        None
     }
   }
 }
