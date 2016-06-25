@@ -22,7 +22,6 @@ object KafkaMutationGenericAvroProducer {
  */
 class KafkaMutationGenericAvroProducer(config: Config) extends KafkaMutationAvroProducer(config, classOf[mypipe.kafka.producer.KafkaGenericAvroSerializer], Map("schema-repo-client" -> "mypipe.avro.GenericInMemorySchemaRepo")) {
 
-  // TODO: re-implement support for this
   override def handleAlter(event: AlterEvent): Boolean = {
     // no special support for alters needed, "generic" schema
     true

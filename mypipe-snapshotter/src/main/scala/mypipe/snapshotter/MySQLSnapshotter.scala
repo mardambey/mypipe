@@ -1,24 +1,82 @@
 package mypipe.snapshotter
 
 import com.github.mauricio.async.db.{ Connection, QueryResult }
+import mypipe.api.data.{ ColumnMetadata, ColumnType }
 import mypipe.mysql.BinaryLogFilePosition
+import mypipe.mysql.Util
+import org.slf4j.LoggerFactory
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ ExecutionContext, Future }
 
+/** Interesting parameters:
+ *  - boundary-query: used for creating splits
+ *  - query: import the results of this query
+ *  - split-by: column used to split work units
+ *  - where: where clause used during import
+ *
+ *  By default we will use the query:
+ *   select min(<split-by>), max(<split-by>) from <table name>
+ *  to find out boundaries for creating splits.
+ *
+ *  In some cases this query is not the most optimal
+ *  so you can specify any arbitrary query returning
+ *  two numeric columns using boundary-query argument.
+ *
+ *  By default, the split-by column is the primary key.
+ *
+ *  1. Determine primary key and use as split-by column, or used given split-by column
+ *  2. Based on type of split-by column, determine data ranges for the table
+ *  3. For each data range, use built in select query or use provided query to fetch data
+ *  4. For each row, turn it into a SelectEvent and push it into the SelectConsumer's pipe.
+ */
 object MySQLSnapshotter {
 
-  val trxIsolationLevel = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;"
-  val autoCommit = "SET autocommit=0;"
-  val flushTables = "FLUSH TABLES;"
-  val readLock = "FLUSH TABLES WITH READ LOCK;"
-  val showMasterStatus = "SHOW MASTER STATUS;"
-  val unlockTables = "UNLOCK TABLES;"
-  val commit = "COMMIT;"
+  val trxIsolationLevel = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"
+  val autoCommit = "SET autocommit=0"
+  val flushTables = "FLUSH TABLES"
+  val readLock = "FLUSH TABLES WITH READ LOCK"
+  val showMasterStatus = "SHOW MASTER STATUS"
+  val unlockTables = "UNLOCK TABLES"
+  val commit = "COMMIT"
 
-  val selectFrom = { dbTable: String ⇒ s"SELECT * FROM $dbTable;" }
+  val selectFrom = { dbTable: String ⇒ s"SELECT * FROM $dbTable" }
   val useDatabase = { dbTable: String ⇒
     val dbName = dbTable.splitAt(dbTable.indexOf('.'))._1
-    s"use $dbName;"
+    s"use $dbName"
+  }
+
+  def snapshot(db: String, table: String, splitByCol: Option[String], selectQuery: Option[String])(implicit c: Connection, ec: ExecutionContext) = {
+
+    // get table columns and primary key
+    val columnsF = Util.getTableColumns(db, table, c)
+    val primaryKeyF = Util.getPrimaryKey(db, table, c)
+
+    val seqF = Future.sequence(Seq(columnsF, primaryKeyF))
+
+    // find primary key if it exists
+    val primaryKeyOptF = seqF map { futures: Seq[_] ⇒
+      val columnsMap = futures(0).asInstanceOf[List[(String, String, Boolean)]]
+      val columns = Util.createColumns(columnsMap)
+      val primaryKeyColumnNamesOpt = futures(1).asInstanceOf[Option[List[String]]]
+
+      primaryKeyColumnNamesOpt map {
+        Util.getPrimaryKeyFromColumns(_, columns)
+      }
+    }
+
+    primaryKeyF
+
+    ???
+  }
+
+  def getSplits(db: String, table: String, splitByCol: ColumnMetadata) = {
+    splitByCol.colType match {
+
+      case ColumnType.INT24 ⇒ //IntegerSplitter()
+    }
+
+    ???
   }
 
   def snapshot(tables: Seq[String], withTransaction: Boolean = true)(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {

@@ -17,8 +17,9 @@ import akka.util.Timeout
  *  @param port of the database
  *  @param username used to authenticate against the database
  *  @param password used to authenticate against the database
+ *  @param timeoutSeconds maximum time to wait for the table metadata request to return
  */
-class TableCache(hostname: String, port: Int, username: String, password: String) {
+class TableCache(hostname: String, port: Int, username: String, password: String, timeoutSeconds: Int) {
   protected val system = ActorSystem("mypipe")
   protected implicit val ec = system.dispatcher
   protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
@@ -71,8 +72,7 @@ class TableCache(hostname: String, port: Int, username: String, password: String
 
   private def lookupTable(tableId: Long, database: String, tableName: String): Table = {
 
-    // TODO: make this configurable
-    implicit val timeout = Timeout(2.second)
+    implicit val timeout = Timeout(timeoutSeconds.second)
 
     val future = ask(dbMetadata, GetColumns(database, tableName, flushCache = true)).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
 

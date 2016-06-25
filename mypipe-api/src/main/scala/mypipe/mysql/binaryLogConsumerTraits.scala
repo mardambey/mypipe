@@ -1,6 +1,7 @@
 package mypipe.mysql
 
 import com.typesafe.config.Config
+
 import mypipe.api.{ HostPortUserPass, Conf }
 
 import mypipe.api.consumer.{ BinaryLogConsumerTableFinder, BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
@@ -137,7 +138,8 @@ class ConfigBasedErrorHandler[BinaryLogEvent] extends BinaryLogConsumerErrorHand
 
 trait CacheableTableMapBehaviour extends BinaryLogConsumerTableFinder with ConnectionSource {
 
-  protected var tableCache = new TableCache(hostname, port, username, password)
+  protected val timeoutSeconds = 5
+  protected var tableCache = new TableCache(hostname, port, username, password, timeoutSeconds)
 
   override protected def findTable(tableMapEvent: TableMapEvent): Option[Table] = {
     val table = tableCache.addTableByEvent(tableMapEvent)
