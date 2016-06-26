@@ -51,10 +51,6 @@ object Snapshotter extends App {
 
     log.info(s"Connected to ${db.hostname}:${db.port} (withTransaction=${!noTransaction})")
 
-    val events = MySQLSnapshotter.snapshotToEvents(MySQLSnapshotter.snapshot(tables, !noTransaction))
-
-    log.info("Fetched snapshot.")
-
     lazy val producers: Map[String, Option[Class[Producer]]] = PipeRunnerUtil.loadProducerClasses(conf, "mypipe.snapshotter.producers")
     lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
     lazy val pipes: Seq[Pipe[_]] = PipeRunnerUtil.createPipes(conf, "mypipe.snapshotter.pipes", producers, consumers)
@@ -79,9 +75,21 @@ object Snapshotter extends App {
     log.info("Consumer setup done.")
 
     pipe.connect()
-    pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(Await.result(events, 10.seconds))
 
-    log.info("All events handled, safe to shut down.")
+    log.info(s"Snapshotting table ${tables.head}")
+
+    val snapshotF = MySQLSnapshotter.snapshot(db = tables.head.split("\\.").head, table = tables.head.split("\\.")(1), None, None, { events ⇒
+
+      log.info(s"Fetched snapshot for ${tables.head} (${events.length} rows)")
+
+      pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(events)
+
+      log.info(s"Snapshot for ${tables.head} (${events.length} rows) converted to events.")
+    })
+
+    log.info("Waiting for snapshots to finish...")
+    Await.result(snapshotF, Duration.Inf)
+    log.info("Done waiting for snapshots to finish.")
   }
 }
 

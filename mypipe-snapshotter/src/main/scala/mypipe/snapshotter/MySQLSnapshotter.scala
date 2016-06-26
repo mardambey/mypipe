@@ -4,6 +4,7 @@ import com.github.mauricio.async.db.{ Connection, QueryResult }
 import mypipe.api.data.{ ColumnMetadata, ColumnType }
 import mypipe.mysql.BinaryLogFilePosition
 import mypipe.mysql.Util
+import mypipe.snapshotter.splitter.{ InputSplit, IntegerSplitter }
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ListBuffer
@@ -32,6 +33,8 @@ import scala.concurrent.{ ExecutionContext, Future }
  */
 object MySQLSnapshotter {
 
+  val log = LoggerFactory.getLogger(getClass)
+
   val trxIsolationLevel = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"
   val autoCommit = "SET autocommit=0"
   val flushTables = "FLUSH TABLES"
@@ -46,39 +49,114 @@ object MySQLSnapshotter {
     s"use $dbName"
   }
 
-  def snapshot(db: String, table: String, splitByCol: Option[String], selectQuery: Option[String])(implicit c: Connection, ec: ExecutionContext) = {
-
-    // get table columns and primary key
-    val columnsF = Util.getTableColumns(db, table, c)
-    val primaryKeyF = Util.getPrimaryKey(db, table, c)
-
-    val seqF = Future.sequence(Seq(columnsF, primaryKeyF))
+  def snapshot(db: String, table: String, splitByCol: Option[String], selectQuery: Option[String], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
 
     // find primary key if it exists
-    val primaryKeyOptF = seqF map { futures: Seq[_] ⇒
-      val columnsMap = futures(0).asInstanceOf[List[(String, String, Boolean)]]
+    val primaryKeyOptF = for (
+      _ ← c.sendQuery(s"use information_schema");
+      columnsMap ← Util.getTableColumns(db, table, c);
+      primaryKeyColumnNamesOpt ← Util.getPrimaryKey(db, table, c)
+    ) yield {
       val columns = Util.createColumns(columnsMap)
-      val primaryKeyColumnNamesOpt = futures(1).asInstanceOf[Option[List[String]]]
-
+      log.info(s"Found primary key: $primaryKeyColumnNamesOpt")
+      log.info(s"Found columns: $columns")
       primaryKeyColumnNamesOpt map {
         Util.getPrimaryKeyFromColumns(_, columns)
       }
     }
 
-    primaryKeyF
+    val splitQueriesListF: Future[List[(String, String)]] = primaryKeyOptF flatMap {
+      case Some(primaryKey) if primaryKey.columns.size == 1 ⇒
 
-    ???
-  }
+        // get splits
+        log.info(s"Trying to use primary key $primaryKey as split-by column.")
+        val splitsF = getSplits(db, table, primaryKey.columns.head)
 
-  def getSplits(db: String, table: String, splitByCol: ColumnMetadata) = {
-    splitByCol.colType match {
+        // TODO: handle no splits returned
+        // create a series of:
+        // $table -> "use $db"
+        // $table -> "select * from $table ..."
+        val splitQueriesF = splitsF map { splits ⇒
+          splits.map { split ⇒
+            (s"$db.$table" -> s"use $db",
+              s"$db.$table" -> s"""SELECT * FROM $table WHERE ${split.lowClausePrefix} and ${split.upperClausePrefix}""")
+          }.foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
+            acc ++ List(v._1, v._2)
+          }
+        }
 
-      case ColumnType.INT24 ⇒ //IntegerSplitter()
+        splitQueriesF
+
+      case Some(primaryKey) if primaryKey.columns.size > 1 ⇒
+        log.error(s"Could not use multi-column primary key as a split-by column, aborting: $primaryKey")
+        Future.successful(List.empty[(String, String)])
+      case None ⇒
+        log.error("Could not find a suitable primary key to use as a split-by column, aborting.")
+        Future.successful(List.empty[(String, String)])
     }
 
-    ???
+    splitQueriesListF map { splitQueriesList ⇒
+      val queries = queriesWithoutTxn(splitQueriesList)
+      _executeQueries(queries, eventHandler)
+    }
   }
 
+  private def _executeQueries(queries: Seq[(String, String)], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext): Future[Unit] = {
+
+    val queryKey = queries.head._1
+    val queryVal = queries.head._2
+
+    log.info(queryVal)
+    c.sendQuery(queryVal).map { queryResult ⇒
+
+      if (!queryKey.isEmpty) {
+        val events = snapshotToEvents(Seq(queryKey -> queryResult))
+        eventHandler(events)
+      }
+
+      queries.tail
+
+    } flatMap {
+      case queries if queries.nonEmpty ⇒
+        _executeQueries(queries, eventHandler)
+      case _ ⇒
+        Future.successful { Unit }
+    }
+  }
+
+  def getSplits(db: String, table: String, splitByCol: ColumnMetadata)(implicit c: Connection, ec: ExecutionContext): Future[List[InputSplit]] = {
+    splitByCol.colType match {
+
+      case ColumnType.INT24 ⇒
+
+        val boundingQuery = s"""SELECT MIN(${splitByCol.name}), MAX(${splitByCol.name}) FROM $db.$table""" // TODO: append user provided WHERE clause if any
+
+        log.info(s"use $db")
+        c.sendQuery(s"use $db") flatMap { _ ⇒
+          log.info(s"$boundingQuery")
+          val boundingValuesF = c.sendQuery(boundingQuery)
+          boundingValuesF map { boundingValues ⇒
+            val r = boundingValues.rows flatMap { rows ⇒
+              rows.headOption map { row ⇒
+                val lowerBound = row(0).asInstanceOf[Int]
+                val upperBound = row(1).asInstanceOf[Int]
+
+                IntegerSplitter.split(splitByCol, lowerBound, upperBound)
+              }
+            }
+
+            r.getOrElse(List.empty)
+          }
+        }
+
+      case x ⇒
+        log.error("split-by column of type $x is not supported, aborting.")
+        Future.successful(List.empty)
+    }
+
+  }
+
+  // TODO: we can still modify and use this to run the queries and spit out events
   def snapshot(tables: Seq[String], withTransaction: Boolean = true)(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
     val tableQueries = tables
       .map({ t ⇒ (t -> useDatabase(t), t -> selectFrom(t)) })
@@ -93,31 +171,30 @@ object MySQLSnapshotter {
     runQueries(queries)
   }
 
-  def snapshotToEvents(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SnapshotterEvent]]] = snapshot map {
-    results ⇒
-      {
-        results.map { result ⇒
-          val colData = result._2.rows.map(identity) map { rows ⇒
-            val colCount = rows.columnNames.length
-            rows.map { row ⇒
-              (0 until colCount) map { i ⇒
-                row(i)
-              }
-            }
-          }
+  def snapshotToEvents(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SnapshotterEvent]]] = snapshot map { snapshotToEvents }
 
-          val firstDot = result._1.indexOf('.')
-          if (firstDot == result._1.lastIndexOf('.') && firstDot > 0) {
-            val Array(db, table) = result._1.split('.')
-            Some(SelectEvent(db, table, colData.getOrElse(Seq.empty)))
-          } else if (result._1.equals("showMasterStatus")) {
-            colData.getOrElse(Seq.empty).headOption.map(c ⇒
-              ShowMasterStatusEvent(BinaryLogFilePosition(c(0).asInstanceOf[String], c(1).asInstanceOf[Long])))
-          } else {
-            None
+  def snapshotToEvents(results: Seq[(String, QueryResult)]): Seq[Option[SnapshotterEvent]] = {
+    results.map { result ⇒
+      val colData = result._2.rows.map(identity) map { rows ⇒
+        val colCount = rows.columnNames.length
+        rows.map { row ⇒
+          (0 until colCount) map { i ⇒
+            row(i)
           }
         }
       }
+
+      val firstDot = result._1.indexOf('.')
+      if (firstDot == result._1.lastIndexOf('.') && firstDot > 0) {
+        val Array(db, table) = result._1.split('.')
+        Some(SelectEvent(db, table, colData.getOrElse(Seq.empty)))
+      } else if (result._1.equals("showMasterStatus")) {
+        colData.getOrElse(Seq.empty).headOption.map(c ⇒
+          ShowMasterStatusEvent(BinaryLogFilePosition(c(0).asInstanceOf[String], c(1).asInstanceOf[Long])))
+      } else {
+        None
+      }
+    }
   }
 
   private def queriesWithoutTxn(tableQueries: Seq[(String, String)]) = Seq(
@@ -136,8 +213,10 @@ object MySQLSnapshotter {
     queries.foldLeft[Future[Seq[(String, QueryResult)]]](Future.successful(Seq.empty)) { (future, query) ⇒
       future flatMap { queryResults ⇒
         if (!query._1.isEmpty) {
+          log.info(s"${query._2}")
           c.sendQuery(query._2).map(r ⇒ queryResults :+ (query._1 -> r))
         } else {
+          log.info(s"${query._2}")
           c.sendQuery(query._2).map(r ⇒ queryResults)
         }
       }

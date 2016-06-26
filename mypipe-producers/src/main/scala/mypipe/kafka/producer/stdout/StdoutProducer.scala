@@ -35,7 +35,20 @@ class StdoutProducer(config: Config) extends Producer(config) {
     mutation match {
 
       case i: InsertMutation ⇒
-        mutations += s"INSERT INTO ${i.table.db}.${i.table.name} (${i.table.columns.map(_.name).mkString(", ")}) VALUES ${i.rows.map("(" + _.columns.values.map(_.valueString).mkString(", ") + ")").mkString(",")}"
+        i.rows.foreach(row ⇒ {
+          val names = i.table.columns.map(_.name)
+          val values = i.table.columns.map { column ⇒
+            try {
+              row.columns(column.name).valueString
+            } catch {
+              case e: Exception ⇒
+                log.error(s"Could not get column $column (returning empty string) due to ${e.getMessage}\n${e.getStackTraceString}")
+                ""
+            }
+          }
+          val query = s"INSERT INTO ${i.table.db}.${i.table.name} (${names.mkString(", ")}) VALUES (${values.mkString(", ")})"
+          mutations += query
+        })
 
       case u: UpdateMutation ⇒
         u.rows.foreach(rr ⇒ {

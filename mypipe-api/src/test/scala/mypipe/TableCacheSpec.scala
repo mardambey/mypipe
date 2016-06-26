@@ -38,7 +38,7 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
          |}
          """.stripMargin)
     consumer = MySQLBinaryLogConsumer(conf)
-    tableCache = new TableCache(db.hostname, db.port, db.username, db.password)
+    tableCache = new TableCache(db.hostname, db.port, db.username, db.password, 5) // TODO: fetch timeout from config
 
     consumer.registerListener(new BinaryLogConsumerListener[MEvent]() {
       override def onStart(c: BinaryLogConsumer[MEvent]): Unit = connected = true

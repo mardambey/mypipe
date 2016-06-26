@@ -31,6 +31,7 @@ object Util {
   }
 
   def getPrimaryKey(db: String, table: String, dbConn: Connection)(implicit ec: ExecutionContext): Future[Option[List[String]]] = {
+    log.info(s"Finding primary key for $db.$table")
     val futurePkey: Future[QueryResult] = dbConn.sendQuery(getPrimaryKeyQuery(table, db))
 
     val pKey: Future[Option[List[String]]] = futurePkey.map(queryResult ⇒ queryResult.rows match {

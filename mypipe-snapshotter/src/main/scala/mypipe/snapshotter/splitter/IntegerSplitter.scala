@@ -14,8 +14,8 @@ object IntegerSplitter extends Splitter[Int] {
   val log = LoggerFactory.getLogger(getClass)
 
   override def split(splitByCol: ColumnMetadata, minValue: Int, maxValue: Int): List[InputSplit] = {
-    val lowClausePrefix = splitByCol + " >= "
-    val highClausePrefix = splitByCol + " < "
+    val lowClausePrefix = splitByCol.name + " >= "
+    val highClausePrefix = splitByCol.name + " < "
 
     val numSplits = 5 // TODO: pass this in, must be >= 1
     val splitLimit = 100 // TODO: get this from config
@@ -41,7 +41,7 @@ object IntegerSplitter extends Splitter[Int] {
         // This is the last one use a closed interval.
         splits += InputSplit(
           lowClausePrefix + start,
-          splitByCol + " <= " + end)
+          splitByCol.name + " <= " + end)
       } else {
         // Normal open-interval case.
         splits += InputSplit(

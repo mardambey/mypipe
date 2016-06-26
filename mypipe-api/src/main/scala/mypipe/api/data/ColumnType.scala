@@ -1,8 +1,12 @@
 package mypipe.api.data
 
 import mypipe.util.Enum
+import org.slf4j.LoggerFactory
 
 object ColumnType extends Enum {
+
+  protected val log = LoggerFactory.getLogger(getClass)
+
   sealed trait EnumVal extends Value {
     val str: String // All ColumnType values also contain a string form
     override def toString: String = s"$str/$value"
@@ -50,8 +54,14 @@ object ColumnType extends Enum {
 
     def valueString: String = {
       column.metadata.colType match {
-        case VAR_STRING | STRING ⇒ new String(column.valueOption[Array[Byte]].getOrElse(Array.empty))
-        case _                   ⇒ column.valueOption[Object].map(_.toString).getOrElse("")
+        case VAR_STRING | STRING ⇒ column.valueOption[String].getOrElse("")
+        case _ ⇒ try {
+          column.valueOption[Object].map(_.toString).getOrElse("")
+        } catch {
+          case e: Exception ⇒
+            log.error(s"Could not get string value (returning empty string) for column $column")
+            ""
+        }
       }
     }
   }
