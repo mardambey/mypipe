@@ -49,37 +49,73 @@ object MySQLSnapshotter {
     s"use $dbName"
   }
 
-  def snapshot(db: String, table: String, splitByCol: Option[String], selectQuery: Option[String], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
-
-    // find primary key if it exists
-    val primaryKeyOptF = for (
+  private def getSplitByColumnFromPrimaryKey(db: String, table: String)(implicit c: Connection, ec: ExecutionContext): Future[Option[ColumnMetadata]] = {
+    for (
       _ ← c.sendQuery(s"use information_schema");
       columnsMap ← Util.getTableColumns(db, table, c);
       primaryKeyColumnNamesOpt ← Util.getPrimaryKey(db, table, c)
     ) yield {
       val columns = Util.createColumns(columnsMap)
       log.info(s"Found primary key: $primaryKeyColumnNamesOpt")
-      log.info(s"Found columns: $columns")
-      primaryKeyColumnNamesOpt map {
-        Util.getPrimaryKeyFromColumns(_, columns)
+      log.debug(s"Found columns: $columns")
+      primaryKeyColumnNamesOpt flatMap { primaryKeyColumnNames ⇒
+        val primaryKey = Util.getPrimaryKeyFromColumns(primaryKeyColumnNames, columns)
+        if (primaryKey.columns.size == 1) Some(primaryKey.columns.head)
+        else None
       }
     }
+  }
 
-    val splitQueriesListF: Future[List[(String, String)]] = primaryKeyOptF flatMap {
-      case Some(primaryKey) if primaryKey.columns.size == 1 ⇒
+  private def getSplitByColumn(db: String, table: String, colName: String)(implicit c: Connection, ec: ExecutionContext): Future[Option[ColumnMetadata]] = {
+    for (
+      _ ← c.sendQuery(s"use information_schema");
+      columnsMap ← Util.getTableColumns(db, table, c)
+    ) yield {
+      val columns = Util.createColumns(columnsMap)
+      log.debug(s"Found columns: $columns")
+      columns.find(_.name.equals(colName))
+    }
+  }
+
+  private def getSelectQuery(db: String, table: String, selectQuery: Option[String]): String = {
+    selectQuery match {
+      case Some(q) ⇒
+        log.info("Using user provided select query: $q")
+        q
+      case None ⇒
+        val q = s"""SELECT * FROM $table"""
+        log.info("Using built int select query: $q")
+        q
+    }
+  }
+
+  def snapshot(db: String, table: String, splitByColumnName: Option[String], selectQuery: Option[String], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
+
+    val splitbyColumnOptF = splitByColumnName match {
+      case Some(colName) ⇒
+        log.info(s"Using user provided split by column ${splitByColumnName.get}.")
+        getSplitByColumn(db, table, colName)
+      case None ⇒
+        log.info("Searching for primary key to user as split by columns.")
+        getSplitByColumnFromPrimaryKey(db, table)
+    }
+
+    val splitQueriesListF: Future[List[(String, String)]] = splitbyColumnOptF flatMap {
+      case Some(splitByColumn) ⇒
 
         // get splits
-        log.info(s"Trying to use primary key $primaryKey as split-by column.")
-        val splitsF = getSplits(db, table, primaryKey.columns.head)
+        log.info(s"Trying to use split-by-column as $splitByColumn")
+        val splitsF = getSplits(db, table, splitByColumn)
 
         // TODO: handle no splits returned
         // create a series of:
         // $table -> "use $db"
         // $table -> "select * from $table ..."
         val splitQueriesF = splitsF map { splits ⇒
+          val query = getSelectQuery(db, table, selectQuery)
           splits.map { split ⇒
             (s"$db.$table" → s"use $db",
-              s"$db.$table" → s"""SELECT * FROM $table WHERE ${split.lowClausePrefix} and ${split.upperClausePrefix}""")
+              s"$db.$table" → s"""$query WHERE ${split.lowClausePrefix} and ${split.upperClausePrefix}""")
           }.foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
             acc ++ List(v._1, v._2)
           }
@@ -87,8 +123,8 @@ object MySQLSnapshotter {
 
         splitQueriesF
 
-      case Some(primaryKey) if primaryKey.columns.size > 1 ⇒
-        log.error(s"Could not use multi-column primary key as a split-by column, aborting: $primaryKey")
+      case None if splitByColumnName.isDefined ⇒
+        log.error(s"Could not use user provided column $splitByColumnName as a split-by column, aborting.")
         Future.successful(List.empty[(String, String)])
       case None ⇒
         log.error("Could not find a suitable primary key to use as a split-by column, aborting.")
@@ -156,21 +192,6 @@ object MySQLSnapshotter {
 
   }
 
-  // TODO: we can still modify and use this to run the queries and spit out events
-  def snapshot(tables: Seq[String], withTransaction: Boolean = true)(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
-    val tableQueries = tables
-      .map({ t ⇒ (t → useDatabase(t), t → selectFrom(t)) })
-      .foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
-        acc ++ List(v._1, v._2)
-      }
-
-    val queries =
-      (if (withTransaction) queriesWithTxn _
-      else queriesWithoutTxn _) apply tableQueries
-
-    runQueries(queries)
-  }
-
   def snapshotToEvents(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SnapshotterEvent]]] = snapshot map { snapshotToEvents }
 
   def snapshotToEvents(results: Seq[(String, QueryResult)]): Seq[Option[SnapshotterEvent]] = {
@@ -212,17 +233,4 @@ object MySQLSnapshotter {
       "" → commit
     )
 
-  private def runQueries(queries: Seq[(String, String)])(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
-    queries.foldLeft[Future[Seq[(String, QueryResult)]]](Future.successful(Seq.empty)) { (future, query) ⇒
-      future flatMap { queryResults ⇒
-        if (!query._1.isEmpty) {
-          log.info(s"${query._2}")
-          c.sendQuery(query._2).map(r ⇒ queryResults :+ (query._1 → r))
-        } else {
-          log.info(s"${query._2}")
-          c.sendQuery(query._2).map(r ⇒ queryResults)
-        }
-      }
-    }
-  }
 }

@@ -78,7 +78,7 @@ object Snapshotter extends App {
 
     log.info(s"Snapshotting table ${tables.head}")
 
-    val snapshotF = MySQLSnapshotter.snapshot(db = tables.head.split("\\.").head, table = tables.head.split("\\.")(1), None, None, { events ⇒
+    val snapshotF = MySQLSnapshotter.snapshot(db = tables.head.split("\\.").head, table = tables.head.split("\\.")(1), splitByColumnName = None, selectQuery = None, { events ⇒
 
       log.info(s"Fetched snapshot for ${tables.head} (${events.length} rows)")
 
