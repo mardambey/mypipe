@@ -10,13 +10,13 @@ import scala.concurrent.duration._
 import mypipe._
 import mypipe.kafka.producer.KafkaMutationGenericAvroProducer
 
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{Await, Future}
 import mypipe.mysql.MySQLBinaryLogConsumer
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 import org.apache.avro.util.Utf8
 import mypipe.avro.GenericInMemorySchemaRepo
-import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
+import mypipe.avro.schema.{AvroSchemaUtils, GenericSchemaRepository}
 import mypipe.kafka.consumer.KafkaGenericMutationAvroConsumer
 import org.apache.avro.Schema
 
@@ -33,7 +33,8 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
          |{
          |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
          |}
-         """.stripMargin)
+         """.stripMargin
+  )
   val binlogConsumer = MySQLBinaryLogConsumer(c)
   val binlogPosRepo = new FileBasedBinaryLogPositionRepository(filePrefix = "test-pipe-kafka-generic", dataDir = Conf.DATADIR)
   val pipe = new Pipe("test-pipe-kafka-generic", binlogConsumer, kafkaProducer, binlogPosRepo)
@@ -57,49 +58,51 @@ class KafkaGenericSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec w
     val kafkaConsumer = new KafkaGenericMutationAvroConsumer(
       topic = KafkaUtil.genericTopic(Queries.DATABASE.name, Queries.TABLE.name),
       zkConnect = zkConnect,
-      groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}")(
+      groupId = s"${Queries.DATABASE.name}_${Queries.TABLE.name}-${System.currentTimeMillis()}"
+    )(
 
       insertCallback = { insertMutation ⇒
-        log.debug("consumed insert mutation: " + insertMutation)
-        try {
-          assert(insertMutation.getDatabase.toString == Queries.DATABASE.name)
-          assert(insertMutation.getTable.toString == Queries.TABLE.name)
-          assert(insertMutation.getStrings.get(username).toString.equals(Queries.INSERT.username))
-        } catch {
-          case e: Exception ⇒ log.error(s"Failed testing insert: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
-        }
+      log.debug("consumed insert mutation: " + insertMutation)
+      try {
+        assert(insertMutation.getDatabase.toString == Queries.DATABASE.name)
+        assert(insertMutation.getTable.toString == Queries.TABLE.name)
+        assert(insertMutation.getStrings.get(username).toString.equals(Queries.INSERT.username))
+      } catch {
+        case e: Exception ⇒ log.error(s"Failed testing insert: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
+      }
 
-        true
-      },
+      true
+    },
 
       updateCallback = { updateMutation ⇒
-        log.debug("consumed update mutation: " + updateMutation)
-        try {
-          assert(updateMutation.getDatabase.toString == Queries.DATABASE.name)
-          assert(updateMutation.getTable.toString == Queries.TABLE.name)
-          assert(updateMutation.getOldStrings.get(username).toString == Queries.INSERT.username)
-          assert(updateMutation.getNewStrings.get(username).toString == Queries.UPDATE.username)
-        } catch {
-          case e: Exception ⇒ log.error(s"Failed testing update: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
-        }
+      log.debug("consumed update mutation: " + updateMutation)
+      try {
+        assert(updateMutation.getDatabase.toString == Queries.DATABASE.name)
+        assert(updateMutation.getTable.toString == Queries.TABLE.name)
+        assert(updateMutation.getOldStrings.get(username).toString == Queries.INSERT.username)
+        assert(updateMutation.getNewStrings.get(username).toString == Queries.UPDATE.username)
+      } catch {
+        case e: Exception ⇒ log.error(s"Failed testing update: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
+      }
 
-        true
-      },
+      true
+    },
 
       deleteCallback = { deleteMutation ⇒
-        log.debug("consumed delete mutation: " + deleteMutation)
-        try {
-          assert(deleteMutation.getDatabase.toString == Queries.DATABASE.name)
-          assert(deleteMutation.getTable.toString == Queries.TABLE.name)
-          assert(deleteMutation.getStrings.get(username).toString == Queries.UPDATE.username)
-        } catch {
-          case e: Exception ⇒ log.error(s"Failed testing delete: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
-        }
+      log.debug("consumed delete mutation: " + deleteMutation)
+      try {
+        assert(deleteMutation.getDatabase.toString == Queries.DATABASE.name)
+        assert(deleteMutation.getTable.toString == Queries.TABLE.name)
+        assert(deleteMutation.getStrings.get(username).toString == Queries.UPDATE.username)
+      } catch {
+        case e: Exception ⇒ log.error(s"Failed testing delete: ${e.getMessage}: ${e.getStackTrace.mkString(System.lineSeparator())}")
+      }
 
-        done = true
-        true
+      done = true
+      true
 
-      })
+    }
+    )
 
     val future = kafkaConsumer.start
 

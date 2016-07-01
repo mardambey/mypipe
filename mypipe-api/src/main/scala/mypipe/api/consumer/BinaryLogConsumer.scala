@@ -6,7 +6,7 @@ import mypipe.api.event._
 import mypipe.mysql.BinaryLogFilePosition
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 
 trait BinaryLog[BinaryLogEvent]
 

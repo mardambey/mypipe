@@ -7,7 +7,7 @@ import java.util.logging.Logger
 
 import org.apache.kafka.common.serialization.{ByteArraySerializer, Serializer}
 import org.apache.kafka.clients.producer.ProducerConfig
-import org.apache.kafka.clients.producer.{ProducerRecord, KafkaProducer => KProducer}
+import org.apache.kafka.clients.producer.{ProducerRecord, KafkaProducer ⇒ KProducer}
 import KafkaMutationAvroProducer.MessageType
 
 import scala.collection.JavaConverters._

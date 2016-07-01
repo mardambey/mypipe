@@ -1,8 +1,8 @@
 package mypipe
 
-import mypipe.api.data.{ ColumnType, ColumnMetadata, PrimaryKey }
+import mypipe.api.data.{ColumnType, ColumnMetadata, PrimaryKey}
 import mypipe.mysql._
-import scala.concurrent.{ Future, Await }
+import scala.concurrent.{Future, Await}
 import scala.concurrent.duration._
 import akka.pattern.ask
 import akka.util.Timeout
@@ -17,7 +17,8 @@ class MySQLMetaDataSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec 
 
     val manager = system.actorOf(
       MySQLMetadataManager.props(Queries.DATABASE.host, Queries.DATABASE.port, Queries.DATABASE.username, Some(Queries.DATABASE.password)),
-      s"TestDBMetadataActor-${Queries.DATABASE.host}:${Queries.DATABASE.port}")
+      s"TestDBMetadataActor-${Queries.DATABASE.host}:${Queries.DATABASE.port}"
+    )
 
     val future = ask(manager, GetColumns("mypipe", "user")).asInstanceOf[Future[(List[ColumnMetadata], Option[PrimaryKey])]]
     val c = Await.result(future, 2 seconds)

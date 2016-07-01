@@ -1,6 +1,6 @@
 package mypipe.api.data
 
-import java.lang.{ Long ⇒ JLong }
+import java.lang.{Long ⇒ JLong}
 
 case class PrimaryKey(columns: List[ColumnMetadata])
 

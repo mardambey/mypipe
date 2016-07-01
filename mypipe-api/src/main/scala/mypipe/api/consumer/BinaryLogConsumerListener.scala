@@ -1,7 +1,7 @@
 package mypipe.api.consumer
 
 import mypipe.api.data.Table
-import mypipe.api.event.{ AlterEvent, Mutation }
+import mypipe.api.event.{AlterEvent, Mutation}
 
 trait BinaryLogConsumerListener[BinaryLogEvent] {
   def onStart(consumer: BinaryLogConsumer[BinaryLogEvent]) {}

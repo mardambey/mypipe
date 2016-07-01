@@ -2,9 +2,9 @@ package mypipe.mysql
 
 import com.typesafe.config.Config
 
-import mypipe.api.{ HostPortUserPass, Conf }
+import mypipe.api.{HostPortUserPass, Conf}
 
-import mypipe.api.consumer.{ BinaryLogConsumerTableFinder, BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener }
+import mypipe.api.consumer.{BinaryLogConsumerTableFinder, BinaryLogConsumer, BinaryLogConsumerErrorHandler, BinaryLogConsumerListener}
 import mypipe.api.data.Table
 import mypipe.api.event._
 import mypipe.util.Eval

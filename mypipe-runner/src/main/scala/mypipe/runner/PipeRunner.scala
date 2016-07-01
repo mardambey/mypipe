@@ -2,8 +2,8 @@ package mypipe.runner
 
 import mypipe.api.consumer.BinaryLogConsumer
 import mypipe.api.producer.Producer
-import mypipe.api.repo.{ FileBasedBinaryLogPositionRepository, BinaryLogPositionRepositoryFromConfiguration, ConfigurableBinaryLogPositionRepository }
-import mypipe.mysql.{ MySQLBinaryLogConsumer, BinaryLogFilePosition }
+import mypipe.api.repo.{FileBasedBinaryLogPositionRepository, BinaryLogPositionRepositoryFromConfiguration, ConfigurableBinaryLogPositionRepository}
+import mypipe.mysql.{MySQLBinaryLogConsumer, BinaryLogFilePosition}
 import mypipe.pipe._
 
 import scala.collection.JavaConverters._
@@ -59,10 +59,12 @@ object PipeRunnerUtil {
     }).toSeq
   }
 
-  def createPipes(conf: Config,
-                  key: String,
-                  producerClasses: Map[String, Option[Class[Producer]]],
-                  consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])]): Seq[Pipe[_]] = {
+  def createPipes(
+    conf:            Config,
+    key:             String,
+    producerClasses: Map[String, Option[Class[Producer]]],
+    consumerConfigs: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])]
+  ): Seq[Pipe[_]] = {
 
     val pipes = conf.getObject(key).asScala
 
@@ -131,7 +133,8 @@ object PipeRunnerUtil {
         case Some(clazz) ⇒
           val consumer = {
             clazz.getConstructors.find(
-              _.getParameterTypes.headOption.exists(_.equals(classOf[Config])))
+              _.getParameterTypes.headOption.exists(_.equals(classOf[Config]))
+            )
               .map(_.newInstance(params._2))
               .getOrElse(clazz.newInstance())
           }

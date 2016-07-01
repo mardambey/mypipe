@@ -5,11 +5,11 @@ import java.nio.ByteBuffer
 import java.util
 
 import mypipe.api.data.Row
-import mypipe.api.event.{ Mutation, SingleValuedMutation, UpdateMutation }
+import mypipe.api.event.{Mutation, SingleValuedMutation, UpdateMutation}
 import mypipe.avro.Guid
 import mypipe.avro.schema.GenericSchemaRepository
 import org.apache.avro.Schema
-import org.apache.avro.generic.{ GenericData, GenericDatumWriter, GenericRecord }
+import org.apache.avro.generic.{GenericData, GenericDatumWriter, GenericRecord}
 import org.apache.avro.io.EncoderFactory
 import org.apache.kafka.common.serialization.Serializer
 import org.slf4j.LoggerFactory

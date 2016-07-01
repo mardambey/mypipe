@@ -8,15 +8,18 @@ import scala.reflect.runtime._
 import scala.reflect.runtime.universe._
 
 class KafkaMutationAvroConsumer[InsertMutationType <: SpecificRecord, UpdateMutationType <: SpecificRecord, DeleteMutationType <: SpecificRecord](
-  topic: String,
-  zkConnect: String,
-  groupId: String,
-  valueDecoder: Decoder[SpecificRecord])(insertCallback: (InsertMutationType) ⇒ Boolean,
-                                         updateCallback: (UpdateMutationType) ⇒ Boolean,
-                                         deleteCallback: (DeleteMutationType) ⇒ Boolean,
-                                         implicit val insertTag: TypeTag[InsertMutationType],
-                                         implicit val updateTag: TypeTag[UpdateMutationType],
-                                         implicit val deleteTag: TypeTag[DeleteMutationType])
+  topic:        String,
+  zkConnect:    String,
+  groupId:      String,
+  valueDecoder: Decoder[SpecificRecord]
+)(
+  insertCallback:         (InsertMutationType) ⇒ Boolean,
+  updateCallback:         (UpdateMutationType) ⇒ Boolean,
+  deleteCallback:         (DeleteMutationType) ⇒ Boolean,
+  implicit val insertTag: TypeTag[InsertMutationType],
+  implicit val updateTag: TypeTag[UpdateMutationType],
+  implicit val deleteTag: TypeTag[DeleteMutationType]
+)
     extends KafkaConsumer[SpecificRecord](topic, zkConnect, groupId, valueDecoder) {
 
   protected val logger = LoggerFactory.getLogger(getClass.getName)

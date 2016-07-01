@@ -1,8 +1,8 @@
 package mypipe.pipe
 
-import akka.actor.{ ActorSystem, Cancellable }
-import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
-import mypipe.api.event.{ AlterEvent, Mutation }
+import akka.actor.{ActorSystem, Cancellable}
+import mypipe.api.consumer.{BinaryLogConsumer, BinaryLogConsumerListener}
+import mypipe.api.event.{AlterEvent, Mutation}
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
 import mypipe.api.repo.BinaryLogPositionRepository
@@ -53,8 +53,10 @@ case class Pipe[BinaryLogEvent](id: String, consumer: BinaryLogConsumer[BinaryLo
       state = State.STARTED
       _connected = true
 
-      flusher = Some(system.scheduler.schedule(Conf.FLUSH_INTERVAL_SECS.seconds,
-        Conf.FLUSH_INTERVAL_SECS.seconds)(flushAndsaveBinaryLogPosition(consumer)))
+      flusher = Some(system.scheduler.schedule(
+        Conf.FLUSH_INTERVAL_SECS.seconds,
+        Conf.FLUSH_INTERVAL_SECS.seconds
+      )(flushAndsaveBinaryLogPosition(consumer)))
     }
 
     private def flushAndsaveBinaryLogPosition(consumer: BinaryLogConsumer[BinaryLogEvent]) {

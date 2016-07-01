@@ -1,13 +1,13 @@
 package mypipe
 
 import com.typesafe.config.ConfigFactory
-import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
-import mypipe.api.event.{ InsertMutation, Mutation }
+import mypipe.api.consumer.{BinaryLogConsumer, BinaryLogConsumerListener}
+import mypipe.api.event.{InsertMutation, Mutation}
 import mypipe.mysql._
 
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import java.util.concurrent.{ LinkedBlockingQueue, TimeUnit }
+import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 
 import akka.actor.ActorDSL._
 import akka.pattern.ask
@@ -16,7 +16,7 @@ import akka.agent.Agent
 
 import scala.collection.mutable.ListBuffer
 import org.slf4j.LoggerFactory
-import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
+import com.github.shyiko.mysql.binlog.event.{Event ⇒ MEvent, _}
 import mypipe.producer.QueueProducer
 
 class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
@@ -76,7 +76,8 @@ class LatencySpec extends UnitSpec with DatabaseSpec with ActorSystemSpec {
            |{
            |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
            |}
-         """.stripMargin)
+         """.stripMargin
+      )
       val consumer = MySQLBinaryLogConsumer(conf)
 
       consumer.registerListener(new BinaryLogConsumerListener[MEvent]() {

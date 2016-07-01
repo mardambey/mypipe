@@ -62,11 +62,11 @@ abstract class KafkaMutationAvroProducer[T <: Serializer[MessageType]](config: C
     try {
       if (input.isInstanceOf[SingleValuedMutation]) {
         val mut = input.asInstanceOf[SingleValuedMutation]
-        mut.rows foreach { row => producer.queue(getKafkaTopic(input), (mut, Left(row))) }
+        mut.rows foreach { row ⇒ producer.queue(getKafkaTopic(input), (mut, Left(row))) }
         true
       } else {
         val mut = input.asInstanceOf[UpdateMutation]
-        mut.rows foreach { row => producer.queue(getKafkaTopic(input), (mut, Right(row._1, row._2))) }
+        mut.rows foreach { row ⇒ producer.queue(getKafkaTopic(input), (mut, Right(row._1, row._2))) }
         true
       }
     } catch {

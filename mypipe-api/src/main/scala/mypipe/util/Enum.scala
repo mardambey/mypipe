@@ -20,7 +20,7 @@ trait Enum { //DIY enum type
 
   //Adds an EnumVal to our storage, uses CCAS to make sure it's thread safe, returns the ordinal
   private final def addEnumVal(newVal: EnumVal): Int = {
-    import _values.{ get, compareAndSet ⇒ CAS }
+    import _values.{get, compareAndSet ⇒ CAS}
     val oldVec = get
     val newVec = oldVec :+ newVal
     if ((get eq oldVec) && CAS(oldVec, newVec)) newVec.indexWhere(_ eq newVal) else addEnumVal(newVal)

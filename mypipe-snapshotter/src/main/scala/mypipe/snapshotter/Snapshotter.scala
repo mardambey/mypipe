@@ -9,8 +9,8 @@ import mypipe.pipe.Pipe
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import com.github.mauricio.async.db.{ Configuration, Connection }
-import com.typesafe.config.{ Config, ConfigFactory }
+import com.github.mauricio.async.db.{Configuration, Connection}
+import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Await

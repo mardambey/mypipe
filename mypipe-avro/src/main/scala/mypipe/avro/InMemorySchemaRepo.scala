@@ -1,7 +1,7 @@
 package mypipe.avro
 
 import mypipe.avro.schema.GenericSchemaRepository
-import org.schemarepo.{ ValidatorFactory, InMemoryRepository }
+import org.schemarepo.{ValidatorFactory, InMemoryRepository}
 
 abstract class InMemorySchemaRepo[ID, SCHEMA] extends GenericSchemaRepository[ID, SCHEMA] {
 

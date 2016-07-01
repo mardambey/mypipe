@@ -1,10 +1,10 @@
 package mypipe.kafka.producer
 
 import com.typesafe.config.Config
-import mypipe.api.event.{ AlterEvent, Mutation }
+import mypipe.api.event.{AlterEvent, Mutation}
 import mypipe.kafka.KafkaUtil
 
-class KafkaMutationSpecificAvroProducer(config: Config) extends KafkaMutationAvroProducer(config, classOf[mypipe.kafka.producer.KafkaSpecificAvroSerializer], Map("schema-repo-client" -> config.getString("schema-repo-client"))) {
+class KafkaMutationSpecificAvroProducer(config: Config) extends KafkaMutationAvroProducer(config, classOf[mypipe.kafka.producer.KafkaSpecificAvroSerializer], Map("schema-repo-client" → config.getString("schema-repo-client"))) {
 
   override def handleAlter(event: AlterEvent): Boolean = {
     true

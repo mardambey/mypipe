@@ -4,9 +4,9 @@ import java.util.UUID
 
 import mypipe.api._
 import mypipe.util.Lists._
-import com.fasterxml.uuid.{ EthernetAddress, Generators }
+import com.fasterxml.uuid.{EthernetAddress, Generators}
 
-import mypipe.api.data.{ UnknownTable, Table }
+import mypipe.api.data.{UnknownTable, Table}
 import mypipe.api.event._
 import mypipe.mysql.BinaryLogFilePosition
 
@@ -86,7 +86,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsum
     processList[BinaryLogConsumerListener[BinaryLogEvent]](
       list = listeners.toList,
       listOp = _.onMutation(this, mutation),
-      onError = handleMutationError(_, _)(mutation))
+      onError = handleMutationError(_, _)(mutation)
+    )
   }
 
   private def handleTableMap(event: TableMapEvent): Boolean = {
@@ -95,7 +96,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsum
       processList[BinaryLogConsumerListener[BinaryLogEvent]](
         list = listeners.toList,
         listOp = _.onTableMap(this, table),
-        onError = handleTableMapError(_, _)(table, event))
+        onError = handleTableMapError(_, _)(table, event)
+      )
     })
 
     success && updateBinaryLogPosition()
@@ -112,7 +114,8 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsum
         processList[BinaryLogConsumerListener[BinaryLogEvent]](
           list = listeners.toList,
           listOp = _.onTableAlter(this, event),
-          onError = handleAlterError(_, _)(table, event))
+          onError = handleAlterError(_, _)(table, event)
+        )
     }
 
     success && updateBinaryLogPosition()
@@ -154,12 +157,14 @@ abstract class AbstractBinaryLogConsumer[BinaryLogEvent] extends BinaryLogConsum
           processList[BinaryLogConsumerListener[BinaryLogEvent]](
             list = listeners.toList,
             listOp = _.onMutation(this, mutations),
-            onError = handleMutationsError(_, _)(mutations))
+            onError = handleMutationsError(_, _)(mutations)
+          )
         } else {
           processList[Mutation](
             list = txQueue.toList,
             listOp = _handleMutation,
-            onError = handleCommitError)
+            onError = handleCommitError
+          )
         }
 
       clearTxState()

@@ -7,7 +7,7 @@
     </layout>
   </appender>
 
-  <logger name="mypipe" level="debug"/>
+  <logger name="mypipe.kafka" level="debug"/>
 
   <root level="info">
     <appender-ref ref="STDOUT" />

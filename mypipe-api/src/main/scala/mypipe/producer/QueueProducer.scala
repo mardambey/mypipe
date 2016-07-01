@@ -2,7 +2,7 @@ package mypipe.producer
 
 import java.util
 
-import mypipe.api.event.{ AlterEvent, Mutation }
+import mypipe.api.event.{AlterEvent, Mutation}
 import mypipe.api.producer.Producer
 
 import scala.collection.JavaConverters._

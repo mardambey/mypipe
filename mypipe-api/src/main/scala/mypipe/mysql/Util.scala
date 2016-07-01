@@ -1,10 +1,10 @@
 package mypipe.mysql
 
-import com.github.mauricio.async.db.{ Connection, QueryResult }
-import mypipe.api.data.{ ColumnMetadata, ColumnType, PrimaryKey }
+import com.github.mauricio.async.db.{Connection, QueryResult}
+import mypipe.api.data.{ColumnMetadata, ColumnType, PrimaryKey}
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 
 object Util {
 
@@ -37,14 +37,16 @@ object Util {
     val pKey: Future[Option[List[String]]] = futurePkey.map(queryResult ⇒ queryResult.rows match {
 
       case Some(resultSet) if resultSet.nonEmpty ⇒
-        Some(resultSet.map(row ⇒ row(0).asInstanceOf[String]).toList)
+        val pk = resultSet.map(row ⇒ row(0).asInstanceOf[String]).toList
+        log.debug("Found primary key for {}.{} {}", Array(db, table, pk): _*)
+        Some(pk)
 
       case Some(resultSet) ⇒
-        log.debug(s"No primary key determined for $db:$table")
+        log.info(s"No primary key determined for $db.$table")
         None
 
       case None ⇒
-        log.error(s"Failed to determine primary key for $db:$table")
+        log.error(s"Failed to determine primary key for $db.$table")
         None
     })
 

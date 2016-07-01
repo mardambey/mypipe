@@ -1,6 +1,6 @@
 package mypipe.api.repo
 
-import java.io.{ File, PrintWriter }
+import java.io.{File, PrintWriter}
 
 import com.typesafe.config.Config
 import mypipe.api.Conf
@@ -73,6 +73,7 @@ class FileBasedBinaryLogPositionRepository(filePrefix: String, dataDir: String) 
 class ConfigurableFileBasedBinaryLogPositionRepository(override val config: Config)
   extends FileBasedBinaryLogPositionRepository(
     config.getString("file-prefix"),
-    config.getOptionalNoneEmptyString("data-dir").getOrElse(Conf.DATADIR))
+    config.getOptionalNoneEmptyString("data-dir").getOrElse(Conf.DATADIR)
+  )
   with ConfigurableBinaryLogPositionRepository
 

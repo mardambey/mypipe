@@ -20,7 +20,7 @@ object KafkaMutationGenericAvroProducer {
  *
  *  @param config configuration must have "metadata-brokers"
  */
-class KafkaMutationGenericAvroProducer(config: Config) extends KafkaMutationAvroProducer(config, classOf[mypipe.kafka.producer.KafkaGenericAvroSerializer], Map("schema-repo-client" -> "mypipe.avro.GenericInMemorySchemaRepo")) {
+class KafkaMutationGenericAvroProducer(config: Config) extends KafkaMutationAvroProducer(config, classOf[mypipe.kafka.producer.KafkaGenericAvroSerializer], Map("schema-repo-client" → "mypipe.avro.GenericInMemorySchemaRepo")) {
 
   override def handleAlter(event: AlterEvent): Boolean = {
     // no special support for alters needed, "generic" schema

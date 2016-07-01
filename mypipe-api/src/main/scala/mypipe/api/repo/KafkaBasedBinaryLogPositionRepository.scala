@@ -19,6 +19,7 @@ object ConfigurableKafkaBasedBinaryLogPositionRepository {
 class ConfigurableKafkaBasedBinaryLogPositionRepository(override val config: Config)
   extends KafkaBasedBinaryLogPositionRepository(
     ConfigurableKafkaBasedBinaryLogPositionRepository.producerProperties(config),
-    ConfigurableKafkaBasedBinaryLogPositionRepository.consumerProperties(config))
+    ConfigurableKafkaBasedBinaryLogPositionRepository.consumerProperties(config)
+  )
   with ConfigurableBinaryLogPositionRepository
 

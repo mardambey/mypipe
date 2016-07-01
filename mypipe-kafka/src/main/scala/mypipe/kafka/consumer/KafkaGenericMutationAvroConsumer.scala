@@ -1,7 +1,7 @@
 package mypipe.kafka.consumer
 
-import mypipe.avro.{ DeleteMutation, InsertMutation, UpdateMutation }
-import KafkaGenericMutationAvroConsumer.{ GenericDeleteMutationCallback, GenericInsertMutationCallback, GenericUpdateMutationCallback }
+import mypipe.avro.{DeleteMutation, InsertMutation, UpdateMutation}
+import KafkaGenericMutationAvroConsumer.{GenericDeleteMutationCallback, GenericInsertMutationCallback, GenericUpdateMutationCallback}
 
 import scala.reflect.runtime.universe._
 
@@ -16,11 +16,13 @@ class KafkaGenericMutationAvroConsumer(topic: String, zkConnect: String, groupId
     topic = topic,
     zkConnect = zkConnect,
     groupId = groupId,
-    valueDecoder = new KafkaGenericAvroDecoder())(
+    valueDecoder = new KafkaGenericAvroDecoder()
+  )(
     insertCallback,
     updateCallback,
     deleteCallback,
     implicitly[TypeTag[InsertMutation]],
     implicitly[TypeTag[UpdateMutation]],
-    implicitly[TypeTag[DeleteMutation]])
+    implicitly[TypeTag[DeleteMutation]]
+  )
 

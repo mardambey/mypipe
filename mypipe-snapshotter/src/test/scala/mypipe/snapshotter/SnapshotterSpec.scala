@@ -2,7 +2,7 @@ package mypipe.snapshotter
 
 import akka.util.Timeout
 import com.github.mauricio.async.db.Connection
-import mypipe.{ Queries, ActorSystemSpec, DatabaseSpec, UnitSpec }
+import mypipe.{Queries, ActorSystemSpec, DatabaseSpec, UnitSpec}
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 
@@ -37,7 +37,7 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
             }
           }
 
-          result._1 -> colData.getOrElse(Seq.empty)
+          result._1 → colData.getOrElse(Seq.empty)
         }
       }
 

@@ -1,7 +1,7 @@
 package mypipe.api.producer
 
 import com.typesafe.config.Config
-import mypipe.api.event.{ AlterEvent, Mutation }
+import mypipe.api.event.{AlterEvent, Mutation}
 
 abstract class Producer(config: Config) {
   def queue(mutation: Mutation): Boolean

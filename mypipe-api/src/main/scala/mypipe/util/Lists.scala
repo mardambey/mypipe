@@ -6,9 +6,11 @@ object Lists {
 
   protected val log = LoggerFactory.getLogger(getClass)
 
-  def processList[T](list: List[T],
-                     listOp: (T) ⇒ Boolean,
-                     onError: (List[T], T) ⇒ Boolean): Boolean = {
+  def processList[T](
+    list:    List[T],
+    listOp:  (T) ⇒ Boolean,
+    onError: (List[T], T) ⇒ Boolean
+  ): Boolean = {
 
     list.forall(item ⇒ {
       val res = try { listOp(item) } catch {

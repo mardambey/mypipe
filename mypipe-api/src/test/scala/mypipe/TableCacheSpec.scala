@@ -1,19 +1,19 @@
 package mypipe
 
-import java.util.concurrent.{ TimeUnit, LinkedBlockingQueue }
-import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent }
+import java.util.concurrent.{TimeUnit, LinkedBlockingQueue}
+import com.github.shyiko.mysql.binlog.event.{Event ⇒ MEvent}
 
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import mypipe.api.consumer.{ BinaryLogConsumer, BinaryLogConsumerListener }
+import mypipe.api.consumer.{BinaryLogConsumer, BinaryLogConsumerListener}
 import mypipe.api.data.Table
-import mypipe.api.event.{ AlterEvent, TableMapEvent }
+import mypipe.api.event.{AlterEvent, TableMapEvent}
 import mypipe.mysql._
 import org.scalatest.BeforeAndAfterAll
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import scala.concurrent.{ TimeoutException, Await, Future }
+import scala.concurrent.{TimeoutException, Await, Future}
 
 class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec with BeforeAndAfterAll {
 
@@ -36,7 +36,8 @@ class TableCacheSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
          |{
          |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
          |}
-         """.stripMargin)
+         """.stripMargin
+    )
     consumer = MySQLBinaryLogConsumer(conf)
     tableCache = new TableCache(db.hostname, db.port, db.username, db.password, 5) // TODO: fetch timeout from config
 

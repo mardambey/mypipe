@@ -1,7 +1,7 @@
 package mypipe.kafka.consumer
 
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{Await, Future}
 
 class GenericConsoleConsumer(topic: String, zkConnect: String, groupId: String) {
 
@@ -11,22 +11,24 @@ class GenericConsoleConsumer(topic: String, zkConnect: String, groupId: String) 
   val kafkaConsumer = new KafkaGenericMutationAvroConsumer(
     topic = topic,
     zkConnect = zkConnect,
-    groupId = groupId)(
+    groupId = groupId
+  )(
 
     insertCallback = { insertMutation ⇒
-      println(insertMutation)
-      true
-    },
+    println(insertMutation)
+    true
+  },
 
     updateCallback = { updateMutation ⇒
-      println(updateMutation)
-      true
-    },
+    println(updateMutation)
+    true
+  },
 
     deleteCallback = { deleteMutation ⇒
-      println(deleteMutation)
-      true
-    }) {
+    println(deleteMutation)
+    true
+  }
+  ) {
   }
 
   def start(): Unit = {

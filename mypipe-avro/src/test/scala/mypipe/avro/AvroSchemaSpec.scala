@@ -2,7 +2,7 @@ package mypipe.avro
 
 import mypipe.UnitSpec
 import java.util.Properties
-import mypipe.avro.schema.{ GenericSchemaRepository, ShortSchemaId, AvroSchema }
+import mypipe.avro.schema.{GenericSchemaRepository, ShortSchemaId, AvroSchema}
 import org.apache.avro.Schema
 import org.apache.avro.Schema.Parser
 import org.scalatest.BeforeAndAfterAll
@@ -24,7 +24,8 @@ class AvroSchemaSpec extends UnitSpec with BeforeAndAfterAll {
       Some(new Parser().parse(getClass.getResourceAsStream(schema)))
     } catch {
       case e: Exception ⇒ None
-    })
+    }
+  )
 
   val client1 = createSchemaRepoClient(url)
   val client2 = createSchemaRepoClient(url)

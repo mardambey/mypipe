@@ -33,9 +33,10 @@ class BinaryLogPositionRepositoryFromConfiguration(override val config: Config)
     config.getOptionalString("class")
       .map(
         Class.forName(_)
-          .getConstructor(classOf[Config])
-          .newInstance(config.getConfig("config"))
-          .asInstanceOf[ConfigurableBinaryLogPositionRepository])
+        .getConstructor(classOf[Config])
+        .newInstance(config.getConfig("config"))
+        .asInstanceOf[ConfigurableBinaryLogPositionRepository]
+      )
 
   override def saveBinaryLogPosition(consumer: BinaryLogConsumer[_]): Unit = handler.foreach(_.saveBinaryLogPosition(consumer))
   override def loadBinaryLogPosition(consumer: BinaryLogConsumer[_]): Option[BinaryLogFilePosition] = handler.flatMap(_.loadBinaryLogPosition(consumer))

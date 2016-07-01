@@ -1,5 +1,5 @@
 import akka.actor.ActorSystem
-import com.github.mauricio.async.db.{ Configuration, Connection }
+import com.github.mauricio.async.db.{Configuration, Connection}
 import com.github.mauricio.async.db.mysql.MySQLConnection
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterAll
@@ -41,7 +41,8 @@ package object mypipe {
       Queries.DATABASE.port,
       Queries.DATABASE.username,
       Queries.DATABASE.password,
-      Queries.DATABASE.name)
+      Queries.DATABASE.name
+    )
 
     override def beforeAll(): Unit = {
       db.connect()

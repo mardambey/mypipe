@@ -1,11 +1,11 @@
 package mypipe.kafka.producer
 
 import java.nio.ByteBuffer
-import java.lang.{ Long ⇒ JLong }
-import java.util.{ HashMap ⇒ JMap }
+import java.lang.{Long ⇒ JLong}
+import java.util.{HashMap ⇒ JMap}
 
-import mypipe.api.data.{ Column, ColumnType, Row }
-import mypipe.api.event.{ Mutation, SingleValuedMutation, UpdateMutation }
+import mypipe.api.data.{Column, ColumnType, Row}
+import mypipe.api.event.{Mutation, SingleValuedMutation, UpdateMutation}
 import mypipe.avro.schema.AvroSchemaUtils
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericData

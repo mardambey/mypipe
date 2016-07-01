@@ -2,7 +2,7 @@ package mypipe.avro
 
 import mypipe.api.event.Mutation
 import org.apache.avro.Schema
-import mypipe.avro.schema.{ AvroSchemaUtils, AvroSchema, ShortSchemaId }
+import mypipe.avro.schema.{AvroSchemaUtils, AvroSchema, ShortSchemaId}
 
 /** An in memory Avro schema repository that maps 3 topics: insert, update, delete.
  *  The schemas returned are InsertMutation, UpdateMutation, and DeleteMutation that

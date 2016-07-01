@@ -2,10 +2,10 @@ package mypipe.avro.schema
 
 import scala.collection.mutable
 import java.util.logging.Logger
-import com.google.common.collect.{ HashBiMap, BiMap }
+import com.google.common.collect.{HashBiMap, BiMap}
 import org.schemarepo.client.RESTRepositoryClient
 import org.schemarepo.json.GsonJsonUtil
-import org.schemarepo.{ BaseRepository, Subject, SchemaEntry }
+import org.schemarepo.{BaseRepository, Subject, SchemaEntry}
 
 trait SchemaRepository[ID, SCHEMA] {
 
@@ -79,14 +79,16 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
    *  @tparam VALUE the type of the value in the map we want to update
    *  @return Some(schema) if the subject and key are valid, None otherwise
    */
-  private def retrieveUnknownEntity[KEY, VALUE](subject: String,
-                                                key: KEY,
-                                                map: java.util.Map[KEY, VALUE],
-                                                entityRetrievalFunction: Subject ⇒ SchemaEntry,
-                                                schemaEntryToStringFunction: SchemaEntry ⇒ String,
-                                                stringToValueFunction: String ⇒ VALUE,
-                                                createMissingSubject: Boolean = false,
-                                                throwException: Boolean = false): Option[VALUE] = {
+  private def retrieveUnknownEntity[KEY, VALUE](
+    subject:                     String,
+    key:                         KEY,
+    map:                         java.util.Map[KEY, VALUE],
+    entityRetrievalFunction:     Subject ⇒ SchemaEntry,
+    schemaEntryToStringFunction: SchemaEntry ⇒ String,
+    stringToValueFunction:       String ⇒ VALUE,
+    createMissingSubject:        Boolean                   = false,
+    throwException:              Boolean                   = false
+  ): Option[VALUE] = {
     val subjectOption: Option[Subject] = client.lookup(subject) match {
       case null ⇒ {
         if (createMissingSubject) {
@@ -112,7 +114,9 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
             case schemaEntry ⇒ {
               val value: VALUE = stringToValueFunction(
                 schemaEntryToStringFunction(
-                  schemaEntry))
+                  schemaEntry
+                )
+              )
               map.put(key, value)
               Some(value)
             }
@@ -138,16 +142,18 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
     }
   }
 
-  private def retrieveEntity[KEY, VALUE](subject: String,
-                                         key: KEY,
-                                         mainCache: mutable.Map[String, BiMap[KEY, VALUE]],
-                                         inverseCache: mutable.Map[String, BiMap[VALUE, KEY]],
-                                         entityRetrievalFunction: Subject ⇒ SchemaEntry,
-                                         schemaEntryToStringFunction: SchemaEntry ⇒ String,
-                                         stringToValueFunction: String ⇒ VALUE,
-                                         createMissingSubject: Boolean = false,
-                                         flushCache: Boolean = false,
-                                         throwException: Boolean = false): Option[VALUE] = {
+  private def retrieveEntity[KEY, VALUE](
+    subject:                     String,
+    key:                         KEY,
+    mainCache:                   mutable.Map[String, BiMap[KEY, VALUE]],
+    inverseCache:                mutable.Map[String, BiMap[VALUE, KEY]],
+    entityRetrievalFunction:     Subject ⇒ SchemaEntry,
+    schemaEntryToStringFunction: SchemaEntry ⇒ String,
+    stringToValueFunction:       String ⇒ VALUE,
+    createMissingSubject:        Boolean                                = false,
+    flushCache:                  Boolean                                = false,
+    throwException:              Boolean                                = false
+  ): Option[VALUE] = {
       def specificRetrieveFunction(cachedMap: java.util.Map[KEY, VALUE]): Option[VALUE] = {
         retrieveUnknownEntity[KEY, VALUE](
           subject,
@@ -157,7 +163,8 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
           schemaEntryToStringFunction,
           stringToValueFunction,
           createMissingSubject,
-          throwException)
+          throwException
+        )
       }
 
     mainCache.get(subject) match {
@@ -187,7 +194,8 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
       schemaToIdCache,
       entityRetrievalFunction = _.lookupById(idToString(schemaId)),
       schemaEntryToStringFunction = _.getSchema,
-      stringToValueFunction = stringToSchema)
+      stringToValueFunction = stringToSchema
+    )
   }
 
   /** @param subject
@@ -201,7 +209,8 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
         latestSchemaCache,
         entityRetrievalFunction = _.latest,
         schemaEntryToStringFunction = _.getSchema,
-        stringToValueFunction = stringToSchema)
+        stringToValueFunction = stringToSchema
+      )
 
     if (flushCache) {
       retrieve
@@ -225,7 +234,8 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
       idToSchemaCache,
       entityRetrievalFunction = _.lookupBySchema(schemaToString(schema)),
       schemaEntryToStringFunction = _.getId,
-      stringToValueFunction = stringToId)
+      stringToValueFunction = stringToId
+    )
   }
 
   /** @param subject
@@ -244,6 +254,7 @@ abstract class GenericSchemaRepository[ID, SCHEMA] extends SchemaRepository[ID, 
       stringToValueFunction = stringToId,
       createMissingSubject = true,
       flushCache = true,
-      throwException = true).get
+      throwException = true
+    ).get
   }
 }

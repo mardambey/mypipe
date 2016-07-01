@@ -3,12 +3,12 @@ package mypipe.snapshotter
 import com.typesafe.config.Config
 
 import scala.concurrent.duration._
-import scala.concurrent.{ Future, Await }
+import scala.concurrent.{Future, Await}
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 
-import mypipe.api.consumer.{ ConfigLoader, BinaryLogConsumer }
+import mypipe.api.consumer.{ConfigLoader, BinaryLogConsumer}
 import mypipe.api.data._
 import mypipe.api.event._
 import mypipe.mysql._
@@ -68,7 +68,7 @@ class SelectConsumer(override val config: Config)
 
       // zip the names and values from the table's columns and the row's data and
       // create a map that contains column names to Column objects with values
-      val cols = table.columns.zip(evRow).map(c ⇒ c._1.name -> Column(c._1, c._2))
+      val cols = table.columns.zip(evRow).map(c ⇒ c._1.name → Column(c._1, c._2))
       val columns = ListMap.empty[String, Column] ++ cols.toArray
 
       Row(table, columns)

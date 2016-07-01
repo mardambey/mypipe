@@ -2,7 +2,7 @@ package mypipe.kafka.consumer
 
 import mypipe.api.event.Mutation
 import mypipe.avro._
-import mypipe.avro.schema.{ AvroSchemaUtils, GenericSchemaRepository }
+import mypipe.avro.schema.{AvroSchemaUtils, GenericSchemaRepository}
 import org.apache.avro.Schema
 
 case class KafkaGenericAvroDecoder() extends KafkaAvroDecoder[InsertMutation, UpdateMutation, DeleteMutation] {

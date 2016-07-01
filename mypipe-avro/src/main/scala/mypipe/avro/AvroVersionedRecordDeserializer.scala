@@ -1,11 +1,11 @@
 package mypipe.avro
 
 import mypipe.api.event.Deserializer
-import org.apache.avro.io.{ DatumReader, BinaryDecoder, DecoderFactory }
+import org.apache.avro.io.{DatumReader, BinaryDecoder, DecoderFactory}
 import org.apache.avro.Schema
 
 import scala.reflect.runtime.universe._
-import org.apache.avro.specific.{ SpecificDatumReader, SpecificRecord }
+import org.apache.avro.specific.{SpecificDatumReader, SpecificRecord}
 import java.util.logging.Logger
 
 class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](implicit val tag: TypeTag[InputRecord])
@@ -21,15 +21,15 @@ class AvroVersionedRecordDeserializer[InputRecord <: SpecificRecord](implicit va
   def createInstance[T: TypeTag]: T = {
     val tpe = typeOf[T]
 
-    def fail = throw new IllegalArgumentException(s"Cannot instantiate $tpe")
+      def fail = throw new IllegalArgumentException(s"Cannot instantiate $tpe")
 
     val noArgConstructor = tpe.member(nme.CONSTRUCTOR) match {
-      case symbol: TermSymbol =>
+      case symbol: TermSymbol ⇒
         symbol.alternatives.collectFirst {
-          case constr: MethodSymbol if constr.paramss == Nil || constr.paramss == List(Nil) => constr
+          case constr: MethodSymbol if constr.paramss == Nil || constr.paramss == List(Nil) ⇒ constr
         } getOrElse fail
 
-      case NoSymbol => fail
+      case NoSymbol ⇒ fail
     }
     val classMirror = typeTag[T].mirror.reflectClass(tpe.typeSymbol.asClass)
     classMirror.reflectConstructor(noArgConstructor).apply().asInstanceOf[T]

@@ -1,7 +1,7 @@
 package mypipe.avro
 
 import mypipe.api.event.Serializer
-import org.apache.avro.specific.{ SpecificDatumWriter, SpecificRecord }
+import org.apache.avro.specific.{SpecificDatumWriter, SpecificRecord}
 import mypipe.avro.schema.SchemaRepository
 import org.apache.avro.Schema
 import java.util.logging.Logger

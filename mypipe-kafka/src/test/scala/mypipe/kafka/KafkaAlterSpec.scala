@@ -7,7 +7,7 @@ import mypipe.api.Conf
 import mypipe.api.event.Mutation
 import mypipe.api.repo.FileBasedBinaryLogPositionRepository
 import mypipe.avro.schema.AvroSchemaUtils
-import mypipe.kafka.consumer.{ KafkaIterator, KafkaSpecificAvroDecoder }
+import mypipe.kafka.consumer.{KafkaIterator, KafkaSpecificAvroDecoder}
 import mypipe.mysql.MySQLBinaryLogConsumer
 import mypipe.pipe.Pipe
 import mypipe.kafka.producer.KafkaMutationSpecificAvroProducer
@@ -24,14 +24,16 @@ class KafkaAlterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wit
   @volatile var done = false
 
   val kafkaProducer = new KafkaMutationSpecificAvroProducer(
-    conf.getConfig("mypipe.test.kafka-specific-producer"))
+    conf.getConfig("mypipe.test.kafka-specific-producer")
+  )
 
   val c = ConfigFactory.parseString(
     s"""
          |{
          |  source = "${Queries.DATABASE.host}:${Queries.DATABASE.port}:${Queries.DATABASE.username}:${Queries.DATABASE.password}"
          |}
-         """.stripMargin)
+         """.stripMargin
+  )
   val binlogConsumer = MySQLBinaryLogConsumer(c)
   val binlogPosRepo = new FileBasedBinaryLogPositionRepository(filePrefix = "test-pipe-kafka-alter", dataDir = Conf.DATADIR)
   val pipe = new Pipe("test-pipe-kafka-alter", binlogConsumer, kafkaProducer, binlogPosRepo)

@@ -41,12 +41,14 @@ object IntegerSplitter extends Splitter[Int] {
         // This is the last one use a closed interval.
         splits += InputSplit(
           lowClausePrefix + start,
-          splitByCol.name + " <= " + end)
+          splitByCol.name + " <= " + end
+        )
       } else {
         // Normal open-interval case.
         splits += InputSplit(
           lowClausePrefix + start,
-          highClausePrefix + end)
+          highClausePrefix + end
+        )
       }
 
       start = end

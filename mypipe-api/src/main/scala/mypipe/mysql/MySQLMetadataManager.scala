@@ -1,11 +1,11 @@
 package mypipe.mysql
 
-import mypipe.api.data.{ ColumnMetadata, PrimaryKey, ColumnType }
+import mypipe.api.data.{ColumnMetadata, PrimaryKey, ColumnType}
 
 import org.slf4j.LoggerFactory
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import com.github.mauricio.async.db.{ Configuration, Connection }
+import com.github.mauricio.async.db.{Configuration, Connection}
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor._
 import com.github.mauricio.async.db.mysql.MySQLConnection
@@ -72,7 +72,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
       val mapColsF = Util.getTableColumns(db, table, dbConn.head)
       val pKeyF = Util.getPrimaryKey(db, table, dbConn(1))
 
-      val results = Await.result(Future.sequence(List(mapColsF, pKeyF)), 1.seconds)
+      val results = Await.result(Future.sequence(List(mapColsF, pKeyF)), 10.seconds)
       val mapCols = results(0)
       val pKey = results(1)
 

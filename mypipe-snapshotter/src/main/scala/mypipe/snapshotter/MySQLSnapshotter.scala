@@ -1,14 +1,14 @@
 package mypipe.snapshotter
 
-import com.github.mauricio.async.db.{ Connection, QueryResult }
-import mypipe.api.data.{ ColumnMetadata, ColumnType }
+import com.github.mauricio.async.db.{Connection, QueryResult}
+import mypipe.api.data.{ColumnMetadata, ColumnType}
 import mypipe.mysql.BinaryLogFilePosition
 import mypipe.mysql.Util
-import mypipe.snapshotter.splitter.{ InputSplit, IntegerSplitter }
+import mypipe.snapshotter.splitter.{InputSplit, IntegerSplitter}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Interesting parameters:
  *  - boundary-query: used for creating splits
@@ -78,8 +78,8 @@ object MySQLSnapshotter {
         // $table -> "select * from $table ..."
         val splitQueriesF = splitsF map { splits ⇒
           splits.map { split ⇒
-            (s"$db.$table" -> s"use $db",
-              s"$db.$table" -> s"""SELECT * FROM $table WHERE ${split.lowClausePrefix} and ${split.upperClausePrefix}""")
+            (s"$db.$table" → s"use $db",
+              s"$db.$table" → s"""SELECT * FROM $table WHERE ${split.lowClausePrefix} and ${split.upperClausePrefix}""")
           }.foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
             acc ++ List(v._1, v._2)
           }
@@ -110,7 +110,7 @@ object MySQLSnapshotter {
     c.sendQuery(queryVal).map { queryResult ⇒
 
       if (!queryKey.isEmpty) {
-        val events = snapshotToEvents(Seq(queryKey -> queryResult))
+        val events = snapshotToEvents(Seq(queryKey → queryResult))
         eventHandler(events)
       }
 
@@ -159,7 +159,7 @@ object MySQLSnapshotter {
   // TODO: we can still modify and use this to run the queries and spit out events
   def snapshot(tables: Seq[String], withTransaction: Boolean = true)(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
     val tableQueries = tables
-      .map({ t ⇒ (t -> useDatabase(t), t -> selectFrom(t)) })
+      .map({ t ⇒ (t → useDatabase(t), t → selectFrom(t)) })
       .foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
         acc ++ List(v._1, v._2)
       }
@@ -198,23 +198,26 @@ object MySQLSnapshotter {
   }
 
   private def queriesWithoutTxn(tableQueries: Seq[(String, String)]) = Seq(
-    "showMasterStatus" -> showMasterStatus) ++ tableQueries
+    "showMasterStatus" → showMasterStatus
+  ) ++ tableQueries
 
   private def queriesWithTxn(tableQueries: Seq[(String, String)]) = Seq(
-    "" -> trxIsolationLevel,
-    "" -> autoCommit,
-    "" -> flushTables,
-    "" -> readLock,
-    "showMasterStatus" -> showMasterStatus,
-    "" -> unlockTables) ++ tableQueries ++ Seq(
-      "" -> commit)
+    "" → trxIsolationLevel,
+    "" → autoCommit,
+    "" → flushTables,
+    "" → readLock,
+    "showMasterStatus" → showMasterStatus,
+    "" → unlockTables
+  ) ++ tableQueries ++ Seq(
+      "" → commit
+    )
 
   private def runQueries(queries: Seq[(String, String)])(implicit c: Connection, ec: ExecutionContext): Future[Seq[(String, QueryResult)]] = {
     queries.foldLeft[Future[Seq[(String, QueryResult)]]](Future.successful(Seq.empty)) { (future, query) ⇒
       future flatMap { queryResults ⇒
         if (!query._1.isEmpty) {
           log.info(s"${query._2}")
-          c.sendQuery(query._2).map(r ⇒ queryResults :+ (query._1 -> r))
+          c.sendQuery(query._2).map(r ⇒ queryResults :+ (query._1 → r))
         } else {
           log.info(s"${query._2}")
           c.sendQuery(query._2).map(r ⇒ queryResults)
