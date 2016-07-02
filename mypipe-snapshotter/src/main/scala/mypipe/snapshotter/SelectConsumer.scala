@@ -16,7 +16,7 @@ import mypipe.mysql._
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 
-trait SnapshotterEvent
+sealed trait SnapshotterEvent
 case class SelectEvent(database: String, table: String, rows: Seq[Seq[Any]]) extends SnapshotterEvent
 case class ShowMasterStatusEvent(filePosition: BinaryLogFilePosition) extends SnapshotterEvent
 

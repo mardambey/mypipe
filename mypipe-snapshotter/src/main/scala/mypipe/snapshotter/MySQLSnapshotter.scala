@@ -43,12 +43,6 @@ object MySQLSnapshotter {
   val unlockTables = "UNLOCK TABLES"
   val commit = "COMMIT"
 
-  val selectFrom = { dbTable: String ⇒ s"SELECT * FROM $dbTable" }
-  val useDatabase = { dbTable: String ⇒
-    val dbName = dbTable.splitAt(dbTable.indexOf('.'))._1
-    s"use $dbName"
-  }
-
   private def getSplitByColumnFromPrimaryKey(db: String, table: String)(implicit c: Connection, ec: ExecutionContext): Future[Option[ColumnMetadata]] = {
     for (
       _ ← c.sendQuery(s"use information_schema");
@@ -131,7 +125,7 @@ object MySQLSnapshotter {
         Future.successful(List.empty[(String, String)])
     }
 
-    splitQueriesListF map { splitQueriesList ⇒
+    splitQueriesListF flatMap { splitQueriesList ⇒
       val queries = queriesWithoutTxn(splitQueriesList)
       _executeQueries(queries, eventHandler)
     }
@@ -216,7 +210,7 @@ object MySQLSnapshotter {
       }
 
       val firstDot = result._1.indexOf('.')
-      if (firstDot == result._1.lastIndexOf('.') && firstDot > 0) {
+      if (firstDot == result._1.lastIndexOf('.') && firstDot > 0 && result._2.rows.nonEmpty) {
         val Array(db, table) = result._1.split('.')
         Some(SelectEvent(db, table, colData.getOrElse(Seq.empty)))
       } else if (result._1.equals("showMasterStatus")) {
