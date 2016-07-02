@@ -3,6 +3,7 @@ package mypipe.snapshotter.splitter
 import mypipe.api.data.ColumnMetadata
 import org.slf4j.LoggerFactory
 
+import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
 /** A splitter with INT24 type boundaries (ie: Int).
@@ -107,24 +108,29 @@ object IntegerSplitter extends Splitter[Int] {
       split2(if (newSplits != numSplits) newSplits else newSplits + 1, splitLimit, minVal, maxVal)
 
     } else {
-      log.info("Split size: " + splitSize + " Num splits: " + numSplits
-        + " from: " + minVal + " to: " + maxVal)
+      log.info(s"Split size: $splitSize Num splits: $numSplits from: $minVal to: $maxVal")
 
       val remainder = (maxVal - minVal) % numSplits
       var curVal = minVal
 
       // This will honor numSplits as long as split size > 0.  If split size is
       // 0, it will have remainder splits.
-      (0L to numSplits) foreach { i ⇒
-        splits += curVal
-        if (curVal >= maxVal) {
-          //FIXME: this sucks, change it
-          //break
-        } else {
-          curVal += splitSize
-          curVal += (if (i < remainder) 1 else 0)
+
+      val v = 0L to numSplits
+
+        @tailrec def inc(v: Seq[Long]): Unit = {
+          val i = v.head
+          splits += curVal
+          if (curVal >= maxVal || v.tail.isEmpty) {
+            // do nothing
+          } else {
+            curVal += splitSize
+            curVal += (if (i < remainder) 1 else 0)
+            inc(v.tail)
+          }
         }
-      }
+
+      inc(v)
 
       if (splits.length == 1) {
         // make a valid singleton split
