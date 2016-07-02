@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ListBuffer
 
-/** A splitter with integer type boundaries.
+/** A splitter with INT24 type boundaries (ie: Int).
  *
  *  Based off of Apache Sqoop's equivalent code.
  */
@@ -13,48 +13,60 @@ object IntegerSplitter extends Splitter[Int] {
 
   val log = LoggerFactory.getLogger(getClass)
 
-  override def split(splitByCol: ColumnMetadata, minValue: Int, maxValue: Int): List[InputSplit] = {
+  override def split(splitByCol: ColumnMetadata, minValue: Option[Int], maxValue: Option[Int]): List[InputSplit] = {
     val lowClausePrefix = splitByCol.name + " >= "
     val highClausePrefix = splitByCol.name + " < "
 
     val numSplits = 5 // TODO: pass this in, must be >= 1
     val splitLimit = 100 // TODO: get this from config
 
-    // Get all the split points together.
-    val splitPoints = split2(numSplits, splitLimit, minValue, maxValue).toIndexedSeq
+    if (minValue.isEmpty && maxValue.isEmpty) {
+      // Range is null to null. Return a null split accordingly.
+      log.info(s"Split range is NULL to NULL for column ${splitByCol.name}")
+      List(InputSplit(s"${splitByCol.name} IS NULL", s"${splitByCol.name} IS NULL"))
+    } else {
 
-    log.debug("Splits: [{} to {}] into {} parts", Array(minValue, maxValue, numSplits))
+      // Get all the split points together.
+      val splitPoints = split2(numSplits, splitLimit, minValue.getOrElse(0), maxValue.getOrElse(0)).toIndexedSeq // TODO: is the getOrElse(0) OK?
 
-    splitPoints foreach { point ⇒
-      log.debug(point.toString)
-    }
+      log.info(s"Splits: [$minValue to $maxValue] into $numSplits parts")
 
-    val splits = new ListBuffer[InputSplit]()
-
-    // Turn the split points into a set of intervals.
-    var start = splitPoints.head
-
-    (1 until splitPoints.length) foreach { i ⇒
-      val end = splitPoints(i)
-
-      if (i == splitPoints.length - 1) {
-        // This is the last one use a closed interval.
-        splits += InputSplit(
-          lowClausePrefix + start,
-          splitByCol.name + " <= " + end
-        )
-      } else {
-        // Normal open-interval case.
-        splits += InputSplit(
-          lowClausePrefix + start,
-          highClausePrefix + end
-        )
+      splitPoints foreach { point ⇒
+        log.debug(point.toString)
       }
 
-      start = end
-    }
+      val splits = new ListBuffer[InputSplit]()
 
-    splits.toList
+      // Turn the split points into a set of intervals.
+      var start = splitPoints.head
+
+      (1 until splitPoints.length) foreach { i ⇒
+        val end = splitPoints(i)
+
+        if (i == splitPoints.length - 1) {
+          // This is the last one use a closed interval.
+          splits += InputSplit(
+            lowClausePrefix + start,
+            splitByCol.name + " <= " + end
+          )
+        } else {
+          // Normal open-interval case.
+          splits += InputSplit(
+            lowClausePrefix + start,
+            highClausePrefix + end
+          )
+        }
+
+        start = end
+      }
+
+      // At least one extrema is null; add a null split.
+      if (minValue.isEmpty || maxValue.isEmpty) {
+        splits += InputSplit(s"${splitByCol.name} IS NULL", s"${splitByCol.name} IS NULL")
+      }
+
+      splits.toList
+    }
   }
 
   /** Returns a list of longs one element longer than the list of input splits.
@@ -75,9 +87,9 @@ object IntegerSplitter extends Splitter[Int] {
    *  @param maxVal Maximum value of the set to split.
    *  @return Split values inside the set.
    */
-  def split2(numSplits: Long, splitLimit: Long, minVal: Long, maxVal: Long): List[Long] = {
+  def split2(numSplits: Int, splitLimit: Int, minVal: Int, maxVal: Int): List[Int] = {
 
-    val splits = new ListBuffer[Long]()
+    val splits = new ListBuffer[Int]()
 
     // We take the min-max interval and divide by the numSplits and also
     // calculate a remainder.  Because of integer division rules, numsplits *

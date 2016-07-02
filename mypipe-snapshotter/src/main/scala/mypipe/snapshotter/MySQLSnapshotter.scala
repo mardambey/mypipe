@@ -80,11 +80,11 @@ object MySQLSnapshotter {
   private def getSelectQuery(db: String, table: String, selectQuery: Option[String]): String = {
     selectQuery match {
       case Some(q) ⇒
-        log.info("Using user provided select query: $q")
+        log.info(s"Using user provided select query: $q")
         q
       case None ⇒
         val q = s"""SELECT * FROM $table"""
-        log.info("Using built int select query: $q")
+        log.info(s"Using built int select query: $q")
         q
     }
   }
@@ -160,30 +160,40 @@ object MySQLSnapshotter {
     }
   }
 
+  protected def getBoundingValues[T](db: String, table: String, splitByCol: ColumnMetadata)(implicit c: Connection, ec: ExecutionContext): Future[List[Option[T]]] = {
+    val boundingQuery = s"""SELECT MIN(${splitByCol.name}), MAX(${splitByCol.name}) FROM $db.$table""" // TODO: append user provided WHERE clause if any
+
+    c.sendQuery(s"use $db") flatMap { _ ⇒
+      log.info(s"$boundingQuery")
+      val boundingValuesF = c.sendQuery(boundingQuery)
+      boundingValuesF map { boundingValues ⇒
+        val r = boundingValues.rows flatMap { rows ⇒
+          rows.headOption map { row ⇒
+            val lowerBound = row(0)
+            val upperBound = row(1)
+
+            List(
+              if (lowerBound == null) None else Some(lowerBound.asInstanceOf[T]),
+              if (upperBound == null) None else Some(upperBound.asInstanceOf[T])
+            )
+          }
+        }
+
+        r.getOrElse(List(None, None))
+      }
+    }
+  }
+
   def getSplits(db: String, table: String, splitByCol: ColumnMetadata)(implicit c: Connection, ec: ExecutionContext): Future[List[InputSplit]] = {
     splitByCol.colType match {
 
       case ColumnType.INT24 ⇒
 
-        val boundingQuery = s"""SELECT MIN(${splitByCol.name}), MAX(${splitByCol.name}) FROM $db.$table""" // TODO: append user provided WHERE clause if any
-
-        log.info(s"use $db")
-        c.sendQuery(s"use $db") flatMap { _ ⇒
-          log.info(s"$boundingQuery")
-          val boundingValuesF = c.sendQuery(boundingQuery)
-          boundingValuesF map { boundingValues ⇒
-            val r = boundingValues.rows flatMap { rows ⇒
-              rows.headOption map { row ⇒
-                val lowerBound = row(0).asInstanceOf[Int]
-                val upperBound = row(1).asInstanceOf[Int]
-
-                IntegerSplitter.split(splitByCol, lowerBound, upperBound)
-              }
-            }
-
-            r.getOrElse(List.empty)
+        getBoundingValues[Int](db, table, splitByCol)
+          .map {
+            case (List(lowerBound, upperBound)) ⇒
+              IntegerSplitter.split(splitByCol, lowerBound, upperBound)
           }
-        }
 
       case x ⇒
         log.error("split-by column of type $x is not supported, aborting.")
