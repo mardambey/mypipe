@@ -1,14 +1,16 @@
 package mypipe.mysql
 
-import mypipe.api.data.{ColumnMetadata, Table, PrimaryKey}
+import mypipe.api.data.{ColumnMetadata, PrimaryKey, Table}
 import mypipe.api.event.TableMapEvent
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Await}
-import akka.actor._
+import scala.concurrent.{Await, Future}
 import akka.pattern.ask
 import akka.util.Timeout
+import mypipe.util.Actors
+
+import scala.compat.Platform
 
 /** A cache for tables whose metadata needs to be looked up against
  *  the database in order to determine column and key structure.
@@ -20,11 +22,11 @@ import akka.util.Timeout
  *  @param timeoutSeconds maximum time to wait for the table metadata request to return
  */
 class TableCache(hostname: String, port: Int, username: String, password: String, timeoutSeconds: Int) {
-  protected val system = ActorSystem("mypipe")
+  protected val system = Actors.actorSystem
   protected implicit val ec = system.dispatcher
   protected val tablesById = scala.collection.mutable.HashMap[Long, Table]()
   protected val tableNameToId = scala.collection.mutable.HashMap[String, Long]()
-  protected lazy val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port")
+  protected lazy val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"DBMetadataActor-$hostname:$port-${System.nanoTime()}")
   protected val log = LoggerFactory.getLogger(getClass)
 
   def getTable(tableId: Long): Option[Table] = {

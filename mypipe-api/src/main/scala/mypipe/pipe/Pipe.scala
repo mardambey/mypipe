@@ -1,12 +1,12 @@
 package mypipe.pipe
 
-import akka.actor.{ActorSystem, Cancellable}
+import akka.actor.Cancellable
 import mypipe.api.consumer.{BinaryLogConsumer, BinaryLogConsumerListener}
 import mypipe.api.event.{AlterEvent, Mutation}
 import mypipe.api.Conf
 import mypipe.api.producer.Producer
 import mypipe.api.repo.BinaryLogPositionRepository
-import mypipe.util.Enum
+import mypipe.util.{Actors, Enum}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
@@ -40,7 +40,7 @@ case class Pipe[BinaryLogEvent](id: String, consumer: BinaryLogConsumer[BinaryLo
   protected val log = LoggerFactory.getLogger(getClass)
   protected var state = State.STOPPED
   protected var CONSUMER_DISCONNECT_WAIT_SECS = 2
-  protected val system = ActorSystem("mypipe")
+  protected val system = Actors.actorSystem
   implicit val ec = system.dispatcher
 
   @volatile protected var _connected: Boolean = false

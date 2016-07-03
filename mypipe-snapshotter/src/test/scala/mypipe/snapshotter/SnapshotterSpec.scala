@@ -54,6 +54,9 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
             case x ⇒
               log.error(s"Found unknown event, ignoring $x")
           }
+
+          // always continue
+          true
         }
       )
     }

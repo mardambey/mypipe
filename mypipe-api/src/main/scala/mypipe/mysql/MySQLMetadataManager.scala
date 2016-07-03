@@ -1,19 +1,20 @@
 package mypipe.mysql
 
-import mypipe.api.data.{ColumnMetadata, PrimaryKey, ColumnType}
-
+import mypipe.api.data.{ColumnMetadata, PrimaryKey}
 import org.slf4j.LoggerFactory
+
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import com.github.mauricio.async.db.{Configuration, Connection}
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor._
 import com.github.mauricio.async.db.mysql.MySQLConnection
+import mypipe.util.Actors
 
 case class GetColumns(database: String, table: String, flushCache: Boolean = false)
 
 object MySQLMetadataManager {
-  protected val system = ActorSystem("mypipe")
+  protected val system = Actors.actorSystem
   def props(hostname: String, port: Int, username: String, password: Option[String] = None, database: Option[String] = Some("information_schema")): Props = Props(new MySQLMetadataManager(hostname, port, username, password, database))
   def apply(hostname: String, port: Int, username: String, password: Option[String] = None) =
     system.actorOf(MySQLMetadataManager.props(hostname, port, username, password))

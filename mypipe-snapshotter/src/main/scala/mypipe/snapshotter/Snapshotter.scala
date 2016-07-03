@@ -11,6 +11,7 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.github.mauricio.async.db.{Configuration, Connection}
 import com.typesafe.config.{Config, ConfigFactory}
+import mypipe.util.Actors
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Await
@@ -78,12 +79,25 @@ object Snapshotter extends App {
     }
 
     val pipe = pipes.head
+    @volatile var shuttingDown: Boolean = false
+
+      def shutdown() = {
+        synchronized {
+          if (!shuttingDown) {
+            shuttingDown = true
+            pipe.disconnect()
+            log.info(s"Disconnecting from ${db.hostname}:${db.port}.")
+            db.disconnect()
+            log.info("Shutting down actor system...")
+            Actors.actorSystem.shutdown()
+            Actors.actorSystem.awaitTermination()
+            log.info("Bye bye...")
+          }
+        }
+      }
 
     sys.addShutdownHook({
-      pipe.disconnect()
-      log.info(s"Disconnecting from ${db.hostname}:${db.port}.")
-      db.disconnect()
-      log.info("Shutting down...")
+      shutdown()
     })
 
     log.info("Consumer setup done.")
@@ -103,16 +117,18 @@ object Snapshotter extends App {
       eventHandler = { events ⇒
 
         log.info(s"Fetched snapshot for ${tables.head} (${events.length} rows)")
-
         pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(events)
-
         log.info(s"Snapshot for ${tables.head} (${events.length} rows) converted to events.")
+
+        true
       }
     )
 
     log.info("Waiting for snapshots to finish...")
     Await.result(snapshotF, Duration.Inf)
     log.info("Done waiting for snapshots to finish.")
+
+    shutdown()
   }
 }
 

@@ -7,7 +7,6 @@ import mypipe.mysql.Util
 import mypipe.snapshotter.splitter.{BoundingValues, InputSplit, IntegerSplitter}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Interesting parameters:
@@ -83,7 +82,7 @@ object MySQLSnapshotter {
     }
   }
 
-  def snapshot(db: String, table: String, numSplits: Int, splitLimit: Int, splitByColumnName: Option[String], selectQuery: Option[String], whereClause: Option[String], eventHandler: Seq[SnapshotterEvent] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
+  def snapshot(db: String, table: String, numSplits: Int, splitLimit: Int, splitByColumnName: Option[String], selectQuery: Option[String], whereClause: Option[String], eventHandler: Seq[SnapshotterEvent] ⇒ Boolean)(implicit c: Connection, ec: ExecutionContext) = {
 
     val splitbyColumnOptF = splitByColumnName match {
       case Some(colName) ⇒
@@ -134,7 +133,7 @@ object MySQLSnapshotter {
     }
   }
 
-  private def _executeQueries(queries: Seq[(String, String)], eventHandler: Seq[SnapshotterEvent] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext): Future[Unit] = {
+  private def _executeQueries(queries: Seq[(String, String)], eventHandler: Seq[SnapshotterEvent] ⇒ Boolean)(implicit c: Connection, ec: ExecutionContext): Future[Boolean] = {
 
     val queryKey = queries.head._1
     val queryVal = queries.head._2
@@ -146,16 +145,29 @@ object MySQLSnapshotter {
       if (!queryKey.isEmpty) {
         val events = snapshotToEvents(Seq(queryKey → queryResult))
 
-        if (events.nonEmpty) eventHandler(events)
+        val successfullyHandled = if (events.nonEmpty) {
+          eventHandler(events)
+        } else {
+          true
+        }
+
+        (queries.tail, successfullyHandled)
+      } else {
+        (Seq.empty, true)
       }
 
-      queries.tail
-
     } flatMap {
-      case queries if queries.nonEmpty ⇒
+      case (queries, true) if queries.nonEmpty ⇒
         _executeQueries(queries, eventHandler)
-      case _ ⇒
-        Future.successful { Unit }
+      case (queries, false) if queries.nonEmpty ⇒
+        log.error(s"Failed while handling events, aborting, left over queries: $queries")
+        Future.successful(false)
+      case (queries, true) if queries.isEmpty ⇒
+        log.info("Successfully finished running queries.")
+        Future.successful(true)
+      case x ⇒
+        log.error(s"Unknown error encountered: $x")
+        Future.successful(false)
     }
   }
 

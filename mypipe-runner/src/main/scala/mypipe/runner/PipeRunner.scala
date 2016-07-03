@@ -2,8 +2,8 @@ package mypipe.runner
 
 import mypipe.api.consumer.BinaryLogConsumer
 import mypipe.api.producer.Producer
-import mypipe.api.repo.{FileBasedBinaryLogPositionRepository, BinaryLogPositionRepositoryFromConfiguration, ConfigurableBinaryLogPositionRepository}
-import mypipe.mysql.{MySQLBinaryLogConsumer, BinaryLogFilePosition}
+import mypipe.api.repo.{BinaryLogPositionRepositoryFromConfiguration, ConfigurableBinaryLogPositionRepository, FileBasedBinaryLogPositionRepository}
+import mypipe.mysql.{BinaryLogFilePosition, MySQLBinaryLogConsumer}
 import mypipe.pipe._
 
 import scala.collection.JavaConverters._
@@ -11,6 +11,7 @@ import mypipe.api.Conf
 import mypipe.api.Conf.RichConfig
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
+import mypipe.util.Actors
 import org.slf4j.LoggerFactory
 
 object PipeRunner extends App {
@@ -26,16 +27,32 @@ object PipeRunner extends App {
 
   if (pipes.isEmpty) {
     log.info("No pipes defined, exiting.")
-    sys.exit()
+    shutdown()
+  }
+
+  @volatile var shuttingDown: Boolean = false
+
+  def shutdown() = {
+    synchronized {
+      if (!shuttingDown) {
+        shuttingDown = true
+        pipes.foreach(_.disconnect())
+        log.info("Shutting down actor system...")
+        Actors.actorSystem.shutdown()
+        Actors.actorSystem.awaitTermination()
+        log.info("Bye bye...")
+      }
+    }
   }
 
   sys.addShutdownHook({
-    log.info("Shutting down...")
-    pipes.foreach(_.disconnect())
+    shutdown()
   })
 
   log.info(s"Connecting ${pipes.size} pipes...")
   pipes.foreach(_.connect())
+
+  shutdown()
 }
 
 object PipeRunnerUtil {

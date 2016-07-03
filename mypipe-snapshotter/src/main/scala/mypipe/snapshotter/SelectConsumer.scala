@@ -3,15 +3,15 @@ package mypipe.snapshotter
 import com.typesafe.config.Config
 
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Await}
+import scala.concurrent.{Await, Future}
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-
-import mypipe.api.consumer.{ConfigLoader, BinaryLogConsumer}
+import mypipe.api.consumer.{BinaryLogConsumer, ConfigLoader}
 import mypipe.api.data._
 import mypipe.api.event._
 import mypipe.mysql._
+import mypipe.util.Actors
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
@@ -28,7 +28,7 @@ class SelectConsumer(override val config: Config)
     with ConfigLoader
     with ConfigBasedConnectionSource {
 
-  private val system = ActorSystem("mypipe-snapshotter")
+  private val system = Actors.actorSystem
   private val dbMetadata = system.actorOf(MySQLMetadataManager.props(hostname, port, username, Some(password)), s"SelectConsumer-DBMetadataActor-$hostname:$port")
   private implicit val ec = system.dispatcher
   private implicit val timeout = Timeout(2.second)
