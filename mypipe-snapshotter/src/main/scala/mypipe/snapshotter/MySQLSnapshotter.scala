@@ -4,7 +4,7 @@ import com.github.mauricio.async.db.{Connection, QueryResult}
 import mypipe.api.data.{ColumnMetadata, ColumnType}
 import mypipe.mysql.BinaryLogFilePosition
 import mypipe.mysql.Util
-import mypipe.snapshotter.splitter.{InputSplit, IntegerSplitter}
+import mypipe.snapshotter.splitter.{BoundingValues, InputSplit, IntegerSplitter}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ListBuffer
@@ -87,10 +87,10 @@ object MySQLSnapshotter {
 
     val splitbyColumnOptF = splitByColumnName match {
       case Some(colName) ⇒
-        log.info(s"Using user provided split by column ${splitByColumnName.get}.")
+        log.info(s"Using user provided split by column '${splitByColumnName.get}'.")
         getSplitByColumn(db, table, colName)
       case None ⇒
-        log.info("Searching for primary key to user as split by columns.")
+        log.info("Searching for primary key to user as split by column.")
         getSplitByColumnFromPrimaryKey(db, table)
     }
 
@@ -98,7 +98,7 @@ object MySQLSnapshotter {
       case Some(splitByColumn) ⇒
 
         // get splits
-        log.info(s"Trying to use split-by-column as $splitByColumn")
+        log.info(s"Trying to use column '${splitByColumn.name}' as split-by-column (isPrimaryKey=${splitByColumn.isPrimaryKey}, colType=${splitByColumn.colType})")
         val splitsF = getSplits(db, table, splitByColumn, numSplits, splitLimit)
 
         // TODO: handle no splits returned
@@ -118,7 +118,7 @@ object MySQLSnapshotter {
         splitQueriesF
 
       case None if splitByColumnName.isDefined ⇒
-        log.error(s"Could not use user provided column $splitByColumnName as a split-by column, aborting.")
+        log.error(s"Could not use user provided column '$splitByColumnName' as a split-by column, aborting.")
         Future.successful(List.empty[(String, String)])
       case None ⇒
         log.error("Could not find a suitable primary key to use as a split-by column, aborting.")
@@ -154,7 +154,7 @@ object MySQLSnapshotter {
     }
   }
 
-  protected def getBoundingValues[T](db: String, table: String, splitByCol: ColumnMetadata)(implicit c: Connection, ec: ExecutionContext): Future[List[Option[T]]] = {
+  protected def getBoundingValues[T](db: String, table: String, splitByCol: ColumnMetadata)(implicit c: Connection, ec: ExecutionContext): Future[BoundingValues[T]] = {
     val boundingQuery = s"""SELECT MIN(${splitByCol.name}), MAX(${splitByCol.name}) FROM $db.$table""" // TODO: append user provided WHERE clause if any
 
     c.sendQuery(s"use $db") flatMap { _ ⇒
@@ -166,31 +166,30 @@ object MySQLSnapshotter {
             val lowerBound = row(0)
             val upperBound = row(1)
 
-            List(
+            BoundingValues(
               if (lowerBound == null) None else Some(lowerBound.asInstanceOf[T]),
               if (upperBound == null) None else Some(upperBound.asInstanceOf[T])
             )
           }
         }
 
-        r.getOrElse(List(None, None))
+        r.getOrElse(BoundingValues(None, None))
       }
     }
   }
 
   def getSplits(db: String, table: String, splitByCol: ColumnMetadata, numSplits: Int, splitLimit: Int)(implicit c: Connection, ec: ExecutionContext): Future[List[InputSplit]] = {
+
     splitByCol.colType match {
 
       case ColumnType.INT24 ⇒
+        log.info(s"Split by column type is ${ColumnType.INT24}")
 
         getBoundingValues[Int](db, table, splitByCol)
-          .map {
-            case (List(lowerBound, upperBound)) ⇒
-              IntegerSplitter.split(splitByCol, lowerBound, upperBound, numSplits, splitLimit)
-          }
+          .map { IntegerSplitter.split(splitByCol, _, numSplits, splitLimit) }
 
       case x ⇒
-        log.error("split-by column of type $x is not supported, aborting.")
+        log.error(s"Split by column of type $x is not supported, returning empty split list.")
         Future.successful(List.empty)
     }
 

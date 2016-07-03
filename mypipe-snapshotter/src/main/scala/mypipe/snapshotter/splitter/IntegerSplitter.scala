@@ -14,7 +14,10 @@ object IntegerSplitter extends Splitter[Int] {
 
   val log = LoggerFactory.getLogger(getClass)
 
-  override def split(splitByCol: ColumnMetadata, minValue: Option[Int], maxValue: Option[Int], numSplits: Int, splitLimit: Int): List[InputSplit] = {
+  override def split(splitByCol: ColumnMetadata, boundingValues: BoundingValues[Int], numSplits: Int, splitLimit: Int): List[InputSplit] = {
+
+    val maxValue = boundingValues.upperBound
+    val minValue = boundingValues.lowerBound
 
     val lowClausePrefix = splitByCol.name + " >= "
     val highClausePrefix = splitByCol.name + " < "
