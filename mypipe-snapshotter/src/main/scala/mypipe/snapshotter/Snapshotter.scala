@@ -17,13 +17,18 @@ import scala.concurrent.Await
 
 object Snapshotter extends App {
 
-  private[Snapshotter] case class CmdLineOptions(tables: Seq[String] = Seq.empty, noTransaction: Boolean = false)
+  private[Snapshotter] case class CmdLineOptions(tables: Seq[String] = Seq.empty, noTransaction: Boolean = false, numSplits: Int = 5, splitLimit: Int = 100)
 
   val log = LoggerFactory.getLogger(getClass)
+
   val conf = ConfigFactory.load()
+
   val Array(dbHost, dbPort, dbUsername, dbPassword, dbName) = conf.getString("mypipe.snapshotter.database.info").split(":")
+
   val db = Db(dbHost, dbPort.toInt, dbUsername, dbPassword, dbName)
+
   implicit lazy val c: Connection = db.connection
+
   val parser = new OptionParser[CmdLineOptions]("mypipe-snapshotter") {
     head("mypipe-snapshotter", "1.0")
     opt[Seq[String]]('t', "tables") required () valueName "<db1.table1>,<db1.table2>,<db2.table1>..." action { (x, c) ⇒
@@ -32,24 +37,30 @@ object Snapshotter extends App {
     opt[Unit]('x', "no-transaction") optional () action { (_, c) ⇒
       c.copy(noTransaction = true)
     } text "do not perform the snapshot using a consistent read in a transaction"
+    opt[Int]('n', "numSplits") optional () valueName "5" action { (x, c) ⇒
+      c.copy(numSplits = x)
+    } text "number of splits to divide to table into" validate (t ⇒ if (t > 0) success else failure("the number of splits must be at least 1"))
+    opt[Int]('l', "splitLimit") optional () valueName "100" action { (x, c) ⇒
+      c.copy(splitLimit = x)
+    } text "maximum possible number of splits to divide to table into" validate (t ⇒ if (t > 0 && t <= 100) success else failure("the maximum number of splits must be between 1 and 100"))
   }
 
   val cmdLineOptions = parser.parse(args, CmdLineOptions())
 
   cmdLineOptions match {
-    case Some(c) ⇒
-      snapshot(c.tables, c.noTransaction)
+    case Some(cfg) ⇒
+      snapshot(cfg.tables, cfg.noTransaction, cfg.numSplits, cfg.splitLimit)
     case None ⇒
       log.debug(s"Could not parser parameters, aborting: ${args.mkString(" ")}")
   }
 
-  private def snapshot(tables: Seq[String], noTransaction: Boolean): Unit = {
+  private def snapshot(tables: Seq[String], noTransaction: Boolean, numSplits: Int, splitLimit: Int): Unit = {
 
     db.connect()
 
     while (!db.connection.isConnected) Thread.sleep(10)
 
-    log.info(s"Connected to ${db.hostname}:${db.port} (withTransaction=${!noTransaction})")
+    log.info(s"Connected to ${db.hostname}:${db.port} (withTransaction=${!noTransaction}, numSplits=$numSplits, splitLimit=$splitLimit)")
 
     lazy val producers: Map[String, Option[Class[Producer]]] = PipeRunnerUtil.loadProducerClasses(conf, "mypipe.snapshotter.producers")
     lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
@@ -78,7 +89,7 @@ object Snapshotter extends App {
 
     log.info(s"Snapshotting table ${tables.head}")
 
-    val snapshotF = MySQLSnapshotter.snapshot(db = tables.head.split("\\.").head, table = tables.head.split("\\.")(1), splitByColumnName = None, selectQuery = None, { events ⇒
+    val snapshotF = MySQLSnapshotter.snapshot(db = tables.head.split("\\.").head, table = tables.head.split("\\.")(1), numSplits = numSplits, splitLimit = splitLimit, splitByColumnName = None, selectQuery = None, { events ⇒
 
       log.info(s"Fetched snapshot for ${tables.head} (${events.length} rows)")
 

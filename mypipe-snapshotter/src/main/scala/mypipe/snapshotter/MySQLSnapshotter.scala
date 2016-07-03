@@ -83,7 +83,7 @@ object MySQLSnapshotter {
     }
   }
 
-  def snapshot(db: String, table: String, splitByColumnName: Option[String], selectQuery: Option[String], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
+  def snapshot(db: String, table: String, numSplits: Int, splitLimit: Int, splitByColumnName: Option[String], selectQuery: Option[String], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
 
     val splitbyColumnOptF = splitByColumnName match {
       case Some(colName) ⇒
@@ -99,7 +99,7 @@ object MySQLSnapshotter {
 
         // get splits
         log.info(s"Trying to use split-by-column as $splitByColumn")
-        val splitsF = getSplits(db, table, splitByColumn)
+        val splitsF = getSplits(db, table, splitByColumn, numSplits, splitLimit)
 
         // TODO: handle no splits returned
         // create a series of:
@@ -178,7 +178,7 @@ object MySQLSnapshotter {
     }
   }
 
-  def getSplits(db: String, table: String, splitByCol: ColumnMetadata)(implicit c: Connection, ec: ExecutionContext): Future[List[InputSplit]] = {
+  def getSplits(db: String, table: String, splitByCol: ColumnMetadata, numSplits: Int, splitLimit: Int)(implicit c: Connection, ec: ExecutionContext): Future[List[InputSplit]] = {
     splitByCol.colType match {
 
       case ColumnType.INT24 ⇒
@@ -186,7 +186,7 @@ object MySQLSnapshotter {
         getBoundingValues[Int](db, table, splitByCol)
           .map {
             case (List(lowerBound, upperBound)) ⇒
-              IntegerSplitter.split(splitByCol, lowerBound, upperBound)
+              IntegerSplitter.split(splitByCol, lowerBound, upperBound, numSplits, splitLimit)
           }
 
       case x ⇒
