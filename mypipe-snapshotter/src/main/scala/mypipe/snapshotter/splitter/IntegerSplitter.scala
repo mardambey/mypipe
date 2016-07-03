@@ -31,8 +31,6 @@ object IntegerSplitter extends Splitter[Int] {
       // Get all the split points together.
       val splitPoints = split2(numSplits, splitLimit, minValue.getOrElse(0), maxValue.getOrElse(0)).toIndexedSeq // TODO: is the getOrElse(0) OK?
 
-      log.info(s"Splits: [$minValue to $maxValue] into $numSplits parts")
-
       splitPoints foreach { point ⇒
         log.debug(point.toString)
       }
@@ -109,7 +107,6 @@ object IntegerSplitter extends Splitter[Int] {
       split2(if (newSplits != numSplits) newSplits else newSplits + 1, splitLimit, minVal, maxVal)
 
     } else {
-      log.info(s"Split size: $splitSize Num splits: $numSplits from: $minVal to: $maxVal")
 
       val remainder = (maxVal - minVal) % numSplits
       var curVal = minVal

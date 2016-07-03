@@ -17,7 +17,7 @@ import scala.concurrent.Await
 
 object Snapshotter extends App {
 
-  private[Snapshotter] case class CmdLineOptions(tables: Seq[String] = Seq.empty, noTransaction: Boolean = false, numSplits: Int = 5, splitLimit: Int = 100)
+  private[Snapshotter] case class CmdLineOptions(tables: Seq[String] = Seq.empty, noTransaction: Boolean = false, numSplits: Int = 5, splitLimit: Int = 100, whereClause: String = "")
 
   val log = LoggerFactory.getLogger(getClass)
 
@@ -43,24 +43,27 @@ object Snapshotter extends App {
     opt[Int]('l', "splitLimit") optional () valueName "100" action { (x, c) ⇒
       c.copy(splitLimit = x)
     } text "maximum possible number of splits to divide to table into" validate (t ⇒ if (t > 0 && t <= 100) success else failure("the maximum number of splits must be between 1 and 100"))
+    opt[String]('w', "whereClause") optional () action { (x, c) ⇒
+      c.copy(whereClause = x.trim)
+    } text "additional WHERE clause parameters that will be ANDed to the existing ones" validate (t ⇒ if (t.trim.length > 0) success else failure("WHERE clause must be non-empty"))
   }
 
   val cmdLineOptions = parser.parse(args, CmdLineOptions())
 
   cmdLineOptions match {
     case Some(cfg) ⇒
-      snapshot(cfg.tables, cfg.noTransaction, cfg.numSplits, cfg.splitLimit)
+      snapshot(cfg.tables, cfg.noTransaction, cfg.numSplits, cfg.splitLimit, cfg.whereClause)
     case None ⇒
       log.debug(s"Could not parser parameters, aborting: ${args.mkString(" ")}")
   }
 
-  private def snapshot(tables: Seq[String], noTransaction: Boolean, numSplits: Int, splitLimit: Int): Unit = {
+  private def snapshot(tables: Seq[String], noTransaction: Boolean, numSplits: Int, splitLimit: Int, whereClause: String): Unit = {
 
     db.connect()
 
     while (!db.connection.isConnected) Thread.sleep(10)
 
-    log.info(s"Connected to ${db.hostname}:${db.port} (withTransaction=${!noTransaction}, numSplits=$numSplits, splitLimit=$splitLimit)")
+    log.info(s"Connected to ${db.hostname}:${db.port} (withTransaction=${!noTransaction}, numSplits=$numSplits, splitLimit=$splitLimit, additionalWhereClause=$whereClause)")
 
     lazy val producers: Map[String, Option[Class[Producer]]] = PipeRunnerUtil.loadProducerClasses(conf, "mypipe.snapshotter.producers")
     lazy val consumers: Seq[(String, Config, Option[Class[BinaryLogConsumer[_]]])] = PipeRunnerUtil.loadConsumerConfigs(conf, "mypipe.snapshotter.consumers")
@@ -89,14 +92,23 @@ object Snapshotter extends App {
 
     log.info(s"Snapshotting table ${tables.head}")
 
-    val snapshotF = MySQLSnapshotter.snapshot(db = tables.head.split("\\.").head, table = tables.head.split("\\.")(1), numSplits = numSplits, splitLimit = splitLimit, splitByColumnName = None, selectQuery = None, { events ⇒
+    val snapshotF = MySQLSnapshotter.snapshot(
+      db = tables.head.split("\\.").head,
+      table = tables.head.split("\\.")(1),
+      numSplits = numSplits,
+      splitLimit = splitLimit,
+      splitByColumnName = None,
+      selectQuery = None,
+      whereClause = if (whereClause.length > 0) Some(whereClause) else None,
+      eventHandler = { events ⇒
 
-      log.info(s"Fetched snapshot for ${tables.head} (${events.length} rows)")
+        log.info(s"Fetched snapshot for ${tables.head} (${events.length} rows)")
 
-      pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(events)
+        pipe.consumer.asInstanceOf[SelectConsumer].handleEvents(events)
 
-      log.info(s"Snapshot for ${tables.head} (${events.length} rows) converted to events.")
-    })
+        log.info(s"Snapshot for ${tables.head} (${events.length} rows) converted to events.")
+      }
+    )
 
     log.info("Waiting for snapshots to finish...")
     Await.result(snapshotF, Duration.Inf)

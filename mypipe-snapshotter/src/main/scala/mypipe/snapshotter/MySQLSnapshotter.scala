@@ -62,7 +62,7 @@ object MySQLSnapshotter {
 
   private def getSplitByColumn(db: String, table: String, colName: String)(implicit c: Connection, ec: ExecutionContext): Future[Option[ColumnMetadata]] = {
     for (
-      _ ← c.sendQuery(s"use information_schema");
+      _ ← c.sendQuery(s"USE information_schema");
       columnsMap ← Util.getTableColumns(db, table, c)
     ) yield {
       val columns = Util.createColumns(columnsMap)
@@ -83,7 +83,7 @@ object MySQLSnapshotter {
     }
   }
 
-  def snapshot(db: String, table: String, numSplits: Int, splitLimit: Int, splitByColumnName: Option[String], selectQuery: Option[String], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
+  def snapshot(db: String, table: String, numSplits: Int, splitLimit: Int, splitByColumnName: Option[String], selectQuery: Option[String], whereClause: Option[String], eventHandler: Seq[SnapshotterEvent] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext) = {
 
     val splitbyColumnOptF = splitByColumnName match {
       case Some(colName) ⇒
@@ -106,10 +106,13 @@ object MySQLSnapshotter {
         // $table -> "use $db"
         // $table -> "select * from $table ..."
         val splitQueriesF = splitsF map { splits ⇒
+
           val query = getSelectQuery(db, table, selectQuery)
+          val additionalWhereClause = whereClause.map { case w if w.length > 0 ⇒ s"AND ($w)" } getOrElse ""
+
           splits.map { split ⇒
             (s"$db.$table" → s"use $db",
-              s"$db.$table" → s"""$query WHERE ${split.lowClausePrefix} and ${split.upperClausePrefix}""")
+              s"$db.$table" → s"""$query WHERE ${split.lowClausePrefix} AND ${split.upperClausePrefix} $additionalWhereClause""")
           }.foldLeft(List.empty[(String, String)]) { (acc: List[(String, String)], v: ((String, String), (String, String))) ⇒
             acc ++ List(v._1, v._2)
           }
@@ -131,17 +134,19 @@ object MySQLSnapshotter {
     }
   }
 
-  private def _executeQueries(queries: Seq[(String, String)], eventHandler: Seq[Option[SnapshotterEvent]] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext): Future[Unit] = {
+  private def _executeQueries(queries: Seq[(String, String)], eventHandler: Seq[SnapshotterEvent] ⇒ Unit)(implicit c: Connection, ec: ExecutionContext): Future[Unit] = {
 
     val queryKey = queries.head._1
     val queryVal = queries.head._2
 
-    log.info(queryVal)
+    log.info(s"Running query: $queryVal")
+
     c.sendQuery(queryVal).map { queryResult ⇒
 
       if (!queryKey.isEmpty) {
         val events = snapshotToEvents(Seq(queryKey → queryResult))
-        eventHandler(events)
+
+        if (events.nonEmpty) eventHandler(events)
       }
 
       queries.tail
@@ -158,7 +163,6 @@ object MySQLSnapshotter {
     val boundingQuery = s"""SELECT MIN(${splitByCol.name}), MAX(${splitByCol.name}) FROM $db.$table""" // TODO: append user provided WHERE clause if any
 
     c.sendQuery(s"use $db") flatMap { _ ⇒
-      log.info(s"$boundingQuery")
       val boundingValuesF = c.sendQuery(boundingQuery)
       boundingValuesF map { boundingValues ⇒
         val r = boundingValues.rows flatMap { rows ⇒
@@ -195,30 +199,35 @@ object MySQLSnapshotter {
 
   }
 
-  def snapshotToEvents(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[Option[SnapshotterEvent]]] = snapshot map { snapshotToEvents }
+  def snapshotToEvents(snapshot: Future[Seq[(String, QueryResult)]])(implicit ec: ExecutionContext): Future[Seq[SnapshotterEvent]] = snapshot map { snapshotToEvents }
 
-  def snapshotToEvents(results: Seq[(String, QueryResult)]): Seq[Option[SnapshotterEvent]] = {
-    results.map { result ⇒
-      val colData = result._2.rows.map(identity) map { rows ⇒
-        val colCount = rows.columnNames.length
-        rows.map { row ⇒
-          (0 until colCount) map { i ⇒
-            row(i)
+  def snapshotToEvents(results: Seq[(String, QueryResult)]): Seq[SnapshotterEvent] = {
+    results
+      .map { result ⇒
+        val colData = result._2.rows.map(identity) map { rows ⇒
+          val colCount = rows.columnNames.length
+          rows.map { row ⇒
+            (0 until colCount) map { i ⇒
+              row(i)
+            }
           }
         }
-      }
 
-      val firstDot = result._1.indexOf('.')
-      if (firstDot == result._1.lastIndexOf('.') && firstDot > 0 && result._2.rows.nonEmpty) {
-        val Array(db, table) = result._1.split('.')
-        Some(SelectEvent(db, table, colData.getOrElse(Seq.empty)))
-      } else if (result._1.equals("showMasterStatus")) {
-        colData.getOrElse(Seq.empty).headOption.map(c ⇒
-          ShowMasterStatusEvent(BinaryLogFilePosition(c(0).asInstanceOf[String], c(1).asInstanceOf[Long])))
-      } else {
-        None
+        val firstDot = result._1.indexOf('.')
+        if (firstDot == result._1.lastIndexOf('.') && firstDot > 0 && result._2.rows.nonEmpty) {
+          val Array(db, table) = result._1.split('.')
+          Some(SelectEvent(db, table, colData.getOrElse(Seq.empty)))
+        } else if (result._1.equals("showMasterStatus")) {
+          colData.getOrElse(Seq.empty).headOption.map(c ⇒
+            ShowMasterStatusEvent(BinaryLogFilePosition(c(0).asInstanceOf[String], c(1).asInstanceOf[Long])))
+        } else {
+          None
+        }
       }
-    }
+      // remove Nones
+      .filter(_.isDefined)
+      // remove the option
+      .map(_.get)
   }
 
   private def queriesWithoutTxn(tableQueries: Seq[(String, String)]) = Seq(

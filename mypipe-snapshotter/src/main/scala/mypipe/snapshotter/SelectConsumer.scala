@@ -35,14 +35,15 @@ class SelectConsumer(override val config: Config)
   private val tables = scala.collection.mutable.HashMap[String, Table]()
   private var binlogPos: Option[BinaryLogFilePosition] = None
 
-  def handleEvents(events: Seq[Option[SnapshotterEvent]]) = {
+  def handleEvents(events: Seq[SnapshotterEvent]) = {
     events.foreach {
-      case Some(select: SelectEvent) ⇒
+      case select: SelectEvent ⇒
         decodeEvent(select).foreach(s ⇒ listeners.foreach(_.onMutation(this, s.asInstanceOf[Mutation])))
-      case Some(ShowMasterStatusEvent(pos)) ⇒
+      case ShowMasterStatusEvent(pos) ⇒
         binlogPos = Some(pos)
         log.info(s"Binary log position to resume from after snapshot: $binlogPos")
-      case _ ⇒
+      case x ⇒
+        log.warn(s"Ignoring unknown event: $x")
     }
   }
 
@@ -89,7 +90,7 @@ class SelectConsumer(override val config: Config)
   override protected def onStop(): Unit = Unit
   override protected def onStart(): Future[Boolean] = Future.successful(true)
 
-  override def toString() = id
+  override def toString = id
 
   private def getTable(database: String, table: String): Option[Table] = {
     tables.get(s"$database.$table") match {

@@ -28,24 +28,34 @@ class SnapshotterSpec extends UnitSpec with DatabaseSpec with ActorSystemSpec wi
 
       val tables = Seq("mypipe.user")
 
-      MySQLSnapshotter.snapshot(db = tables.head.split("\\.").head, table = tables.head.split("\\.")(1), None, None, { results ⇒
-        results.map {
-          case Some(result: SelectEvent) ⇒
-            val rows = result.rows
-            log.info(s"found select data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
-            asserts += rows.isEmpty /* figure out exactly why we're doing this */ || (rows.length == 1 && (
-              rows.head.toArray.deep.equals(Array(123, "username", "password", 0, "bio").deep) ||
-              rows.head.toArray.deep.equals(Array(124, "username", "password", 0, "bio").deep)
-            ))
+      MySQLSnapshotter.snapshot(
+        db = tables.head.split("\\.").head,
+        table = tables.head.split("\\.")(1),
+        numSplits = 5,
+        splitLimit = 100,
+        splitByColumnName = None,
+        selectQuery = None,
+        whereClause = None,
+        eventHandler = { results ⇒
 
-          case Some(result: ShowMasterStatusEvent) ⇒
-            log.info(s"found show master status data: $result}")
-            asserts += true
+          results.map {
+            case result: SelectEvent ⇒
+              val rows = result.rows
+              log.info(s"found select data: length:${rows.length} data:${rows.map(_.toArray.map(c ⇒ c.getClass.getName + ":" + c.toString).mkString(",")).mkString("\n")}")
+              asserts += rows.isEmpty /* figure out exactly why we're doing this */ || (rows.length == 1 && (
+                rows.head.toArray.deep.equals(Array(123, "username", "password", 0, "bio").deep) ||
+                rows.head.toArray.deep.equals(Array(124, "username", "password", 0, "bio").deep)
+              ))
 
-          case x ⇒
-            log.error(s"Found unknown event, ignoring $x")
+            case result: ShowMasterStatusEvent ⇒
+              log.info(s"found show master status data: $result}")
+              asserts += true
+
+            case x ⇒
+              log.error(s"Found unknown event, ignoring $x")
+          }
         }
-      })
+      )
     }
 
     try {
