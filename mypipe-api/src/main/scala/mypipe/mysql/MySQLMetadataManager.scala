@@ -57,6 +57,24 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     super.preRestart(reason, message)
   }
 
+  protected def disconnectAll(): Unit = {
+    for {
+      (_, connections) ← dbConns
+      connection ← connections
+    } connection.disconnect
+    dbConns.clear()
+  }
+
+  override def postStop(): Unit = {
+    disconnectAll()
+    super.postStop()
+  }
+
+  override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
+    disconnectAll()
+    super.preRestart(reason, message)
+  }
+
   protected def getTableColumns(db: String, table: String, flushCache: Boolean): (List[ColumnMetadata], Option[PrimaryKey]) = {
 
     if (flushCache) dbTableCols.remove(s"$db.$table")
