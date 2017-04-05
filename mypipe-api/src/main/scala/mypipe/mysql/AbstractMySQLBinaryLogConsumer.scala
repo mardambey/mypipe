@@ -13,8 +13,10 @@ import com.github.shyiko.mysql.binlog.event.EventType._
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 import scala.compat.Platform
-import scala.concurrent.Future
+import scala.concurrent.blocking
+import scala.concurrent.{ Await, Future }
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
 
 abstract class AbstractMySQLBinaryLogConsumer
     extends AbstractBinaryLogConsumer[MEvent]
@@ -121,30 +123,37 @@ abstract class AbstractMySQLBinaryLogConsumer
   override def toString: String = s"$hostname:$port"
 
   override protected def onStart(): Future[Boolean] = {
-    Future {
-      @volatile var connected = false
+    @volatile var connected = false
+    client.setServerId(MySQLServerId.next)
+    client.registerEventListener(new EventListener() {
+      override def onEvent(event: MEvent) = handleEvent(event)
+    })
 
-      client.setServerId(MySQLServerId.next)
-      client.registerEventListener(new EventListener() {
-        override def onEvent(event: MEvent) = handleEvent(event)
-      })
+    client.registerLifecycleListener(new LifecycleListener {
+      override def onDisconnect(client: BinaryLogClient) = handleDisconnect()
+      override def onConnect(client: BinaryLogClient) = {
+        log.info(s"connected = true")
+        connected = true
+        handleConnect()
+      }
+      override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
+      override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
+    })
 
-      client.registerLifecycleListener(new LifecycleListener {
-        override def onDisconnect(client: BinaryLogClient) = handleDisconnect()
-        override def onConnect(client: BinaryLogClient) = { connected = true; handleConnect() }
-        override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
-        override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
-      })
+    log.info(s"Connecting client to $client.get:$hostname:$port")
 
-      log.info(s"Connecting client to $client.get:$hostname:$port")
+    // `client.connect()` blocks, so use a Thread instead of a Future
+    val clientThread = new Thread(new Runnable {
+      def run() {
+        client.connect()
+      }
+    })
+    clientThread.start
 
-      Future { client.connect() }
+    val startTime = Platform.currentTime
+    while (Platform.currentTime - startTime < 10000 && !connected) Thread.sleep(10)
 
-      val startTime = Platform.currentTime
-      while (Platform.currentTime - startTime < 10000 && !connected) Thread.sleep(10)
-
-      connected
-    }
+    Future.successful(connected)
   }
 
   override protected def onStop(): Unit = client.disconnect()
