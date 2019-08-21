@@ -124,6 +124,7 @@ abstract class AbstractMySQLBinaryLogConsumer
 
   override protected def onStart(): Future[Boolean] = {
     @volatile var connected = false
+    client.setServerId(MySQLServerId.next)
     client.registerEventListener(new EventListener() {
       override def onEvent(event: MEvent) = handleEvent(event)
     })
