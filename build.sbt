@@ -2,7 +2,7 @@ import Dependencies._
 
 lazy val commonSettings = Seq(
   name := "mypipe-asana-fork",
-  version := "1.0.1",
+  version := "1.0.2",
   organization := "com.github.asana",
   crossScalaVersions := Seq("2.11.12", "2.12.8"),
   exportJars := true,
