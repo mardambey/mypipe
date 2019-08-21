@@ -17,3 +17,4 @@ addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.1.6")
 
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.0")
 
+addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.4")
