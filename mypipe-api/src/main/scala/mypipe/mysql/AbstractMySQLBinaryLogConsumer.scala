@@ -17,12 +17,14 @@ import scala.concurrent.blocking
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
+import scala.util.Random
 
 abstract class AbstractMySQLBinaryLogConsumer
     extends AbstractBinaryLogConsumer[MEvent]
     with ConnectionSource {
 
   protected lazy val client = new BinaryLogClient(hostname, port, username, password)
+  private val random = new Random()
 
   def setBinaryLogPosition(binlogFileAndPos: BinaryLogFilePosition): Unit = {
     if (binlogFileAndPos != BinaryLogFilePosition.current) {
@@ -124,7 +126,7 @@ abstract class AbstractMySQLBinaryLogConsumer
 
   override protected def onStart(): Future[Boolean] = {
     @volatile var connected = false
-    client.setServerId(MySQLServerId.next)
+    client.setServerId(random.nextLong())
     client.registerEventListener(new EventListener() {
       override def onEvent(event: MEvent) = handleEvent(event)
     })
