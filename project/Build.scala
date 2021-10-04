@@ -2,8 +2,8 @@ import sbt._
 import Keys._
 
 object Dependencies {
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.5.11"
-  val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.5.11"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.5.23"
+  val akkaAgent = "com.typesafe.akka" %% "akka-agent" % "2.5.23"
   val avro = "org.apache.avro" % "avro" % "1.7.7"
   val commonsLang = "commons-lang" % "commons-lang" % "2.6" force()
   val guava = "com.google.guava" % "guava" % "19.0"
@@ -26,43 +26,4 @@ object Dependencies {
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val typesafeConfig = "com.typesafe" % "config" % "1.3.3"
   val xinject = "javax.inject" % "javax.inject" % "1"
-}
-
-object AvroCompiler {
-  import sbtavro.SbtAvro._
-
-  lazy val settingsTest = avroSettings ++ Seq(
-    sourceDirectory in avroConfig <<= (sourceDirectory in Test)(_ / "avro"),
-    version in avroConfig := "1.7.7"
-  )
-
-  lazy val settingsCompile = avroSettings ++ Seq(
-    version in avroConfig := "1.7.7"
-  )
-}
-
-object Format {
-  import com.typesafe.sbt.SbtScalariform._
-
-  lazy val settings = scalariformSettings ++ Seq(
-    ScalariformKeys.preferences := formattingPreferences
-  )
-
-  lazy val formattingPreferences = {
-    import scalariform.formatter.preferences._
-    FormattingPreferences().
-      setPreference(AlignParameters, true).
-      setPreference(AlignSingleLineCaseStatements, true).
-      setPreference(DoubleIndentClassDeclaration, true).
-      setPreference(IndentLocalDefs, true).
-      setPreference(IndentPackageBlocks, true).
-      setPreference(IndentSpaces, 2).
-      setPreference(MultilineScaladocCommentsStartOnFirstLine, true).
-      setPreference(PreserveSpaceBeforeArguments, false).
-      setPreference(PreserveDanglingCloseParenthesis, false).
-      setPreference(RewriteArrowSymbols, true).
-      setPreference(SpaceBeforeColon, false).
-      setPreference(SpaceInsideBrackets, false).
-      setPreference(SpacesWithinPatternBinders, true)
-  }
 }

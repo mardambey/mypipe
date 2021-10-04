@@ -1,4 +1,7 @@
 # mypipe
+
+## This repository is not maintained or supported by Asana, and is not accepting patches
+
 mypipe latches onto a MySQL server with binary log replication enabled and
 allows for the creation of pipes that can consume the replication stream and
 act on the data (primarily integrated with Apache Kafka).
