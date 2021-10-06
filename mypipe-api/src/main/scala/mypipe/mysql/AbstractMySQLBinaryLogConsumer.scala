@@ -129,11 +129,10 @@ abstract class AbstractMySQLBinaryLogConsumer
     // MySQL server id should be between 1 (inclusive) and 4294967295 (inclusive)
     // Source: https://dev.mysql.com/doc/refman/5.7/en/replication-options.html
 
-    val origin = 1L
-    val bound = 1L << 32
-
+    val lower = 1L
+    val upper = 4294967295L
     // Format is nextLong(lower_inclusive, upper_exclusive), or lower <= x < upper
-    ThreadLocalRandom.current().nextLong(origin, bound)
+    ThreadLocalRandom.current().nextLong(lower, upper + 1)
   }
 
   override protected def onStart(): Future[Boolean] = {
