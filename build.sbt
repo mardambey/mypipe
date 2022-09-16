@@ -30,7 +30,7 @@ lazy val apiDependencies = Seq(
   jug,
   logback,
   mysqlAsync,
-  mysqlBinlogConnectorJava,
+//  mysqlBinlogConnectorJava,
   scalaTest,
   slf4jApi,
   typesafeConfig
