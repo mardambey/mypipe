@@ -17,7 +17,7 @@ object Dependencies {
   val slf4jApi = "org.slf4j" % "slf4j-api" % "1.7.25" force()
   val mysqlAsync =  "com.github.mauricio" %% "mysql-async" % "0.2.21"
   // val mysqlBinlogConnectorJava = "com.github.shyiko" % "mysql-binlog-connector-java" % "0.2.4"
-//  val mysqlBinlogConnectorJava = "com.github.asana" % "mysql-binlog-connector-java-asana-fork" % "0.2.3"
+  val mysqlBinlogConnectorJava = "com.github.asana" % "mysql-binlog-connector-java-asana-fork" % "0.2.3"
   val rsApi = "javax.ws.rs" % "javax.ws.rs-api" % "2.0.1"
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.8" % "test"
   val schemaRepoClient = "org.schemarepo" % "schema-repo-client" % "0.1.3"

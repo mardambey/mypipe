@@ -18,7 +18,7 @@ lazy val commonSettings = Seq(
     "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/",
     "Typesafe Snapshots" at "https://repo.typesafe.com/typesafe/snapshots/",
     "Typesafe Repository" at "https://repo.typesafe.com/typesafe/releases/",
-    "Asana Repository" at "https://dl.bintray.com/asana/maven",
+    "Asana Repository" at "https://asana-oss-cache.s3.amazonaws.com/maven/release/",
     "Twitter Repository" at "https://maven.twttr.com/")
 )
 
@@ -30,7 +30,7 @@ lazy val apiDependencies = Seq(
   jug,
   logback,
   mysqlAsync,
-//  mysqlBinlogConnectorJava,
+  mysqlBinlogConnectorJava,
   scalaTest,
   slf4jApi,
   typesafeConfig
