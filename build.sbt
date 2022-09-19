@@ -2,7 +2,7 @@ import Dependencies._
 
 lazy val commonSettings = Seq(
   name := "mypipe-asana-fork",
-  version := "1.0.5",
+  version := "1.0.6",
   organization := "com.github.asana",
   // crossScalaVersions := Seq("2.12.14", "2.13.6"), // The dream, but https://github.com/mauricio/postgresql-async is not 2.13 compatible
   crossScalaVersions := Seq("2.12.14"),
