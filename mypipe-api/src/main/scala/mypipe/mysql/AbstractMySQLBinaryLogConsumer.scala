@@ -1,28 +1,23 @@
 package mypipe.mysql
 
-import com.github.shyiko.mysql.binlog.BinaryLogClient.{ LifecycleListener, EventListener }
-import com.github.shyiko.mysql.binlog.event.{ Event ⇒ MEvent, _ }
-import mypipe.api.consumer.AbstractBinaryLogConsumer
-import mypipe.api.data.{ UnknownTable, Column, Table, Row }
-import mypipe.api.event.Event
-import mypipe.api.event._
-
 import com.github.shyiko.mysql.binlog.BinaryLogClient
+import com.github.shyiko.mysql.binlog.BinaryLogClient.{EventListener, LifecycleListener}
 import com.github.shyiko.mysql.binlog.event.EventType._
+import com.github.shyiko.mysql.binlog.event.{Event => MEvent, _}
+import mypipe.api.consumer.AbstractBinaryLogConsumer
+import mypipe.api.data.{Column, Row, Table, UnknownTable}
+import mypipe.api.event.{Event, _}
 
+import java.util.concurrent.ThreadLocalRandom
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 import scala.compat.Platform
-import scala.concurrent.blocking
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-
-import java.util.concurrent.ThreadLocalRandom
+import scala.concurrent.Future
 
 abstract class AbstractMySQLBinaryLogConsumer
     extends AbstractBinaryLogConsumer[MEvent]
     with ConnectionSource {
+  protected def connectWaitTime: Long = 10000
 
   protected lazy val client = new BinaryLogClient(hostname, port, username, password)
 
@@ -144,12 +139,15 @@ abstract class AbstractMySQLBinaryLogConsumer
 
     client.registerLifecycleListener(new LifecycleListener {
       override def onDisconnect(client: BinaryLogClient) = handleDisconnect()
+
       override def onConnect(client: BinaryLogClient) = {
         log.info(s"connected = true")
         connected = true
         handleConnect()
       }
+
       override def onEventDeserializationFailure(client: BinaryLogClient, ex: Exception) {}
+
       override def onCommunicationFailure(client: BinaryLogClient, ex: Exception) {}
     })
 
@@ -164,7 +162,7 @@ abstract class AbstractMySQLBinaryLogConsumer
     clientThread.start
 
     val startTime = Platform.currentTime
-    while (Platform.currentTime - startTime < 10000 && !connected) Thread.sleep(10)
+    while (Platform.currentTime - startTime < connectWaitTime && !connected) Thread.sleep(10)
 
     Future.successful(connected)
   }
