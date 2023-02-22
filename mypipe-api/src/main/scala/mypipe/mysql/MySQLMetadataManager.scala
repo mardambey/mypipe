@@ -56,7 +56,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
     super.preRestart(reason, message)
   }
 
-  protected def getTableColumns(db: String, table: String, flushCache: Boolean): (List[ColumnMetadata], Option[PrimaryKey]) = {
+  protected def getTableColumns(db: String, table: String, flushCache: Boolean, timeoutForSqlQueries?: Duration = 1 seconds): (List[ColumnMetadata], Option[PrimaryKey]) = {
 
     if (flushCache) dbTableCols.remove(s"$db.$table")
 
@@ -72,7 +72,7 @@ class MySQLMetadataManager(hostname: String, port: Int, username: String, passwo
       val mapCols = getTableColumns(db, table, dbConn(0))
       val pKey = getPrimaryKey(db, table, dbConn(1))
 
-      val results = Await.result(Future.sequence(List(mapCols, pKey)), 1 seconds)
+      val results = Await.result(Future.sequence(List(mapCols, pKey)), timeoutForSqlQueries)
       val results1 = results(0)
       val results2 = results(1)
 
